@@ -15,9 +15,9 @@ try {
             $per  = min(100,max(5,(int)($_GET['per']??25)));
             $off  = ($page-1)*$per;
 
-            $where = "WHERE (v.placa LIKE :q OR v.marca LIKE :q OR p.nombre LIKE :q)";
-            $params = [':q' => $q];
-            if ($vid) { $where .= " AND c.vehiculo_id = :vid"; $params[':vid'] = $vid; }
+            $where = "WHERE (v.placa LIKE ? OR v.marca LIKE ? OR p.nombre LIKE ?)";
+            $params = [$q, $q, $q];
+            if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
 
             $totalStmt = $db->prepare("SELECT COUNT(*) FROM combustible c
                 LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
@@ -30,13 +30,15 @@ try {
             $statsStmt->execute($params);
             $stats = $statsStmt->fetch();
 
-            $params[':per'] = $per; $params[':off'] = $off;
+            $listParams = $params;
+            $listParams[] = $per;
+            $listParams[] = $off;
             $stmt = $db->prepare("SELECT c.*, v.placa, v.marca, p.nombre AS proveedor_nombre
                 FROM combustible c
                 LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
                 LEFT JOIN proveedores p ON p.id=c.proveedor_id
-                $where ORDER BY c.fecha DESC, c.id DESC LIMIT :per OFFSET :off");
-            $stmt->execute($params);
+                $where ORDER BY c.fecha DESC, c.id DESC LIMIT ? OFFSET ?");
+            $stmt->execute($listParams);
             $rows = $stmt->fetchAll();
 
             // Calcular rendimiento para cada fila
@@ -55,7 +57,11 @@ try {
             break;
 
         case 'POST':
-            require_role('admin','operador');
+            if (!can('create')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para crear registros de combustible.']);
+                break;
+            }
             $d = json_decode(file_get_contents('php://input'), true);
             $l = (float)$d['litros']; $c = (float)$d['costo_litro'];
             $stmt = $db->prepare("INSERT INTO combustible (fecha,vehiculo_id,litros,costo_litro,total,km,proveedor_id,tipo_carga,notas) VALUES (?,?,?,?,?,?,?,?,?)");
@@ -66,7 +72,11 @@ try {
             break;
 
         case 'PUT':
-            require_role('admin','operador');
+            if (!can('edit')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para editar registros de combustible.']);
+                break;
+            }
             $d = json_decode(file_get_contents('php://input'), true);
             $l=(float)$d['litros']; $c=(float)$d['costo_litro'];
             $stmt = $db->prepare("UPDATE combustible SET fecha=?,vehiculo_id=?,litros=?,costo_litro=?,total=?,km=?,proveedor_id=?,tipo_carga=?,notas=? WHERE id=?");
@@ -75,7 +85,11 @@ try {
             break;
 
         case 'DELETE':
-            require_role('admin');
+            if (!can('delete')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para eliminar registros de combustible.']);
+                break;
+            }
             $db->prepare("DELETE FROM combustible WHERE id=?")->execute([(int)$_GET['id']]);
             echo json_encode(['ok'=>true]);
             break;

@@ -26,10 +26,20 @@
   <p>Este script creará la base de datos y tablas necesarias para el sistema.</p>
 
 <?php
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'flotacontrol');
+// Cargar .env si existe
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if (!$line || str_starts_with($line,'#') || !str_contains($line,'=')) continue;
+        [$k,$v] = explode('=', $line, 2);
+        putenv(trim($k).'='.trim(trim($v),'"\''));
+    }
+}
+define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'flotacontrol');
 
 $log = [];
 $ok  = true;
@@ -72,7 +82,7 @@ $tables = [
   nombre        VARCHAR(100) NOT NULL,
   email         VARCHAR(150) NOT NULL UNIQUE,
   password      VARCHAR(255) NOT NULL,
-  rol           ENUM('admin','operador','lectura') NOT NULL DEFAULT 'operador',
+  rol           ENUM('coordinador_it','soporte','monitoreo','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo',
   activo        TINYINT(1) NOT NULL DEFAULT 1,
   ultimo_acceso DATETIME NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -187,29 +197,63 @@ foreach ($tables as $name => $sql) {
     }
 }
 
-// 4. Usuario admin por defecto
-$adminEmail = 'admin@flotacontrol.local';
-$adminPass  = 'Admin1234!';
-try {
-    $exists = $pdo->query("SELECT COUNT(*) FROM usuarios WHERE email = '{$adminEmail}'")->fetchColumn();
-    if (!$exists) {
-        $hash = password_hash($adminPass, PASSWORD_DEFAULT);
-        $pdo->exec("INSERT INTO usuarios (nombre, email, password, rol) VALUES ('Administrador', '{$adminEmail}', '{$hash}', 'admin')");
-        step("Usuario administrador creado", true);
-    } else {
-        step("Usuario administrador ya existe", true, "No se sobreescribió");
+// 4. Usuarios iniciales del sistema
+$usuarios_iniciales = [
+    [
+        'nombre' => 'Coordinador IT',
+        'email'  => 'coordinador@flotacontrol.local',
+        'pass'   => 'CoordIT2024x',
+        'rol'    => 'coordinador_it',
+    ],
+    [
+        'nombre' => 'Soporte Sistema',
+        'email'  => 'soporte@flotacontrol.local',
+        'pass'   => 'Soporte2024x',
+        'rol'    => 'soporte',
+    ],
+    [
+        'nombre' => 'Monitor Flota',
+        'email'  => 'monitoreo@flotacontrol.local',
+        'pass'   => 'Monitor2024x',
+        'rol'    => 'monitoreo',
+    ],
+    [
+        'nombre' => 'Dev Test',
+        'email'  => 'dev@flotacontrol.local',
+        'pass'   => 'DevTest2024x',
+        'rol'    => 'coordinador_it',
+    ],
+];
+foreach ($usuarios_iniciales as $u) {
+    try {
+        $exists = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = ?");
+        $exists->execute([$u['email']]);
+        if (!$exists->fetchColumn()) {
+            $hash = password_hash($u['pass'], PASSWORD_DEFAULT);
+            $pdo->prepare("INSERT INTO usuarios (nombre,email,password,rol) VALUES (?,?,?,?)")
+                ->execute([$u['nombre'], $u['email'], $hash, $u['rol']]);
+            step("Usuario '{$u['nombre']}' ({$u['rol']}) creado", true);
+        } else {
+            step("Usuario '{$u['email']}' ya existe", true, "No se sobreescribió");
+        }
+    } catch (PDOException $e) {
+        step("Crear usuario '{$u['nombre']}'", false, $e->getMessage());
     }
-} catch (PDOException $e) {
-    step("Crear usuario admin", false, $e->getMessage());
 }
 
 if ($ok): ?>
 <div class="creds">
   <strong>✅ Instalación completada</strong><br><br>
-  Accede con estas credenciales iniciales:<br><br>
-  📧 <strong>Email:</strong> admin@flotacontrol.local<br>
-  🔒 <strong>Contraseña:</strong> Admin1234!<br><br>
-  <small style="color:#ff4757">⚠️ Cambia la contraseña al ingresar. Elimina este archivo <code>install.php</code> del servidor.</small>
+  <strong style="color:var(--accent,#e8ff47)">Usuarios creados:</strong><br><br>
+  🔑 <strong>Coordinador IT</strong> (admin total)<br>
+  &nbsp;&nbsp;&nbsp;📧 coordinador@flotacontrol.local &nbsp;|&nbsp; 🔒 CoordIT2024x<br><br>
+  🛠️ <strong>Soporte</strong> (crear/editar)<br>
+  &nbsp;&nbsp;&nbsp;📧 soporte@flotacontrol.local &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp; 🔒 Soporte2024x<br><br>
+  👁️ <strong>Monitoreo</strong> (solo lectura)<br>
+  &nbsp;&nbsp;&nbsp;📧 monitoreo@flotacontrol.local &nbsp;|&nbsp; 🔒 Monitor2024x<br><br>
+  🧪 <strong>Dev Test</strong> (coordinador_it)<br>
+  &nbsp;&nbsp;&nbsp;📧 dev@flotacontrol.local &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp; 🔒 DevTest2024x<br><br>
+  <small style="color:#ff4757">⚠️ Cambia las contraseñas al ingresar. Elimina <code>install.php</code> del servidor.</small>
 </div>
 <a href="/index.php" class="btn">Ir al sistema →</a>
 <?php else: ?>

@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/layout.php';
 require_login();
-require_role('admin');
+require_admin();
 ob_start();
 ?>
 <div class="toolbar">
@@ -23,18 +23,18 @@ ob_start();
         <input name="password" type="password" id="pass-input" placeholder="Mínimo 6 caracteres"></div>
       <div class="form-group"><label>Rol</label>
         <select name="rol">
-          <option value="operador">Operador (crear/editar)</option>
-          <option value="lectura">Solo lectura</option>
-          <option value="admin">Administrador</option>
+          <option value="monitoreo">👁 Monitoreo (solo lectura)</option>
+          <option value="soporte">🛠 Soporte (crear/editar)</option>
+          <option value="coordinador_it">🔑 Coordinador IT (admin total)</option>
         </select></div>
       <div class="form-group"><label>Estado</label>
         <select name="activo"><option value="1">Activo</option><option value="0">Inactivo</option></select></div>
     </div>
     <div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text2)">
-      <strong style="color:var(--accent)">Roles:</strong><br>
-      🔑 <strong>Admin</strong> — Acceso total, gestión de usuarios<br>
-      ✏️ <strong>Operador</strong> — Puede crear y editar registros<br>
-      👁️ <strong>Lectura</strong> — Solo puede ver información
+      <strong style="color:var(--accent)">Roles del sistema:</strong><br>
+      🔑 <strong>Coordinador IT</strong> — Acceso total, administra usuarios y permisos<br>
+      🛠️ <strong>Soporte</strong> — Puede ver, crear y editar registros<br>
+      👁️ <strong>Monitoreo</strong> — Solo puede visualizar información (lectura)
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
@@ -44,13 +44,14 @@ async function load(){
   const q=(document.getElementById('s').value||'').toLowerCase();
   const data=await api('/api/usuarios.php');
   const rows=data.rows.filter(u=>!q||u.nombre.toLowerCase().includes(q)||u.email.toLowerCase().includes(q));
-  const EB={'admin':'badge-yellow','operador':'badge-blue','lectura':'badge-gray'};
+  const EB={'coordinador_it':'badge-yellow','soporte':'badge-blue','monitoreo':'badge-cyan','admin':'badge-yellow','operador':'badge-blue','lectura':'badge-gray'};
+  const RL={'coordinador_it':'Coordinador IT','soporte':'Soporte','monitoreo':'Monitoreo','admin':'Admin','operador':'Operador','lectura':'Lectura'};
   const tbody=document.getElementById('tbody');
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">🔑</div><div class="empty-title">Sin usuarios</div></div></td></tr>`;return;}
   tbody.innerHTML=rows.map(u=>`<tr>
     <td><strong>${u.nombre}</strong></td>
     <td>${u.email}</td>
-    <td><span class="badge ${EB[u.rol]||'badge-gray'}">${u.rol}</span></td>
+    <td><span class="badge ${EB[u.rol]||'badge-gray'}">${RL[u.rol]||u.rol}</span></td>
     <td><span class="badge ${u.activo=='1'?'badge-green':'badge-red'}">${u.activo=='1'?'Activo':'Inactivo'}</span></td>
     <td>${u.ultimo_acceso||'—'}</td>
     <td>${u.created_at?.split(' ')[0]||'—'}</td>

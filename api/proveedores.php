@@ -10,28 +10,40 @@ try {
         case 'GET':
             $q='%'.trim($_GET['q']??'').'%';
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $total=$db->prepare("SELECT COUNT(*) FROM proveedores WHERE nombre LIKE :q OR tipo LIKE :q OR telefono LIKE :q");
-            $total->execute([':q'=>$q]);
-            $stmt=$db->prepare("SELECT * FROM proveedores WHERE nombre LIKE :q OR tipo LIKE :q OR telefono LIKE :q ORDER BY nombre ASC LIMIT :per OFFSET :off");
-            $stmt->execute([':q'=>$q,':per'=>$per,':off'=>$off]);
+            $total=$db->prepare("SELECT COUNT(*) FROM proveedores WHERE nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ?");
+            $total->execute([$q,$q,$q]);
+            $stmt=$db->prepare("SELECT * FROM proveedores WHERE nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ? ORDER BY nombre ASC LIMIT ? OFFSET ?");
+            $stmt->execute([$q,$q,$q,$per,$off]);
             echo json_encode(['total'=>(int)$total->fetchColumn(),'rows'=>$stmt->fetchAll()]);
             break;
         case 'POST':
-            require_role('admin','operador');
+            if (!can('create')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para crear proveedores.']);
+                break;
+            }
             $d=json_decode(file_get_contents('php://input'),true);
             $db->prepare("INSERT INTO proveedores (nombre,tipo,telefono,email,direccion,notas) VALUES (?,?,?,?,?,?)")
                ->execute([$d['nombre'],$d['tipo'],$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null]);
             echo json_encode(['id'=>$db->lastInsertId(),'ok'=>true]);
             break;
         case 'PUT':
-            require_role('admin','operador');
+            if (!can('edit')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para editar proveedores.']);
+                break;
+            }
             $d=json_decode(file_get_contents('php://input'),true);
             $db->prepare("UPDATE proveedores SET nombre=?,tipo=?,telefono=?,email=?,direccion=?,notas=? WHERE id=?")
                ->execute([$d['nombre'],$d['tipo'],$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null,$d['id']]);
             echo json_encode(['ok'=>true]);
             break;
         case 'DELETE':
-            require_role('admin');
+            if (!can('delete')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para eliminar proveedores.']);
+                break;
+            }
             $db->prepare("DELETE FROM proveedores WHERE id=?")->execute([(int)$_GET['id']]);
             echo json_encode(['ok'=>true]);
             break;

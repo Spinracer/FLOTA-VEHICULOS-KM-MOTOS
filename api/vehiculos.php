@@ -32,7 +32,11 @@ try {
             break;
 
         case 'POST':
-            require_role('admin', 'operador');
+            if (!can('create')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para crear vehículos.']);
+                break;
+            }
             $d = json_decode(file_get_contents('php://input'), true);
             $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
@@ -47,7 +51,11 @@ try {
             break;
 
         case 'PUT':
-            require_role('admin', 'operador');
+            if (!can('edit')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para editar vehículos.']);
+                break;
+            }
             $d = json_decode(file_get_contents('php://input'), true);
             $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=? WHERE id=?");
             $stmt->execute([
@@ -61,7 +69,11 @@ try {
             break;
 
         case 'DELETE':
-            require_role('admin');
+            if (!can('delete')) {
+                http_response_code(403);
+                echo json_encode(['error' => 'No tienes permisos para eliminar vehículos.']);
+                break;
+            }
             $id = (int)($_GET['id'] ?? 0);
             $db->prepare("DELETE FROM vehiculos WHERE id = ?")->execute([$id]);
             echo json_encode(['ok' => true]);

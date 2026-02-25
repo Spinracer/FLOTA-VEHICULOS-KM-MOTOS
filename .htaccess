@@ -1,0 +1,20 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bloquear acceso directo al .env
+    RewriteRule ^\.env$ - [F,L]
+
+    # Bloquear acceso a includes/
+    RewriteRule ^includes/ - [F,L]
+
+    # Permitir acceso a archivos y directorios existentes
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+</IfModule>
+
+# Seguridad: ocultar versión de PHP
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+</IfModule>

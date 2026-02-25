@@ -5,13 +5,17 @@ $user = current_user();
 function render_layout(string $page_title, string $active_page, string $content) {
     global $user;
     ob_start();
+    $rol = $user['rol'];
+    $is_admin   = in_array($rol, ['coordinador_it', 'admin']);
+    $can_edit   = can('edit');
+    $can_create = can('create');
     ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= htmlspecialchars($page_title) ?> — FlotaControl</title>
+<title><?= htmlspecialchars($page_title) ?> — <?= APP_NAME ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
@@ -33,6 +37,7 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/combustible.php" class="nav-item <?= $active_page==='combustible'?'active':'' ?>">
       <span class="nav-icon">⛽</span><span>Combustible</span>
     </a>
+
     <div class="nav-section">Gestión</div>
     <a href="/mantenimientos.php" class="nav-item <?= $active_page==='mantenimientos'?'active':'' ?>">
       <span class="nav-icon">🔧</span><span>Mantenimientos</span>
@@ -43,6 +48,8 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/recordatorios.php" class="nav-item <?= $active_page==='recordatorios'?'active':'' ?>">
       <span class="nav-icon">🔔</span><span>Recordatorios</span>
     </a>
+
+    <?php if ($can_edit || $is_admin): ?>
     <div class="nav-section">Administración</div>
     <a href="/operadores.php" class="nav-item <?= $active_page==='operadores'?'active':'' ?>">
       <span class="nav-icon">👤</span><span>Operadores</span>
@@ -50,19 +57,22 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/proveedores.php" class="nav-item <?= $active_page==='proveedores'?'active':'' ?>">
       <span class="nav-icon">🏪</span><span>Proveedores</span>
     </a>
-    <?php if ($user['rol'] === 'admin'): ?>
+    <?php endif; ?>
+
+    <?php if ($is_admin): ?>
     <div class="nav-section">Sistema</div>
     <a href="/usuarios.php" class="nav-item <?= $active_page==='usuarios'?'active':'' ?>">
       <span class="nav-icon">🔑</span><span>Usuarios</span>
     </a>
     <?php endif; ?>
   </nav>
+
   <div class="sidebar-footer">
     <div class="user-info">
-      <div class="user-avatar"><?= strtoupper(substr($user['nombre'],0,1)) ?></div>
+      <div class="user-avatar"><?= strtoupper(substr($user['nombre'], 0, 1)) ?></div>
       <div>
         <div class="user-name"><?= htmlspecialchars($user['nombre']) ?></div>
-        <div class="user-role badge badge-<?= $user['rol']==='admin'?'yellow':($user['rol']==='operador'?'blue':'gray') ?>"><?= $user['rol'] ?></div>
+        <div class="user-role badge <?= role_badge($rol) ?>"><?= role_label($rol) ?></div>
       </div>
     </div>
     <a href="/logout.php" class="btn-logout">Cerrar sesión</a>
@@ -72,8 +82,13 @@ function render_layout(string $page_title, string $active_page, string $content)
 <div id="main">
   <header class="topbar">
     <div class="topbar-title"><?= htmlspecialchars($page_title) ?></div>
-    <div class="topbar-actions" id="topbar-actions"></div>
+    <div class="topbar-actions" id="topbar-actions">
+      <?php if ($rol === 'monitoreo'): ?>
+        <span class="badge badge-cyan" style="padding:6px 12px;font-size:11px">👁 Modo solo lectura</span>
+      <?php endif; ?>
+    </div>
   </header>
+  <script src="/assets/app.js"></script>
   <div class="page-content">
     <?= $content ?>
   </div>
@@ -81,7 +96,12 @@ function render_layout(string $page_title, string $active_page, string $content)
 
 <div id="toast-container"></div>
 
-<script src="/assets/app.js"></script>
+<script>
+// Pasar permisos del rol al JS
+const USER_ROLE = <?= json_encode($rol) ?>;
+const USER_CAN  = <?= json_encode(array_values(ROLE_PERMISSIONS[$rol] ?? [])) ?>;
+function userCan(perm) { return USER_CAN.includes(perm); }
+</script>
 </body>
 </html>
 <?php
