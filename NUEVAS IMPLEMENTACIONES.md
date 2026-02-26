@@ -99,9 +99,9 @@
 - [ ] URLs firmadas o descarga controlada
 
 ### 4.3 Odómetro
-- [ ] Tabla `odometer_logs`
-- [ ] Bloqueo de odómetro decreciente con override justificado
-- [ ] Auto-registro de odómetro en flujos críticos
+- [x] Tabla `odometer_logs`
+- [x] Bloqueo de odómetro decreciente con override justificado (API)
+- [x] Auto-registro de odómetro en flujos críticos (vehículos/combustible/mantenimientos)
 - [x] Actualización de `km_actual` del vehículo al registrar combustible/mantenimiento (parcial)
 
 **Aceptación**

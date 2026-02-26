@@ -187,6 +187,18 @@ $tables = [
   FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+"odometer_logs" => "CREATE TABLE IF NOT EXISTS odometer_logs (
+  id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+  vehicle_id  INT NOT NULL,
+  reading_km  DECIMAL(10,1) NOT NULL,
+  source      VARCHAR(30) NOT NULL,
+  recorded_at DATETIME NOT NULL,
+  user_id     INT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_odo_vehicle_date (vehicle_id, recorded_at),
+  CONSTRAINT fk_odometer_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehiculos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 "audit_logs" => "CREATE TABLE IF NOT EXISTS audit_logs (
   id           BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id      INT NULL,
@@ -206,12 +218,12 @@ $tables = [
 ];
 
 foreach ($tables as $name => $sql) {
-    try {
-        $pdo->exec($sql);
-        step("Tabla '{$name}' creada", true);
-    } catch (PDOException $e) {
-        step("Tabla '{$name}'", false, $e->getMessage());
-    }
+  try {
+    $pdo->exec($sql);
+    step("Tabla '{$name}' creada", true);
+  } catch (Throwable $e) {
+    step("Tabla '{$name}'", false, $e->getMessage());
+  }
 }
 
 // 4. Usuarios iniciales del sistema

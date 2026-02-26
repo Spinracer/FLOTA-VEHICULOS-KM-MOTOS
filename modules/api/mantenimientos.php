@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
+require_once __DIR__ . '/../../includes/odometro.php';
 require_login();
 header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
@@ -39,10 +40,18 @@ try {
                 break;
             }
             $d = json_decode(file_get_contents('php://input'),true);
+            $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
+            $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
+            odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado) VALUES (?,?,?,?,?,?,?,?,?)");
             $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado']]);
-            if ($d['km']) $db->prepare("UPDATE vehiculos SET km_actual=GREATEST(km_actual,?) WHERE id=?")->execute([$d['km'],$d['vehiculo_id']]);
+            if ($km) {
+                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+            }
             $newId = (int)$db->lastInsertId();
+            if ($allowOverride) {
+                audit_log('mantenimientos', 'odometro_override', $newId, [], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
+            }
             audit_log('mantenimientos', 'create', $newId, [], $d);
             echo json_encode(['id'=>$newId,'ok'=>true]);
             break;
@@ -56,8 +65,17 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM mantenimientos WHERE id=? LIMIT 1");
             $prevStmt->execute([(int)$d['id']]);
             $prev = $prevStmt->fetch() ?: [];
+            $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
+            $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
+            odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,proximo_km=?,proveedor_id=?,estado=? WHERE id=?");
             $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado'],$d['id']]);
+            if ($km) {
+                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+            }
+            if ($allowOverride) {
+                audit_log('mantenimientos', 'odometro_override', (int)$d['id'], ['km_anterior' => $prev['km'] ?? null], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
+            }
             audit_log('mantenimientos', 'update', (int)$d['id'], $prev, $d);
             echo json_encode(['ok'=>true]);
             break;
@@ -76,4 +94,4 @@ try {
             echo json_encode(['ok'=>true]);
             break;
     }
-} catch (PDOException $e) { http_response_code(500); echo json_encode(['error'=>$e->getMessage()]); }
+} catch (Throwable $e) { http_response_code(500); echo json_encode(['error'=>$e->getMessage()]); }
