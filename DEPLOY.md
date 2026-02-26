@@ -65,4 +65,5 @@ App disponible en: `http://127.0.0.1:8000`
 - Menú principal debe mostrar Asignaciones
 - En Proveedores debe existir campo de taller autorizado
 - Usuarios admin permite crear rol Taller con proveedor asignado
+- Operadores debe permitir abrir historial consolidado (📚)
 - Operaciones CRUD deben registrar actividad en `audit_logs`

@@ -50,6 +50,7 @@ async function load(){
       <td><span class="badge ${lb}">${r.venc_licencia||lt}</span></td>
       <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
       <?php if(can('edit')): ?><td><div class="action-btns">
+        <button class="btn btn-ghost btn-sm" onclick="verHistorial(${r.id})">📚</button>
         <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
         <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="del(${r.id})">🗑️</button><?php endif; ?>
       </div></td><?php endif; ?>
@@ -60,6 +61,41 @@ function abrirNuevo(){document.getElementById('mtitle').textContent='👤 Nuevo 
 function editar(r){document.getElementById('mtitle').textContent='✏️ Editar Operador';fillForm('modal',{id:r.id,nombre:r.nombre,licencia:r.licencia,categoria_lic:r.categoria_lic,venc_licencia:r.venc_licencia,telefono:r.telefono,email:r.email,estado:r.estado,notas:r.notas});openModal('modal');}
 async function guardar(){const d=getForm('modal');if(!d.nombre){toast('El nombre es obligatorio','error');return;}await api('/api/operadores.php',d.id?'PUT':'POST',d);toast(d.id?'Actualizado':'Operador registrado');closeModal('modal');load();}
 async function del(id){confirmDelete('¿Eliminar este operador?',async()=>{await api(`/api/operadores.php?id=${id}`,'DELETE');toast('Eliminado','warning');load();});}
+
+async function verHistorial(id){
+  const h = await api(`/api/operadores.php?action=history&id=${id}`);
+  const op = h.operador || {};
+  const asg = h.asignaciones || [];
+  const fuel = h.combustible || [];
+  const inc = h.incidentes || [];
+
+  const htmlAsg = asg.length
+    ? `<table><thead><tr><th>ID</th><th>Vehículo</th><th>Inicio</th><th>Fin</th><th>Estado</th></tr></thead><tbody>${asg.map(a=>`<tr><td>${a.id}</td><td>${a.placa||''}</td><td>${a.start_at||'—'}</td><td>${a.end_at||'—'}</td><td>${a.estado||'—'}</td></tr>`).join('')}</tbody></table>`
+    : `<div class="empty" style="margin-top:8px"><div class="empty-title">Sin asignaciones</div></div>`;
+
+  const htmlFuel = fuel.length
+    ? `<table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Litros</th><th>Total</th><th>Asignación</th></tr></thead><tbody>${fuel.map(c=>`<tr><td>${c.fecha}</td><td>${c.placa||'—'}</td><td>${Number(c.litros||0).toFixed(2)}</td><td>$${Number(c.total||0).toFixed(2)}</td><td>#${c.asignacion_id||'—'}</td></tr>`).join('')}</tbody></table>`
+    : `<div class="empty" style="margin-top:8px"><div class="empty-title">Sin combustible asociado</div></div>`;
+
+  const htmlInc = inc.length
+    ? `<table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Severidad</th><th>Estado</th></tr></thead><tbody>${inc.map(i=>`<tr><td>${i.fecha}</td><td>${i.placa||'—'}</td><td>${i.tipo||'—'}</td><td>${i.severidad||'—'}</td><td>${i.estado||'—'}</td></tr>`).join('')}</tbody></table>`
+    : `<div class="empty" style="margin-top:8px"><div class="empty-title">Sin incidentes asociados</div></div>`;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg open';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:980px">
+      <div class="modal-title">📚 Historial de ${op.nombre || 'Operador'}</div>
+      <div style="display:grid;gap:14px;max-height:70vh;overflow:auto;padding-right:4px">
+        <div><h4 style="margin-bottom:8px">Asignaciones (${asg.length})</h4>${htmlAsg}</div>
+        <div><h4 style="margin-bottom:8px">Combustible asociado (${fuel.length})</h4>${htmlFuel}</div>
+        <div><h4 style="margin-bottom:8px">Incidentes asociados (${inc.length})</h4>${htmlInc}</div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest('.modal-bg').remove()">Cerrar</button></div>
+    </div>`;
+  wrap.addEventListener('click', (e)=>{ if(e.target===wrap) wrap.remove(); });
+  document.body.appendChild(wrap);
+}
 document.addEventListener('DOMContentLoaded',load);
 </script>
 <?php $content=ob_get_clean(); echo render_layout('Operadores','operadores',$content); ?>

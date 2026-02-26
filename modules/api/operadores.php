@@ -9,6 +9,61 @@ $db = getDB();
 try {
     switch ($method) {
         case 'GET':
+            if (($_GET['action'] ?? '') === 'history') {
+                $id = (int)($_GET['id'] ?? 0);
+                if ($id <= 0) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'ID de operador inválido.']);
+                    break;
+                }
+
+                $opStmt = $db->prepare("SELECT id,nombre,estado FROM operadores WHERE id=? LIMIT 1");
+                $opStmt->execute([$id]);
+                $op = $opStmt->fetch();
+                if (!$op) {
+                    http_response_code(404);
+                    echo json_encode(['error' => 'Operador no encontrado.']);
+                    break;
+                }
+
+                $asgStmt = $db->prepare("SELECT a.id, a.vehiculo_id, v.placa, v.marca, a.start_at, a.end_at, a.start_km, a.end_km, a.estado
+                    FROM asignaciones a
+                    JOIN vehiculos v ON v.id=a.vehiculo_id
+                    WHERE a.operador_id=?
+                    ORDER BY a.id DESC
+                    LIMIT 100");
+                $asgStmt->execute([$id]);
+                $asignaciones = $asgStmt->fetchAll();
+
+                $fuelStmt = $db->prepare("SELECT DISTINCT c.id, c.fecha, c.vehiculo_id, v.placa, c.litros, c.total, c.km, a.id AS asignacion_id
+                    FROM combustible c
+                    JOIN asignaciones a ON a.vehiculo_id=c.vehiculo_id AND a.operador_id=?
+                        AND c.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))
+                    JOIN vehiculos v ON v.id=c.vehiculo_id
+                    ORDER BY c.fecha DESC, c.id DESC
+                    LIMIT 200");
+                $fuelStmt->execute([$id]);
+                $combustible = $fuelStmt->fetchAll();
+
+                $incStmt = $db->prepare("SELECT DISTINCT i.id, i.fecha, i.vehiculo_id, v.placa, i.tipo, i.severidad, i.estado, a.id AS asignacion_id
+                    FROM incidentes i
+                    JOIN asignaciones a ON a.vehiculo_id=i.vehiculo_id AND a.operador_id=?
+                        AND i.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))
+                    JOIN vehiculos v ON v.id=i.vehiculo_id
+                    ORDER BY i.fecha DESC, i.id DESC
+                    LIMIT 200");
+                $incStmt->execute([$id]);
+                $incidentes = $incStmt->fetchAll();
+
+                echo json_encode([
+                    'operador' => $op,
+                    'asignaciones' => $asignaciones,
+                    'combustible' => $combustible,
+                    'incidentes' => $incidentes,
+                ]);
+                break;
+            }
+
             $q='%'.trim($_GET['q']??'').'%';
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
             $total=$db->prepare("SELECT COUNT(*) FROM operadores WHERE nombre LIKE ? OR licencia LIKE ? OR telefono LIKE ?");

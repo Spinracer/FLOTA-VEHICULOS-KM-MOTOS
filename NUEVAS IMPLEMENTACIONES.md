@@ -131,8 +131,8 @@
 - [x] CRUD de conductores/operadores (datos básicos)
 - [x] Estado activo/inactivo/suspendido en operador
 - [ ] Documentos de licencia con adjuntos
-- [ ] Historial de asignaciones/combustible/incidentes por conductor
-- [ ] Regla: conductor inactivo no puede asignarse
+- [x] Historial de asignaciones/combustible/incidentes por conductor
+- [x] Regla: conductor inactivo no puede asignarse
 
 **Aceptación**
 - Perfil del conductor auditable con historial.
