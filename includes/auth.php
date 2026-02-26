@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/audit.php';
 
 // ─────────────────────────────────────────────────────────
 // ROLES DEL SISTEMA
@@ -140,6 +141,10 @@ function login(string $email, string $password): bool {
         $db->prepare(
             "UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?"
         )->execute([$user['id']]);
+        audit_log('auth', 'login', (int)$user['id'], [], [
+            'email' => $user['email'],
+            'rol'   => $user['rol']
+        ]);
         return true;
     }
     return false;
@@ -147,6 +152,10 @@ function login(string $email, string $password): bool {
 
 function logout(): void {
     session_init();
+    audit_log('auth', 'logout', (int)($_SESSION['user_id'] ?? 0), [], [
+        'email' => $_SESSION['user_email'] ?? null,
+        'rol'   => $_SESSION['user_rol'] ?? null
+    ]);
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $p = session_get_cookie_params();

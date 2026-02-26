@@ -186,6 +186,23 @@ $tables = [
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"audit_logs" => "CREATE TABLE IF NOT EXISTS audit_logs (
+  id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id      INT NULL,
+  user_email   VARCHAR(150) NULL,
+  user_rol     VARCHAR(50) NULL,
+  entidad      VARCHAR(80) NOT NULL,
+  entidad_id   BIGINT NULL,
+  accion       VARCHAR(40) NOT NULL,
+  antes_json   JSON NULL,
+  despues_json JSON NULL,
+  meta_json    JSON NULL,
+  ip           VARCHAR(45) NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_audit_entidad_fecha (entidad, created_at),
+  INDEX idx_audit_user_fecha (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ];
 
 foreach ($tables as $name => $sql) {
