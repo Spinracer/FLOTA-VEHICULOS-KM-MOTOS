@@ -36,18 +36,21 @@ C:\xampp\htdocs\flotacontrol\
 
 ---
 
-### 2. Configurar la conexión MySQL
+### 2. Configurar variables de entorno
 
-Edita el archivo `includes/db.php` con tus datos de conexión:
+1) Copia `.env.example` a `.env`.
 
-```php
-define('DB_HOST', 'localhost');   // Host de MySQL
-define('DB_NAME', 'flotacontrol'); // Nombre de la base de datos
-define('DB_USER', 'root');         // Tu usuario MySQL
-define('DB_PASS', '');             // Tu contraseña MySQL
+2) Edita `.env` con tus datos:
+
+```env
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=flotacontrol
+DB_USER=root
+DB_PASS=
 ```
 
-También actualiza los mismos datos en `install.php` (líneas 8-11).
+`includes/db.php` e `install.php` ya leen estas variables automáticamente.
 
 ---
 
@@ -67,10 +70,12 @@ El instalador creará:
 
 ### 4. Credenciales iniciales
 
-| Campo | Valor |
-|---|---|
-| Email | `admin@flotacontrol.local` |
-| Contraseña | `Admin1234!` |
+| Perfil | Email | Contraseña |
+|---|---|---|
+| Coordinador IT | `coordinador@flotacontrol.local` | `CoordIT2024x` |
+| Soporte | `soporte@flotacontrol.local` | `Soporte2024x` |
+| Monitoreo | `monitoreo@flotacontrol.local` | `Monitor2024x` |
+| Dev Test | `dev@flotacontrol.local` | `DevTest2024x` |
 
 > ⚠️ **Cambia la contraseña** desde `Sistema > Usuarios` al ingresar por primera vez.
 
@@ -102,9 +107,9 @@ Para conocer la IP de tu servidor:
 
 | Rol | Permisos |
 |---|---|
-| **Admin** | Acceso total + gestión de usuarios del sistema |
-| **Operador** | Ver + Crear + Editar registros |
-| **Lectura** | Solo visualización de información |
+| **Coordinador IT** | Acceso total + gestión de usuarios y permisos |
+| **Soporte** | Ver + Crear + Editar registros |
+| **Monitoreo** | Solo visualización |
 
 ---
 
@@ -114,18 +119,18 @@ Para conocer la IP de tu servidor:
 flotacontrol/
 ├── index.php              ← Pantalla de login
 ├── logout.php
-├── dashboard.php          ← Panel principal con KPIs
-├── vehiculos.php          ← Inventario de vehículos
-├── combustible.php        ← Cargas de combustible
-├── mantenimientos.php     ← Bitácora de mantenimientos
-├── incidentes.php         ← Reporte de incidentes
-├── recordatorios.php      ← Alertas y vencimientos
-├── operadores.php         ← Gestión de operadores
-├── proveedores.php        ← Talleres y estaciones
-├── usuarios.php           ← Gestión de usuarios (solo admin)
+├── dashboard.php          ← Entrada (wrapper) al módulo
+├── vehiculos.php          ← Entrada (wrapper) al módulo
+├── combustible.php        ← Entrada (wrapper) al módulo
+├── mantenimientos.php     ← Entrada (wrapper) al módulo
+├── incidentes.php         ← Entrada (wrapper) al módulo
+├── recordatorios.php      ← Entrada (wrapper) al módulo
+├── operadores.php         ← Entrada (wrapper) al módulo
+├── proveedores.php        ← Entrada (wrapper) al módulo
+├── usuarios.php           ← Entrada (wrapper) al módulo
 ├── install.php            ← Instalador (eliminar después de usar)
 │
-├── api/                   ← Endpoints JSON (AJAX)
+├── api/                   ← Wrappers de endpoints JSON
 │   ├── vehiculos.php
 │   ├── combustible.php
 │   ├── mantenimientos.php
@@ -134,6 +139,10 @@ flotacontrol/
 │   ├── operadores.php
 │   ├── proveedores.php
 │   └── usuarios.php
+│
+├── modules/
+│   ├── web/               ← Implementación real de páginas
+│   └── api/               ← Implementación real de endpoints
 │
 ├── includes/
 │   ├── db.php             ← Configuración PDO MySQL
@@ -187,7 +196,7 @@ mysql -u root -p flotacontrol < respaldo_20240101.sql
 ## 🐛 Solución de problemas comunes
 
 **"Error de conexión a la base de datos"**
-→ Verifica `DB_HOST`, `DB_USER` y `DB_PASS` en `includes/db.php`
+→ Verifica `DB_HOST`, `DB_USER` y `DB_PASS` en `.env`
 
 **Página en blanco o error 500**
 → Activa la visualización de errores en PHP o revisa el log de Apache/Nginx

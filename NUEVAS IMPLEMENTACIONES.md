@@ -1,452 +1,328 @@
-# Fleet Management System (Laravel + MySQL) — Implementation Task Plan
+# Sistema de Gestión de Flota (Laravel + MySQL) — Plan de Implementación
 
-> Goal: A production-grade fleet management system (TuFlota-like) with strict business rules, detailed maintenance & fuel control, vehicle assignment locks, attachments (photos/docs), inventory of vehicle components/tools, and powerful exportable reports (CSV/XLSX/PDF).
+> Objetivo: un sistema de flota de nivel productivo (tipo TuFlota) con reglas de negocio estrictas, control detallado de mantenimiento y combustible, bloqueos de asignación de vehículo, adjuntos (fotos/documentos), inventario de componentes/herramientas por vehículo y reportes exportables (CSV/XLSX/PDF).
 >
-> Stack: **PHP 8.2+**, **Laravel 10/11**, **MySQL 8**. APIs-first design with web UI consuming the API.
+> Stack objetivo: **PHP 8.2+**, **Laravel 10/11**, **MySQL 8**. Diseño API-first con UI consumiendo la API.
+>
+> Estado actual del repositorio: **aplicación PHP tradicional (sin Laravel)** con módulos CRUD operativos.
 
 ---
 
-## 0) Tech Decisions (do this first)
+## 0) Decisiones técnicas (hacer primero)
 
-### 0.1 Required packages
-- ✅ **Auth & API**
-  - Laravel Sanctum (token auth for SPA/mobile/integrations)
-- ✅ **Exports**
-  - CSV/XLSX: `maatwebsite/excel`
-- ✅ **PDF**
-  - `barryvdh/laravel-dompdf` (simple) **or** `spatie/browsershot` (best quality HTML→PDF via headless Chrome)
-- ✅ **Media/Files**
-  - `spatie/laravel-medialibrary` (recommended for photos/docs + conversions + storage drivers)
-- ✅ **Activity/Audit log**
-  - `spatie/laravel-activitylog` (audit critical changes)
-- ✅ **Permissions**
-  - `spatie/laravel-permission` (RBAC)
+### 0.1 Paquetes requeridos
+- [ ] **Auth y API**: Laravel Sanctum
+- [ ] **Exportaciones**: `maatwebsite/excel`
+- [ ] **PDF**: `barryvdh/laravel-dompdf` o `spatie/browsershot`
+- [ ] **Archivos/Media**: `spatie/laravel-medialibrary`
+- [ ] **Auditoría**: `spatie/laravel-activitylog`
+- [ ] **Permisos**: `spatie/laravel-permission`
 
-### 0.2 Non-negotiable architecture rules
-- Use **Service layer** for business rules (no heavy logic in controllers).
-- Use **Policies/Guards** to block forbidden actions (assignments/fuel/maintenance).
-- All edits/anulations create **audit entries** (no silent deletes for critical records).
-- All “exports” are generated from **filtered queries** (vehicle/date/type, etc.) and stored for traceability.
+### 0.2 Reglas de arquitectura no negociables
+- [ ] Capa de servicios para reglas de negocio
+- [ ] Policies/Guards para bloquear acciones prohibidas
+- [ ] Auditoría en toda edición/anulación crítica
+- [ ] Exportaciones desde queries filtradas y trazables
 
 ---
 
-## 1) Task: Project Baseline & Conventions
+## 1) Base del proyecto y convenciones
 
-### Subtasks
-- [ ] Define environment requirements: PHP version, MySQL version, storage (local/S3).
-- [ ] Set code standards (PSR-12), run Pint, Larastan/PHPStan (optional).
-- [ ] Create folders:
-  - `app/Domain/*` (services, policies, DTOs)
-  - `app/Http/Controllers/Api/*`
-  - `app/Http/Resources/*`
-  - `app/Exports/*`, `app/Reports/*`
-- [ ] Configure API versioning prefix: `/api/v1/...`
-- [ ] Configure response format (success/error envelope) and validation errors format.
-- [ ] Add global exception handler mapping (Validation/Authorization/NotFound).
+### Subtareas
+- [x] Definir requisitos de entorno (PHP, MySQL, variables de entorno en `.env`)
+- [ ] Estándares de código (PSR-12, Pint, Larastan/PHPStan)
+- [ ] Estructura Laravel (`app/Domain`, `app/Http/...`, `app/Exports`, etc.)
+- [ ] Versionado de API (`/api/v1/...`)
+- [ ] Formato unificado de respuestas y errores
+- [ ] Mapeo global de excepciones
 
-Acceptance
-- API endpoints respond consistently; validation + auth errors are standardized.
+**Aceptación**
+- API responde de forma consistente con validaciones y errores estandarizados.
 
 ---
 
-## 2) Task: Security, Roles, Permissions, Audit
+## 2) Seguridad, roles, permisos y auditoría
 
-### 2.1 Authentication (Sanctum)
-Subtasks
-- [ ] Implement login/logout, token issuance, token revocation.
-- [ ] Add middleware for API auth + rate limiting on auth endpoints.
-- [ ] Add password reset flow (optional if internal-only).
+### 2.1 Autenticación
+- [x] Login/logout funcional (sesión PHP actual)
+- [ ] Tokens (Sanctum)
+- [ ] Rate limiting en auth
+- [ ] Recuperación de contraseña (opcional)
 
-### 2.2 RBAC (spatie/permission)
-Subtasks
-- [ ] Create roles: `Admin`, `FleetManager`, `Workshop`, `Driver`, `Accounting`, `Viewer`
-- [ ] Define permissions by module:
-  - Vehicles: view/create/edit/block/export
-  - Assignments: create/close/override
-  - Maintenance: open/approve/close/void/export
-  - Fuel: register/approve/void/export
-  - Reports: view/export
-  - Catalogs: manage
-- [ ] Protect routes with permission middleware.
+### 2.2 RBAC
+- [x] Roles base implementados (`coordinador_it`, `soporte`, `monitoreo`)
+- [x] Permisos base por acción (`view/create/edit/delete`)
+- [x] Protección de rutas sensibles (ej. usuarios admin)
+- [ ] Matriz de permisos granular por módulo objetivo (vehículos, asignaciones, mantenimiento, combustible, reportes)
 
-### 2.3 Audit Log (spatie/activitylog)
-Subtasks
-- [ ] Log create/update/void actions for: assignments, maintenance orders, maintenance items, fuel logs, vehicle status changes, overrides.
-- [ ] Store: user, action, entity, before/after, IP, timestamp.
-- [ ] Expose audit read endpoints for Admin/FleetManager.
+### 2.3 Auditoría
+- [ ] Bitácora de cambios críticos (create/update/void/override)
+- [ ] Guardar before/after, usuario, IP, fecha
+- [ ] Endpoints de consulta de auditoría
 
-Acceptance
-- Any critical change can be traced to a user and time.
+**Aceptación**
+- Todo cambio crítico es trazable a usuario y fecha.
 
 ---
 
-## 3) Task: Core Catalogs & System Settings
+## 3) Catálogos base y configuración del sistema
 
-### 3.1 Catalogs
-Subtasks
-- [ ] CRUD: expense categories (parts, lubricants, labor, tires, etc.)
-- [ ] CRUD: units (L, gal, pza, service, etc.)
-- [ ] CRUD: maintenance types (preventive/corrective/inspection/emergency)
-- [ ] CRUD: vehicle states (active/blocked/sold/out-of-service)
-- [ ] CRUD: workshop services
+### 3.1 Catálogos
+- [ ] Categorías de gasto
+- [ ] Unidades (L, gal, pza, servicio)
+- [ ] Tipos de mantenimiento
+- [ ] Estados de vehículo del dominio objetivo
+- [ ] Servicios de taller
 
-### 3.2 Settings
-Subtasks
-- [ ] Global thresholds:
-  - abnormal fuel consumption threshold (% below average)
-  - max allowed fuel liters per event (optional)
-  - maintenance approval threshold (amount)
-- [ ] Per-vehicle defaults:
-  - preventive maintenance interval (km/days) per maintenance kind
+### 3.2 Configuración
+- [ ] Umbral de consumo anómalo
+- [ ] Máximo de litros por evento (opcional)
+- [ ] Umbral de aprobación de mantenimiento
+- [ ] Intervalos preventivos por vehículo
 
-Acceptance
-- Forms must use catalog IDs (no free-text categories).
+**Aceptación**
+- Formularios usan IDs de catálogo, sin texto libre.
 
 ---
 
-## 4) Task: Vehicles Module (Vehicle 360° Profile)
+## 4) Módulo de vehículos (perfil 360)
 
-### 4.1 Vehicle CRUD
-Subtasks
-- [ ] Vehicles table: plate/code, brand, model, year, fuel type, notes, current status.
-- [ ] Implement soft-delete for non-critical, but **block delete** if vehicle has history.
-- [ ] Vehicle profile endpoint returns:
-  - summary
-  - current assignment (if any)
-  - active maintenance order (if any)
-  - last odometer reading
-  - last fuel log
-  - counts/totals (monthly cost, etc.)
+### 4.1 CRUD de vehículos
+- [x] Tabla y CRUD de vehículos (placa, marca, modelo, año, combustible, estado, km, notas)
+- [ ] Soft-delete con bloqueo por historial
+- [ ] Endpoint perfil 360 con asignación activa, mantenimiento activo, último odómetro/combustible y totales
 
-### 4.2 Media: Photos & Documents
-Subtasks
-- [ ] Attach multiple photos (damage, angles).
-- [ ] Attach documents (registration, insurance, permits).
-- [ ] Validate file types + size + virus scan optional.
-- [ ] Return signed URLs or controlled download endpoints.
+### 4.2 Fotos y documentos
+- [ ] Adjuntar múltiples fotos
+- [ ] Adjuntar documentos (seguro, permisos, etc.)
+- [ ] Validar tipo/tamaño de archivo
+- [ ] URLs firmadas o descarga controlada
 
-### 4.3 Odometer Logs (foundation)
-Subtasks
-- [ ] Create odometer_logs:
-  - vehicle_id, reading_km, source (assignment/fuel/maintenance/manual), recorded_at, user_id
-- [ ] Rule: no decreasing odometer unless `override` permission + justification saved + audit.
-- [ ] Auto-create odometer logs when closing maintenance, registering fuel, closing assignment (when km provided).
+### 4.3 Odómetro
+- [ ] Tabla `odometer_logs`
+- [ ] Bloqueo de odómetro decreciente con override justificado
+- [ ] Auto-registro de odómetro en flujos críticos
+- [x] Actualización de `km_actual` del vehículo al registrar combustible/mantenimiento (parcial)
 
-Acceptance
-- Every relevant workflow updates odometer consistently; inconsistencies are blocked or require override.
+**Aceptación**
+- Odómetro consistente en todos los flujos.
 
 ---
 
-## 5) Task: Vehicle Components / Tools Inventory (per vehicle)
+## 5) Inventario de componentes/herramientas por vehículo
 
-### 5.1 Components master + vehicle mapping
-Subtasks
-- [ ] Create `components` catalog (e.g., jack/gata, spare tire, tool kit, fire extinguisher, first aid kit, fuel card, fleet card, etc.)
-- [ ] Create `vehicle_components`:
-  - vehicle_id, component_id, quantity, serial/identifier (optional), condition, notes
-- [ ] Allow component “types”:
-  - `tool`
-  - `safety`
-  - `documents`
-  - `cards` (fuel card, fleet card)
-- [ ] Add “card” details (masked number, provider, expiry, status active/blocked)
+### 5.1 Catálogo y mapeo
+- [ ] Catálogo `components`
+- [ ] Tabla `vehicle_components`
+- [ ] Tipos (`tool`, `safety`, `documents`, `cards`)
+- [ ] Datos de tarjetas (máscara, proveedor, vencimiento, estado)
 
-### 5.2 Component checklist on assignment
-Subtasks
-- [ ] When creating/closing assignment, capture component checklist:
-  - missing/damaged items
-  - photos
-  - notes
-- [ ] Persist snapshots: `assignment_component_snapshots` to prove what was delivered/returned.
+### 5.2 Checklist por asignación
+- [ ] Captura de faltantes/daños/fotos en entrega/retorno
+- [ ] Snapshot `assignment_component_snapshots`
 
-Acceptance
-- You can see exactly what tools/cards were inside each vehicle per assignment event.
+**Aceptación**
+- Trazabilidad de herramientas/tarjetas por evento.
 
 ---
 
-## 6) Task: Personnel/Drivers Module
+## 6) Personal / conductores
 
-### Subtasks
-- [ ] CRUD for drivers/employees (name, phone, area/route, active flag).
-- [ ] Driver documents (license photo, expiry date).
-- [ ] Driver history endpoint:
-  - assignments history
-  - fuel logs (optional)
-  - incident reports (optional)
-- [ ] Rule: inactive driver cannot be assigned.
+- [x] CRUD de conductores/operadores (datos básicos)
+- [x] Estado activo/inactivo/suspendido en operador
+- [ ] Documentos de licencia con adjuntos
+- [ ] Historial de asignaciones/combustible/incidentes por conductor
+- [ ] Regla: conductor inactivo no puede asignarse
 
-Acceptance
-- Driver profile is auditable and includes history.
+**Aceptación**
+- Perfil del conductor auditable con historial.
 
 ---
 
-## 7) Task: Assignments Module (with lock rules)
+## 7) Asignaciones (con reglas de bloqueo)
 
-### 7.1 Assignment lifecycle
-Subtasks
-- [ ] Create assignment (vehicle_id, driver_id, start_at, start_km optional, notes, photos).
-- [ ] Close assignment (end_at, end_km required if business requires, notes, photos).
-- [ ] Keep full history; do not overwrite.
+### 7.1 Ciclo de vida
+- [ ] Crear asignación
+- [ ] Cerrar asignación
+- [ ] Historial completo sin sobrescritura
 
-### 7.2 HARD lock rules (must enforce in service + DB constraints)
-Subtasks
-- [ ] Prevent new assignment if:
-  - vehicle has an **active assignment** (not closed), OR
-  - vehicle has an **active maintenance order** (not closed), OR
-  - vehicle is **blocked/out-of-service**
-- [ ] Return error message containing:
-  - reason
-  - link/id of blocking record (assignment/maintenance)
-- [ ] Admin override flow:
-  - permission `assign.override`
-  - mandatory justification stored + audit
-  - still logs system event "override used"
+### 7.2 Reglas duras de bloqueo
+- [ ] No asignar si tiene asignación activa
+- [ ] No asignar si tiene mantenimiento activo
+- [ ] No asignar si vehículo bloqueado/fuera de servicio
+- [ ] Error con razón e ID del bloqueo
+- [ ] Override admin con justificación y auditoría
 
-### 7.3 Optional PDF
-Subtasks
-- [ ] Generate “Delivery/Return” PDF:
-  - vehicle data, driver data, date/time
-  - component checklist snapshot
-  - photos references
-  - signature lines (Driver / Fleet Manager)
+### 7.3 PDF opcional
+- [ ] PDF entrega/retorno con checklist y firmas
 
-Acceptance
-- Vehicle cannot be reassigned unless rules allow or override is used with justification.
+**Aceptación**
+- No hay reasignación indebida sin override trazable.
 
 ---
 
-## 8) Task: Workshops (Authorized) + Portal Access
+## 8) Talleres autorizados y portal
 
-### Subtasks
-- [ ] CRUD workshops (contact, services, authorized flag).
-- [ ] Workshop user accounts (role=Workshop).
-- [ ] Permission boundaries:
-  - workshop can create maintenance draft
-  - workshop can upload diagnostics/quotes/photos
-  - workshop cannot approve payments unless allowed
+- [x] CRUD de proveedores/talleres base (parcial)
+- [ ] Flag de “taller autorizado”
+- [ ] Cuentas de usuario tipo taller
+- [ ] Fronteras de permisos del taller
 
-Acceptance
-- Only authorized workshops can submit maintenance work for vehicles.
+**Aceptación**
+- Solo talleres autorizados registran mantenimiento.
 
 ---
 
-## 9) Task: Maintenance Module (OT + history like TuFlota)
+## 9) Mantenimiento (OT + historial)
 
-### 9.1 Maintenance Order (OT)
-Subtasks
-- [ ] Create OT: vehicle, type, workshop/internal, priority, issue/description, opened_at, entry_km required.
-- [ ] Status machine:
-  - Draft → PendingApproval → Approved → InProgress → Completed → Voided
-- [ ] Attachments: diagnostics, quote(s), invoice, photos.
+### 9.1 Orden de trabajo (OT)
+- [ ] Crear OT formal con máquina de estados completa
+- [x] Registro de mantenimientos con estado básico (`Completado`, `En proceso`, `Pendiente`)
+- [ ] Adjuntos (diagnóstico, cotización, factura, fotos)
 
-### 9.2 Maintenance Items (line items)
-Subtasks
-- [ ] Items table: category(expense), description, qty, unit, unit_price, subtotal.
-- [ ] Totals calculation + tax optional.
-- [ ] Lock editing items after OT is Completed (only Admin can void/correct via credit note style).
+### 9.2 Ítems de mantenimiento
+- [ ] Tabla de partidas (cantidad, unidad, precio, subtotal)
+- [ ] Totales e impuestos
+- [ ] Bloqueo de edición al completar
 
-### 9.3 Preventive Scheduling
-Subtasks
-- [ ] Per-vehicle schedules:
-  - interval_km and/or interval_days
-  - next_due_km, next_due_date
-- [ ] Alerts list:
-  - upcoming (within X km/days)
-  - overdue
-- [ ] One-click “Create OT from alert”.
+### 9.3 Programación preventiva
+- [x] Recordatorios preventivos básicos por fecha (parcial)
+- [ ] Programación por km/días con vencimientos automáticos
+- [ ] Crear OT desde alerta en un clic
 
-### 9.4 Completion rules
-Subtasks
-- [ ] On complete:
-  - exit_km required (>= entry_km unless override)
-  - work summary required
-  - at least 1 attachment required if total > threshold (configurable)
-  - auto-create odometer log
-  - update vehicle operational status:
-    - if active assignment exists → status becomes Assigned
-    - else → Available
+### 9.4 Reglas de cierre
+- [ ] `exit_km` obligatorio y validado
+- [ ] Resumen de trabajo obligatorio
+- [ ] Adjuntos obligatorios sobre umbral
+- [ ] Odómetro automático
+- [ ] Actualización de estado operativo según asignación
 
-### 9.5 Maintenance history view/export
-Subtasks
-- [ ] Vehicle maintenance history endpoint:
-  - filter by vehicle, date range, workshop, type, status, cost range
-  - sorting and pagination
-- [ ] Export history:
-  - CSV + XLSX + PDF
+### 9.5 Historial y exportación
+- [x] Listado histórico con filtros básicos (vehículo/texto)
+- [ ] Filtros avanzados (rango costo, taller, tipo, estado)
+- [ ] Exportar CSV/XLSX/PDF
 
-Acceptance
-- OT acts as single source of truth for maintenance and is exportable + auditable.
+**Aceptación**
+- OT como fuente única, exportable y auditable.
 
 ---
 
-## 10) Task: Fuel Module (detailed) + PDF authorization with signatures
+## 10) Combustible (detallado) + PDF de autorización
 
-### 10.1 Fuel log entry
-Subtasks
-- [ ] Create fuel log fields:
-  - vehicle_id, driver_id (or responsible), station/provider, fuel_type
-  - odometer_km required
-  - liters, unit_price, total
-  - payment_method (cash/card/voucher), receipt_number
-  - recorded_at
-  - notes
-- [ ] Attachments: receipt photo, odometer photo.
+### 10.1 Registro
+- [x] Registro de combustible (vehículo, litros, costo, total, km, proveedor, tipo, notas)
+- [ ] Driver/responsable explícito
+- [ ] Método de pago, número de recibo
+- [ ] Adjuntos (foto de recibo y odómetro)
 
-### 10.2 Fuel lock rules
-Subtasks
-- [ ] By default: **block fuel registration when vehicle is in active maintenance**.
-- [ ] Add exception flow:
-  - reason required (e.g., “transfer to workshop”)
-  - optional approval required based on settings
-  - audit required
+### 10.2 Reglas de bloqueo
+- [ ] Bloquear carga si vehículo está en mantenimiento activo
+- [ ] Flujo de excepción con motivo/posible aprobación/auditoría
 
-### 10.3 Consumption & anomaly detection
-Subtasks
-- [ ] Compute km traveled since last fuel record with valid odometer.
-- [ ] Compute km/L and store on fuel log.
-- [ ] Maintain rolling average per vehicle and alert when below threshold.
-- [ ] Flag suspicious patterns:
-  - multiple fills too close in time
-  - liters exceed tank capacity (optional config)
-  - odometer jump or regression
+### 10.3 Consumo y anomalías
+- [x] Cálculo de km/L por registro (en consulta, no persistido)
+- [x] Cálculo de total automático y KPIs de litros/gasto
+- [ ] Promedio móvil persistido por vehículo
+- [ ] Alertas por anomalías (cargas muy cercanas, exceso de capacidad, odómetro sospechoso)
 
-### 10.4 Fuel authorization PDF (printable) with signature lines
-Subtasks
-- [ ] Generate PDF per fuel log and also in batch (weekly/monthly):
-  - header with company + folio + date
-  - vehicle + driver data
-  - table of fuel entries
-  - totals
-  - signature lines:
-    - Driver/Requester (Firma / Nombre)
-    - Fleet Manager (Firma / Nombre)
-    - Accounting (Firma / Nombre)
-- [ ] Include optional QR to open record page.
-- [ ] Store generated PDF as attachment for traceability.
+### 10.4 PDF autorización con firmas
+- [ ] PDF por registro y por lote
+- [ ] Líneas de firma (conductor, flota, contabilidad)
+- [ ] QR opcional
+- [ ] Guardar PDF generado como adjunto
 
-Acceptance
-- Fuel control is strict, measurable, and printable with signatures to speed paperwork.
+**Aceptación**
+- Control de combustible estricto, medible e imprimible.
 
 ---
 
-## 11) Task: Reporting & Exports (CSV/XLSX/PDF + Filters)
+## 11) Reportes y exportaciones (CSV/XLSX/PDF)
 
-### 11.1 Export engine (reusable)
-Subtasks
-- [ ] Create a “ReportQueryBuilder” pattern:
-  - accepts filters (vehicle_id, date_from, date_to, driver_id, workshop_id, category_id, status, etc.)
-  - returns paginated dataset and export dataset
-- [ ] Create `ReportExportService`:
-  - formats: CSV, XLSX, PDF (and optional JSON for integrations)
-  - large exports run as queued jobs
-  - stores exported file in storage + logs who exported and filters used
+### 11.1 Motor reusable
+- [ ] `ReportQueryBuilder` con filtros
+- [ ] `ReportExportService` con CSV/XLSX/PDF
+- [ ] Colas para exportes grandes
+- [ ] Trazabilidad de exportes
 
-### 11.2 Reports (minimum set)
-Subtasks
-- [ ] Maintenance cost report:
-  - totals by vehicle / month / workshop / category
-- [ ] Fuel report:
-  - totals, average km/L, cost per km (optional)
-- [ ] Vehicle utilization report:
-  - assignments time, downtime in maintenance
-- [ ] Top expensive vehicles report:
-  - combined maintenance + fuel in period
-- [ ] Workshop performance report:
-  - count of OTs, average time to close, total cost
+### 11.2 Reportes mínimos
+- [ ] Costos de mantenimiento
+- [ ] Combustible (totales/km-L/costo por km)
+- [ ] Utilización de vehículos
+- [ ] Top vehículos más costosos
+- [ ] Desempeño por taller
 
-### 11.3 Filters (must exist in UI + API)
-Subtasks
-- [ ] Filter by:
-  - vehicle (single/multiple)
-  - date range (required for most exports)
-  - driver
-  - workshop
-  - category (expense type)
-  - status
-- [ ] Sorting and grouping options:
-  - by vehicle, by month, by category
+### 11.3 Filtros
+- [x] Filtros básicos en varios módulos (texto, vehículo, estado, paginación)
+- [ ] Filtros avanzados comunes por rango de fecha y catálogos
+- [ ] Agrupaciones y ordenamientos avanzados
 
-Acceptance
-- Every report supports CSV/XLSX/PDF and is filterable by vehicle + date at minimum.
+**Aceptación**
+- Todos los reportes exportables y filtrables mínimo por vehículo + fecha.
 
 ---
 
-## 12) Task: API Design (REST) + Documentation
+## 12) Diseño de API REST + documentación
 
-### Subtasks
-- [ ] Create REST endpoints per module:
-  - `/vehicles`, `/vehicles/{id}/profile`, `/vehicles/{id}/history`
-  - `/assignments` (create/close/list)
-  - `/maintenance-orders` (CRUD + status transitions)
-  - `/fuel-logs` (CRUD + exports)
-  - `/reports/*` (query + export endpoints)
-  - `/catalogs/*`
-- [ ] Use FormRequests for validation; Resources for responses.
-- [ ] Add API documentation:
-  - `knuckleswtf/scribe` (recommended) OR `l5-swagger`
+- [x] Endpoints REST base por módulo (`/api/*.php`)
+- [ ] Versionado `/api/v1/*`
+- [ ] FormRequests/Resources (Laravel)
+- [ ] Documentación automática (Scribe/Swagger)
 
-Acceptance
-- All functionality is available via API with documented endpoints.
+**Aceptación**
+- Funcionalidad disponible vía API documentada.
 
 ---
 
-## 13) Task: Data Integrity, Concurrency, and Performance
+## 13) Integridad, concurrencia y performance
 
-### Subtasks
-- [ ] Add DB indexes:
-  - vehicle_id + recorded_at for fuel/maintenance/odometer
-  - status fields
-- [ ] Use DB transactions for:
-  - assignment create/close
-  - OT status transitions + item updates
-  - fuel create + odometer log create
-- [ ] Prevent duplicates:
-  - Ensure only 1 active assignment per vehicle
-  - Ensure only 1 active maintenance order per vehicle
-- [ ] Add tests:
-  - lock rules (assignment/fuel/maintenance)
-  - odometer validation + override
-  - consumption calculations
-  - report filtering correctness
+- [ ] Índices compuestos críticos
+- [ ] Transacciones en operaciones críticas
+- [ ] Restricción de únicos activos (asignación/mantenimiento)
+- [ ] Pruebas automatizadas de reglas duras
+- [x] Restricciones básicas existentes (FK y `placa` única)
 
-Acceptance
-- No race conditions create double active records; workflows remain consistent.
+**Aceptación**
+- Sin condiciones de carrera ni dobles activos.
 
 ---
 
-## 14) Task: Optional “Big System” Upgrades (recommended for scale)
-- [ ] Queue system (Redis + Horizon) for exports and PDF batches.
-- [ ] Notifications (email/WhatsApp integration later):
-  - preventive due, approvals pending, anomalies
-- [ ] Multi-branch support (if needed).
-- [ ] Incident/accident module (photos, insurance claim).
-- [ ] Admin “Override Registry” report (who overrode what and why).
+## 14) Mejoras opcionales para escala
+
+- [ ] Colas con Redis + Horizon
+- [ ] Notificaciones (email/WhatsApp)
+- [ ] Multi-sucursal
+- [ ] Módulo de incidentes avanzados con seguros
+- [ ] Reporte de overrides
 
 ---
 
-## Definition of Done (global)
-- Each module:
-  - has API endpoints + validation + policies
-  - logs audit for critical changes
-  - supports attachments where applicable
-  - enforces lock rules
-- Reports:
-  - filterable by vehicle and date
-  - exportable as CSV/XLSX/PDF
-  - exports stored and auditable
-- PDFs:
-  - include folio + date + signature lines
-  - can be printed cleanly and consistently
+## Definición global de terminado
+
+- [ ] Cada módulo tiene API + validación + políticas
+- [ ] Cambios críticos auditados
+- [ ] Adjuntos donde aplica
+- [ ] Reglas de bloqueo aplicadas
+- [ ] Reportes exportables y trazables
+- [ ] PDFs con folio, fecha y firmas
 
 ---
 
-## Suggested Implementation Order (to avoid context switching)
-1) Security + RBAC + Audit  
-2) Catalogs + Vehicles + Odometer  
-3) Vehicle Components/Tools  
-4) Assignments (lock rules)  
-5) Workshops  
-6) Maintenance (OT + history)  
-7) Fuel (km/L + PDFs)  
-8) Reports + exports engine  
-9) Hardening + tests + performance
+## Orden sugerido de implementación por módulos (estricto)
+
+1. Seguridad + RBAC + auditoría
+2. Catálogos + vehículos + odómetro
+3. Componentes/herramientas
+4. Asignaciones (reglas de bloqueo)
+5. Talleres
+6. Mantenimiento (OT + historial)
+7. Combustible (km/L + PDFs)
+8. Reportes + exportaciones
+9. Endurecimiento + pruebas + performance
+
+---
+
+## Nota de ejecución acordada
+
+- Se trabajará **módulo por módulo**.
+- **No se avanza al siguiente módulo** hasta cerrar completamente el actual (backend + reglas + UI + pruebas mínimas).
+- Las casillas se actualizarán al terminar cada entregable verificable.

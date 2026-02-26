@@ -1,0 +1,19 @@
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Logs y temporales
+*.log
+*.tmp
+*.cache
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Dependencias / build (si se agregan luego)
+vendor/
+node_modules/
