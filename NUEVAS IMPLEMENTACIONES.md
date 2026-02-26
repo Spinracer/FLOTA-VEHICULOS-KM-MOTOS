@@ -142,16 +142,16 @@
 ## 7) Asignaciones (con reglas de bloqueo)
 
 ### 7.1 Ciclo de vida
-- [ ] Crear asignación
-- [ ] Cerrar asignación
-- [ ] Historial completo sin sobrescritura
+- [x] Crear asignación
+- [x] Cerrar asignación
+- [x] Historial completo sin sobrescritura
 
 ### 7.2 Reglas duras de bloqueo
-- [ ] No asignar si tiene asignación activa
-- [ ] No asignar si tiene mantenimiento activo
-- [ ] No asignar si vehículo bloqueado/fuera de servicio
-- [ ] Error con razón e ID del bloqueo
-- [ ] Override admin con justificación y auditoría
+- [x] No asignar si tiene asignación activa
+- [x] No asignar si tiene mantenimiento activo
+- [x] No asignar si vehículo bloqueado/fuera de servicio
+- [x] Error con razón e ID del bloqueo
+- [x] Override admin con justificación y auditoría
 
 ### 7.3 PDF opcional
 - [ ] PDF entrega/retorno con checklist y firmas

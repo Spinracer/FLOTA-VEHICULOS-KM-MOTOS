@@ -62,4 +62,5 @@ App disponible en: `http://127.0.0.1:8000`
 - `GET /` debe responder 200
 - Login debe redirigir a dashboard
 - Menú de Sistema debe mostrar Catálogos para admin
+- Menú principal debe mostrar Asignaciones
 - Operaciones CRUD deben registrar actividad en `audit_logs`

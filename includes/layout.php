@@ -34,6 +34,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/vehiculos.php" class="nav-item <?= $active_page==='vehiculos'?'active':'' ?>">
       <span class="nav-icon">🚗</span><span>Vehículos</span>
     </a>
+    <a href="/asignaciones.php" class="nav-item <?= $active_page==='asignaciones'?'active':'' ?>">
+      <span class="nav-icon">📝</span><span>Asignaciones</span>
+    </a>
     <a href="/combustible.php" class="nav-item <?= $active_page==='combustible'?'active':'' ?>">
       <span class="nav-icon">⛽</span><span>Combustible</span>
     </a>

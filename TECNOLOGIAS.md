@@ -40,3 +40,4 @@
 - Módulo 1: Auditoría base y trazabilidad
 - Módulo 2: Control de odómetro
 - Módulo 3: Catálogos base y configuración global
+- Módulo 4: Asignaciones con reglas de bloqueo

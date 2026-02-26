@@ -163,6 +163,27 @@ $tables = [
   FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+"asignaciones" => "CREATE TABLE IF NOT EXISTS asignaciones (
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  vehiculo_id      INT NOT NULL,
+  operador_id      INT NOT NULL,
+  start_at         DATETIME NOT NULL,
+  start_km         DECIMAL(10,1) NULL,
+  start_notes      TEXT NULL,
+  end_at           DATETIME NULL,
+  end_km           DECIMAL(10,1) NULL,
+  end_notes        TEXT NULL,
+  estado           ENUM('Activa','Cerrada') NOT NULL DEFAULT 'Activa',
+  override_reason  TEXT NULL,
+  created_by       INT NULL,
+  closed_by        INT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_asignaciones_vehiculo_estado (vehiculo_id, estado),
+  INDEX idx_asignaciones_operador_estado (operador_id, estado),
+  CONSTRAINT fk_asig_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_asig_operador FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 "incidentes" => "CREATE TABLE IF NOT EXISTS incidentes (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   fecha        DATE         NOT NULL,
