@@ -139,15 +139,20 @@ $tables = [
   id          INT AUTO_INCREMENT PRIMARY KEY,
   fecha       DATE         NOT NULL,
   vehiculo_id INT          NOT NULL,
+  operador_id INT          NULL,
   litros      DECIMAL(8,2) NOT NULL,
   costo_litro DECIMAL(8,2) NOT NULL DEFAULT 0,
   total       DECIMAL(10,2) NOT NULL DEFAULT 0,
   km          DECIMAL(10,1) NULL,
   proveedor_id INT         NULL,
+  metodo_pago VARCHAR(30)  NOT NULL DEFAULT 'Efectivo',
+  numero_recibo VARCHAR(80) NULL,
   tipo_carga  VARCHAR(20)  NOT NULL DEFAULT 'Lleno',
   notas       TEXT         NULL,
   created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_combustible_operador (operador_id),
   FOREIGN KEY (vehiculo_id)  REFERENCES vehiculos(id)  ON DELETE CASCADE,
+  FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE SET NULL,
   FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -372,6 +377,61 @@ try {
   }
 } catch (Throwable $e) {
   step('Compat: FK usuarios->proveedores', true, 'Omitido: ' . htmlspecialchars($e->getMessage()));
+}
+
+try {
+  if (!$existsColumn('combustible', 'operador_id')) {
+    $pdo->exec("ALTER TABLE combustible ADD COLUMN operador_id INT NULL AFTER vehiculo_id");
+    step('Compat: combustible.operador_id', true);
+  } else {
+    step('Compat: combustible.operador_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: combustible.operador_id', false, $e->getMessage());
+}
+
+try {
+  if (!$existsColumn('combustible', 'metodo_pago')) {
+    $pdo->exec("ALTER TABLE combustible ADD COLUMN metodo_pago VARCHAR(30) NOT NULL DEFAULT 'Efectivo' AFTER proveedor_id");
+    step('Compat: combustible.metodo_pago', true);
+  } else {
+    step('Compat: combustible.metodo_pago', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: combustible.metodo_pago', false, $e->getMessage());
+}
+
+try {
+  if (!$existsColumn('combustible', 'numero_recibo')) {
+    $pdo->exec("ALTER TABLE combustible ADD COLUMN numero_recibo VARCHAR(80) NULL AFTER metodo_pago");
+    step('Compat: combustible.numero_recibo', true);
+  } else {
+    step('Compat: combustible.numero_recibo', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: combustible.numero_recibo', false, $e->getMessage());
+}
+
+try {
+  if (!$existsIndex('combustible', 'idx_combustible_operador')) {
+    $pdo->exec("ALTER TABLE combustible ADD INDEX idx_combustible_operador (operador_id)");
+    step('Compat: índice combustible.operador_id', true);
+  } else {
+    step('Compat: índice combustible.operador_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: índice combustible.operador_id', false, $e->getMessage());
+}
+
+try {
+  if (!$existsFk('combustible', 'fk_combustible_operador')) {
+    $pdo->exec("ALTER TABLE combustible ADD CONSTRAINT fk_combustible_operador FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE SET NULL");
+    step('Compat: FK combustible->operadores', true);
+  } else {
+    step('Compat: FK combustible->operadores', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: FK combustible->operadores', true, 'Omitido: ' . htmlspecialchars($e->getMessage()));
 }
 
 // 3.1 Datos semilla de catálogos base

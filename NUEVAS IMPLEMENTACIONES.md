@@ -211,8 +211,8 @@
 
 ### 10.1 Registro
 - [x] Registro de combustible (vehículo, litros, costo, total, km, proveedor, tipo, notas)
-- [ ] Driver/responsable explícito
-- [ ] Método de pago, número de recibo
+- [x] Driver/responsable explícito
+- [x] Método de pago, número de recibo
 - [ ] Adjuntos (foto de recibo y odómetro)
 
 ### 10.2 Reglas de bloqueo

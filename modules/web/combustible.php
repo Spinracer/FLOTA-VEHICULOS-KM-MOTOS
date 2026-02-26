@@ -4,6 +4,7 @@ require_login();
 $db = getDB();
 $vehiculos   = $db->query("SELECT id,placa,marca,modelo FROM vehiculos ORDER BY placa")->fetchAll();
 $proveedores = $db->query("SELECT id,nombre FROM proveedores ORDER BY nombre")->fetchAll();
+$operadores  = $db->query("SELECT id,nombre,estado FROM operadores ORDER BY nombre")->fetchAll();
 ob_start();
 ?>
 <div id="stat-pills" class="stat-pills"></div>
@@ -27,6 +28,7 @@ ob_start();
   <table>
     <thead>
       <tr><th>Fecha</th><th>Vehículo</th><th>Litros</th><th>Costo/L</th><th>Total</th><th>KM</th><th>Rendimiento</th><th>Tipo</th><th>Proveedor</th>
+      <th>Conductor</th><th>Pago</th><th>Recibo</th>
       <?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr>
     </thead>
     <tbody id="tbody-comb"></tbody>
@@ -48,6 +50,13 @@ ob_start();
           <option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo']) ?></option>
           <?php endforeach; ?>
         </select></div>
+      <div class="form-group"><label>Conductor responsable *</label>
+        <select name="operador_id">
+          <option value="">— Seleccionar —</option>
+          <?php foreach($operadores as $o): ?>
+          <option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['nombre'].' ('.$o['estado'].')') ?></option>
+          <?php endforeach; ?>
+        </select></div>
       <div class="form-group"><label>Litros *</label><input name="litros" type="number" step="0.01" placeholder="50.00" oninput="calcTotal()"></div>
       <div class="form-group"><label>Costo por litro *</label><input name="costo_litro" type="number" step="0.01" placeholder="22.50" oninput="calcTotal()"></div>
       <div class="form-group"><label>Total ($)</label><input name="total" type="number" step="0.01" readonly></div>
@@ -61,6 +70,9 @@ ob_start();
           <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option>
           <?php endforeach; ?>
         </select></div>
+      <div class="form-group"><label>Método de pago</label>
+        <select name="metodo_pago"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option>Crédito</option><option>Otro</option></select></div>
+      <div class="form-group"><label>No. de recibo</label><input name="numero_recibo" placeholder="REC-2026-0001"></div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar bloqueo por mantenimiento u odómetro."></textarea></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
     </div>
@@ -90,7 +102,7 @@ async function load() {
     <div class="stat-pill">📋 Registros: <strong>${data.total}</strong></div>`;
   const badges = {'Lleno':'badge-green','Parcial':'badge-yellow'};
   const tbody = document.getElementById('tbody-comb');
-  if (!data.rows.length) { tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="empty-icon">⛽</div><div class="empty-title">Sin registros</div></div></td></tr>`; return; }
+  if (!data.rows.length) { tbody.innerHTML=`<tr><td colspan="13"><div class="empty"><div class="empty-icon">⛽</div><div class="empty-title">Sin registros</div></div></td></tr>`; return; }
   tbody.innerHTML = data.rows.map(r => `
     <tr>
       <td>${r.fecha}</td>
@@ -102,6 +114,9 @@ async function load() {
       <td><span class="badge ${r.rendimiento ? 'badge-cyan' : 'badge-gray'}">${r.rendimiento ? Number(r.rendimiento).toFixed(1)+' km/L' : '—'}</span></td>
       <td><span class="badge ${badges[r.tipo_carga]||'badge-gray'}">${r.tipo_carga}</span></td>
       <td>${r.proveedor_nombre||'—'}</td>
+      <td>${r.operador_nombre||'—'}</td>
+      <td>${r.metodo_pago||'—'}</td>
+      <td>${r.numero_recibo||'—'}</td>
       <?php if(can('edit')): ?>
       <td><div class="action-btns">
         <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
@@ -119,12 +134,12 @@ function abrirNuevo() {
 }
 function editar(r) {
   document.getElementById('modal-comb-title').textContent = '✏️ Editar Carga';
-  fillForm('modal-comb', { id:r.id, fecha:r.fecha, vehiculo_id:r.vehiculo_id, litros:r.litros, costo_litro:r.costo_litro, total:r.total, km:r.km, tipo_carga:r.tipo_carga, proveedor_id:r.proveedor_id, notas:r.notas });
+  fillForm('modal-comb', { id:r.id, fecha:r.fecha, vehiculo_id:r.vehiculo_id, operador_id:r.operador_id, litros:r.litros, costo_litro:r.costo_litro, total:r.total, km:r.km, tipo_carga:r.tipo_carga, proveedor_id:r.proveedor_id, metodo_pago:r.metodo_pago, numero_recibo:r.numero_recibo, notas:r.notas });
   openModal('modal-comb');
 }
 async function guardar() {
   const d = getForm('modal-comb');
-  if (!d.vehiculo_id || !d.litros) { toast('Vehículo y litros son obligatorios','error'); return; }
+  if (!d.vehiculo_id || !d.operador_id || !d.litros) { toast('Vehículo, conductor y litros son obligatorios','error'); return; }
   await api('/api/combustible.php', d.id?'PUT':'POST', d);
   toast(d.id?'Carga actualizada':'Carga registrada');
   closeModal('modal-comb'); load();

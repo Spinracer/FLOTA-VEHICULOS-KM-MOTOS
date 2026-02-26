@@ -43,4 +43,4 @@
 - Módulo 4: Asignaciones con reglas de bloqueo
 - Módulo 5: Talleres autorizados y portal de taller
 - Módulo 6: Historial operativo por conductor
-- Módulo 7 (parcial): Bloqueo de combustible por mantenimiento activo + override auditado
+- Módulo 7 (parcial): Bloqueo de combustible + override auditado + conductor/pago/recibo

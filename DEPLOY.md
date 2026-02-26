@@ -66,4 +66,5 @@ App disponible en: `http://127.0.0.1:8000`
 - En Proveedores debe existir campo de taller autorizado
 - Usuarios admin permite crear rol Taller con proveedor asignado
 - Operadores debe permitir abrir historial consolidado (📚)
+- En Combustible debe pedirse conductor, método de pago y número de recibo
 - Operaciones CRUD deben registrar actividad en `audit_logs`
