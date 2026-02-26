@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../includes/layout.php';
 require_login();
 require_admin();
+$db = getDB();
+$proveedores_taller = $db->query("SELECT id,nombre FROM proveedores WHERE es_taller_autorizado=1 ORDER BY nombre")->fetchAll();
 ob_start();
 ?>
 <div class="toolbar">
@@ -25,7 +27,13 @@ ob_start();
         <select name="rol">
           <option value="monitoreo">👁 Monitoreo (solo lectura)</option>
           <option value="soporte">🛠 Soporte (crear/editar)</option>
+          <option value="taller">🏪 Taller (portal de mantenimientos)</option>
           <option value="coordinador_it">🔑 Coordinador IT (admin total)</option>
+        </select></div>
+      <div class="form-group"><label>Proveedor del taller</label>
+        <select name="proveedor_id">
+          <option value="">— Ninguno —</option>
+          <?php foreach($proveedores_taller as $p): ?><option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option><?php endforeach; ?>
         </select></div>
       <div class="form-group"><label>Estado</label>
         <select name="activo"><option value="1">Activo</option><option value="0">Inactivo</option></select></div>
@@ -34,6 +42,7 @@ ob_start();
       <strong style="color:var(--accent)">Roles del sistema:</strong><br>
       🔑 <strong>Coordinador IT</strong> — Acceso total, administra usuarios y permisos<br>
       🛠️ <strong>Soporte</strong> — Puede ver, crear y editar registros<br>
+      🏪 <strong>Taller</strong> — Portal acotado a mantenimientos y proveedor asignado<br>
       👁️ <strong>Monitoreo</strong> — Solo puede visualizar información (lectura)
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
@@ -44,8 +53,8 @@ async function load(){
   const q=(document.getElementById('s').value||'').toLowerCase();
   const data=await api('/api/usuarios.php');
   const rows=data.rows.filter(u=>!q||u.nombre.toLowerCase().includes(q)||u.email.toLowerCase().includes(q));
-  const EB={'coordinador_it':'badge-yellow','soporte':'badge-blue','monitoreo':'badge-cyan','admin':'badge-yellow','operador':'badge-blue','lectura':'badge-gray'};
-  const RL={'coordinador_it':'Coordinador IT','soporte':'Soporte','monitoreo':'Monitoreo','admin':'Admin','operador':'Operador','lectura':'Lectura'};
+  const EB={'coordinador_it':'badge-yellow','soporte':'badge-blue','monitoreo':'badge-cyan','taller':'badge-orange','admin':'badge-yellow','operador':'badge-blue','lectura':'badge-gray'};
+  const RL={'coordinador_it':'Coordinador IT','soporte':'Soporte','monitoreo':'Monitoreo','taller':'Taller','admin':'Admin','operador':'Operador','lectura':'Lectura'};
   const tbody=document.getElementById('tbody');
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">🔑</div><div class="empty-title">Sin usuarios</div></div></td></tr>`;return;}
   tbody.innerHTML=rows.map(u=>`<tr>
@@ -71,7 +80,7 @@ function editar(u){
   document.getElementById('mtitle').textContent='✏️ Editar Usuario';
   document.getElementById('pass-note').textContent='(dejar vacío para no cambiar)';
   document.getElementById('pass-input').required=false;
-  fillForm('modal',{id:u.id,nombre:u.nombre,email:u.email,rol:u.rol,activo:u.activo});
+  fillForm('modal',{id:u.id,nombre:u.nombre,email:u.email,rol:u.rol,activo:u.activo,proveedor_id:u.proveedor_id});
   document.querySelector('#modal [name=password]').value='';
   openModal('modal');
 }
@@ -79,6 +88,7 @@ async function guardar(){
   const d=getForm('modal');
   if(!d.nombre||!d.email){toast('Nombre y email son obligatorios','error');return;}
   if(!d.id&&!d.password){toast('La contraseña es obligatoria para nuevos usuarios','error');return;}
+  if(d.rol==='taller'&&!d.proveedor_id){toast('Selecciona un proveedor autorizado para el rol Taller','error');return;}
   try{await api('/api/usuarios.php',d.id?'PUT':'POST',d);toast(d.id?'Usuario actualizado':'Usuario creado');closeModal('modal');load();}catch(e){}
 }
 async function del(id){confirmDelete('¿Eliminar este usuario?',async()=>{try{await api(`/api/usuarios.php?id=${id}`,'DELETE');toast('Usuario eliminado','warning');load();}catch(e){}});}

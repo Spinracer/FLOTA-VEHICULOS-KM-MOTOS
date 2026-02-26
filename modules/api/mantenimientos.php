@@ -8,6 +8,22 @@ require_login();
 header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
+$user = current_user();
+$rol = $user['rol'] ?? '';
+
+function taller_context(PDO $db, int $userId): ?array {
+    $stmt = $db->prepare("SELECT u.id, u.proveedor_id, p.es_taller_autorizado
+        FROM usuarios u
+        LEFT JOIN proveedores p ON p.id = u.proveedor_id
+        WHERE u.id=? LIMIT 1");
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+    if (!$row) return null;
+    return [
+        'proveedor_id' => isset($row['proveedor_id']) ? (int)$row['proveedor_id'] : 0,
+        'autorizado'   => (int)($row['es_taller_autorizado'] ?? 0) === 1,
+    ];
+}
 
 try {
     switch ($method) {
@@ -20,6 +36,15 @@ try {
             $where = "WHERE (v.placa LIKE ? OR m.tipo LIKE ? OR m.descripcion LIKE ?)";
             $params = [$q, $q, $q];
             if ($vid) { $where .= " AND m.vehiculo_id=?"; $params[] = $vid; }
+            if ($rol === 'taller') {
+                $ctx = taller_context($db, (int)($user['id'] ?? 0));
+                if (!$ctx || !$ctx['proveedor_id'] || !$ctx['autorizado']) {
+                    echo json_encode(['total' => 0, 'rows' => []]);
+                    break;
+                }
+                $where .= " AND m.proveedor_id=?";
+                $params[] = $ctx['proveedor_id'];
+            }
             $total = $db->prepare("SELECT COUNT(*) FROM mantenimientos m LEFT JOIN vehiculos v ON v.id=m.vehiculo_id $where");
             $total->execute($params);
             $listParams = $params;
@@ -40,6 +65,20 @@ try {
                 break;
             }
             $d = json_decode(file_get_contents('php://input'),true);
+            if ($rol === 'taller') {
+                $ctx = taller_context($db, (int)($user['id'] ?? 0));
+                if (!$ctx || !$ctx['proveedor_id']) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Usuario de taller sin proveedor asignado.']);
+                    break;
+                }
+                if (!$ctx['autorizado']) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Tu proveedor no está autorizado para registrar mantenimientos.']);
+                    break;
+                }
+                $d['proveedor_id'] = $ctx['proveedor_id'];
+            }
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
@@ -65,6 +104,20 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM mantenimientos WHERE id=? LIMIT 1");
             $prevStmt->execute([(int)$d['id']]);
             $prev = $prevStmt->fetch() ?: [];
+            if ($rol === 'taller') {
+                $ctx = taller_context($db, (int)($user['id'] ?? 0));
+                if (!$ctx || !$ctx['proveedor_id'] || !$ctx['autorizado']) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'No autorizado para editar este mantenimiento.']);
+                    break;
+                }
+                if ((int)($prev['proveedor_id'] ?? 0) !== $ctx['proveedor_id']) {
+                    http_response_code(403);
+                    echo json_encode(['error' => 'Solo puedes editar mantenimientos de tu taller.']);
+                    break;
+                }
+                $d['proveedor_id'] = $ctx['proveedor_id'];
+            }
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
@@ -80,6 +133,11 @@ try {
             echo json_encode(['ok'=>true]);
             break;
         case 'DELETE':
+            if ($rol === 'taller') {
+                http_response_code(403);
+                echo json_encode(['error' => 'El rol taller no puede eliminar mantenimientos.']);
+                break;
+            }
             if (!can('delete')) {
                 http_response_code(403);
                 echo json_encode(['error' => 'No tienes permisos para eliminar mantenimientos.']);

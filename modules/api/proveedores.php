@@ -10,11 +10,17 @@ try {
     switch ($method) {
         case 'GET':
             $q='%'.trim($_GET['q']??'').'%';
+            $soloAut = (int)($_GET['solo_autorizados'] ?? 0);
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $total=$db->prepare("SELECT COUNT(*) FROM proveedores WHERE nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ?");
-            $total->execute([$q,$q,$q]);
-            $stmt=$db->prepare("SELECT * FROM proveedores WHERE nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ? ORDER BY nombre ASC LIMIT ? OFFSET ?");
-            $stmt->execute([$q,$q,$q,$per,$off]);
+            $where = "WHERE (nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ?)";
+            $params = [$q, $q, $q];
+            if ($soloAut === 1) {
+                $where .= " AND es_taller_autorizado=1";
+            }
+            $total=$db->prepare("SELECT COUNT(*) FROM proveedores $where");
+            $total->execute($params);
+            $stmt=$db->prepare("SELECT * FROM proveedores $where ORDER BY nombre ASC LIMIT ? OFFSET ?");
+            $stmt->execute(array_merge($params, [$per,$off]));
             echo json_encode(['total'=>(int)$total->fetchColumn(),'rows'=>$stmt->fetchAll()]);
             break;
         case 'POST':
@@ -24,8 +30,8 @@ try {
                 break;
             }
             $d=json_decode(file_get_contents('php://input'),true);
-            $db->prepare("INSERT INTO proveedores (nombre,tipo,telefono,email,direccion,notas) VALUES (?,?,?,?,?,?)")
-               ->execute([$d['nombre'],$d['tipo'],$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null]);
+                $db->prepare("INSERT INTO proveedores (nombre,tipo,es_taller_autorizado,telefono,email,direccion,notas) VALUES (?,?,?,?,?,?,?)")
+                    ->execute([$d['nombre'],$d['tipo'],(int)($d['es_taller_autorizado'] ?? 0),$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null]);
                 $newId = (int)$db->lastInsertId();
                 audit_log('proveedores', 'create', $newId, [], $d);
                 echo json_encode(['id'=>$newId,'ok'=>true]);
@@ -40,8 +46,8 @@ try {
                 $prevStmt = $db->prepare("SELECT * FROM proveedores WHERE id=? LIMIT 1");
                 $prevStmt->execute([(int)$d['id']]);
                 $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("UPDATE proveedores SET nombre=?,tipo=?,telefono=?,email=?,direccion=?,notas=? WHERE id=?")
-               ->execute([$d['nombre'],$d['tipo'],$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null,$d['id']]);
+            $db->prepare("UPDATE proveedores SET nombre=?,tipo=?,es_taller_autorizado=?,telefono=?,email=?,direccion=?,notas=? WHERE id=?")
+               ->execute([$d['nombre'],$d['tipo'],(int)($d['es_taller_autorizado'] ?? 0),$d['telefono']?:null,$d['email']?:null,$d['direccion']?:null,$d['notas']?:null,$d['id']]);
                 audit_log('proveedores', 'update', (int)$d['id'], $prev, $d);
             echo json_encode(['ok'=>true]);
             break;

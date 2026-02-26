@@ -200,6 +200,7 @@ Header set X-Frame-Options "SAMEORIGIN"
 - **Módulo 2**: odómetro base (`odometer_logs`) con validación de no decremento y override.
 - **Módulo 3**: catálogos base y configuración global con UI admin (`catalogos.php`).
 - **Módulo 4**: asignaciones con reglas de bloqueo + cierre con control de km y override.
+- **Módulo 5**: talleres autorizados + usuario tipo taller con límites en mantenimientos.
 
 ---
 

@@ -82,20 +82,24 @@ $tables = [
   nombre        VARCHAR(100) NOT NULL,
   email         VARCHAR(150) NOT NULL UNIQUE,
   password      VARCHAR(255) NOT NULL,
-  rol           ENUM('coordinador_it','soporte','monitoreo','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo',
+  rol           ENUM('coordinador_it','soporte','monitoreo','taller','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo',
+  proveedor_id  INT NULL,
   activo        TINYINT(1) NOT NULL DEFAULT 1,
   ultimo_acceso DATETIME NULL,
-  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_usuarios_proveedor (proveedor_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 "proveedores" => "CREATE TABLE IF NOT EXISTS proveedores (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(150) NOT NULL,
   tipo       VARCHAR(80)  NOT NULL DEFAULT 'Taller mecánico',
+  es_taller_autorizado TINYINT(1) NOT NULL DEFAULT 0,
   telefono   VARCHAR(30)  NULL,
   email      VARCHAR(150) NULL,
   direccion  VARCHAR(255) NULL,
   notas      TEXT         NULL,
+  INDEX idx_prov_taller_autorizado (es_taller_autorizado),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -291,6 +295,83 @@ foreach ($tables as $name => $sql) {
   } catch (Throwable $e) {
     step("Tabla '{$name}'", false, $e->getMessage());
   }
+}
+
+// 3.1 Ajustes de compatibilidad para instalaciones existentes
+$dbNameEsc = str_replace("'", "''", DB_NAME);
+$existsColumn = function (string $table, string $column) use ($pdo, $dbNameEsc): bool {
+  $stmt = $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='{$dbNameEsc}' AND TABLE_NAME='".str_replace("'","''",$table)."' AND COLUMN_NAME='".str_replace("'","''",$column)."'");
+  return (int)$stmt->fetchColumn() > 0;
+};
+$existsIndex = function (string $table, string $index) use ($pdo, $dbNameEsc): bool {
+  $stmt = $pdo->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA='{$dbNameEsc}' AND TABLE_NAME='".str_replace("'","''",$table)."' AND INDEX_NAME='".str_replace("'","''",$index)."'");
+  return (int)$stmt->fetchColumn() > 0;
+};
+$existsFk = function (string $table, string $constraint) use ($pdo, $dbNameEsc): bool {
+  $stmt = $pdo->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA='{$dbNameEsc}' AND TABLE_NAME='".str_replace("'","''",$table)."' AND CONSTRAINT_NAME='".str_replace("'","''",$constraint)."' AND CONSTRAINT_TYPE='FOREIGN KEY'");
+  return (int)$stmt->fetchColumn() > 0;
+};
+
+try {
+  if (!$existsColumn('proveedores', 'es_taller_autorizado')) {
+    $pdo->exec("ALTER TABLE proveedores ADD COLUMN es_taller_autorizado TINYINT(1) NOT NULL DEFAULT 0");
+    step('Compat: proveedores.es_taller_autorizado', true);
+  } else {
+    step('Compat: proveedores.es_taller_autorizado', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: proveedores.es_taller_autorizado', false, $e->getMessage());
+}
+
+try {
+  if (!$existsIndex('proveedores', 'idx_prov_taller_autorizado')) {
+    $pdo->exec("ALTER TABLE proveedores ADD INDEX idx_prov_taller_autorizado (es_taller_autorizado)");
+    step('Compat: índice proveedores autorizados', true);
+  } else {
+    step('Compat: índice proveedores autorizados', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: índice proveedores autorizados', false, $e->getMessage());
+}
+
+try {
+  $pdo->exec("ALTER TABLE usuarios MODIFY COLUMN rol ENUM('coordinador_it','soporte','monitoreo','taller','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo'");
+  step('Compat: rol taller en usuarios', true);
+} catch (Throwable $e) {
+  step('Compat: rol taller en usuarios', false, $e->getMessage());
+}
+
+try {
+  if (!$existsColumn('usuarios', 'proveedor_id')) {
+    $pdo->exec("ALTER TABLE usuarios ADD COLUMN proveedor_id INT NULL");
+    step('Compat: usuarios.proveedor_id', true);
+  } else {
+    step('Compat: usuarios.proveedor_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: usuarios.proveedor_id', false, $e->getMessage());
+}
+
+try {
+  if (!$existsIndex('usuarios', 'idx_usuarios_proveedor')) {
+    $pdo->exec("ALTER TABLE usuarios ADD INDEX idx_usuarios_proveedor (proveedor_id)");
+    step('Compat: índice usuarios.proveedor_id', true);
+  } else {
+    step('Compat: índice usuarios.proveedor_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: índice usuarios.proveedor_id', false, $e->getMessage());
+}
+
+try {
+  if (!$existsFk('usuarios', 'fk_usuarios_proveedor')) {
+    $pdo->exec("ALTER TABLE usuarios ADD CONSTRAINT fk_usuarios_proveedor FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL");
+    step('Compat: FK usuarios->proveedores', true);
+  } else {
+    step('Compat: FK usuarios->proveedores', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Compat: FK usuarios->proveedores', true, 'Omitido: ' . htmlspecialchars($e->getMessage()));
 }
 
 // 3.1 Datos semilla de catálogos base

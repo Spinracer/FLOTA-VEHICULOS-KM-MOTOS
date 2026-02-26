@@ -41,3 +41,4 @@
 - Módulo 2: Control de odómetro
 - Módulo 3: Catálogos base y configuración global
 - Módulo 4: Asignaciones con reglas de bloqueo
+- Módulo 5: Talleres autorizados y portal de taller

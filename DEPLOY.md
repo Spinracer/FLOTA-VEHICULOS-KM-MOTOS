@@ -63,4 +63,6 @@ App disponible en: `http://127.0.0.1:8000`
 - Login debe redirigir a dashboard
 - Menú de Sistema debe mostrar Catálogos para admin
 - Menú principal debe mostrar Asignaciones
+- En Proveedores debe existir campo de taller autorizado
+- Usuarios admin permite crear rol Taller con proveedor asignado
 - Operaciones CRUD deben registrar actividad en `audit_logs`

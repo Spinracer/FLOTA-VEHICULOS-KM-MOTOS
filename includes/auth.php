@@ -14,6 +14,7 @@ const ROLES = [
     'coordinador_it' => 'Coordinador IT',
     'soporte'        => 'Soporte',
     'monitoreo'      => 'Monitoreo',
+    'taller'         => 'Taller',
 ];
 
 // Mapa de permisos por rol
@@ -21,6 +22,7 @@ const ROLE_PERMISSIONS = [
     'coordinador_it' => ['view', 'create', 'edit', 'delete', 'manage_users', 'manage_permissions'],
     'soporte'        => ['view', 'create', 'edit'],
     'monitoreo'      => ['view'],
+    'taller'         => ['view', 'create', 'edit'],
     // Compatibilidad con roles anteriores
     'admin'          => ['view', 'create', 'edit', 'delete', 'manage_users', 'manage_permissions'],
     'operador'       => ['view', 'create', 'edit'],
@@ -32,6 +34,7 @@ const ROLE_BADGES = [
     'coordinador_it' => 'badge-yellow',
     'soporte'        => 'badge-blue',
     'monitoreo'      => 'badge-cyan',
+    'taller'         => 'badge-orange',
     'admin'          => 'badge-yellow',
     'operador'       => 'badge-blue',
     'lectura'        => 'badge-gray',

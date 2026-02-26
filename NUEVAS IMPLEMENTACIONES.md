@@ -164,9 +164,9 @@
 ## 8) Talleres autorizados y portal
 
 - [x] CRUD de proveedores/talleres base (parcial)
-- [ ] Flag de “taller autorizado”
-- [ ] Cuentas de usuario tipo taller
-- [ ] Fronteras de permisos del taller
+- [x] Flag de “taller autorizado”
+- [x] Cuentas de usuario tipo taller
+- [x] Fronteras de permisos del taller
 
 **Aceptación**
 - Solo talleres autorizados registran mantenimiento.
