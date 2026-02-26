@@ -203,6 +203,7 @@ Header set X-Frame-Options "SAMEORIGIN"
 - **Módulo 5**: talleres autorizados + usuario tipo taller con límites en mantenimientos.
 - **Módulo 6**: historial consolidado por operador (asignaciones, combustible e incidentes).
 - **Módulo 7 (parcial)**: combustible con bloqueo por mantenimiento activo + excepción auditada + conductor/pago/recibo.
+- **Módulo 11 (parcial)**: filtros avanzados por rango de fecha en combustible.
 
 ---
 

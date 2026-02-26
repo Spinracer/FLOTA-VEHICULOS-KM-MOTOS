@@ -35,6 +35,8 @@ try {
         case 'GET':
             $q    = '%'.trim($_GET['q']??'').'%';
             $vid  = (int)($_GET['vehiculo_id'] ?? 0);
+            $from = trim((string)($_GET['from'] ?? ''));
+            $to   = trim((string)($_GET['to'] ?? ''));
             $page = max(1,(int)($_GET['page']??1));
             $per  = min(100,max(5,(int)($_GET['per']??25)));
             $off  = ($page-1)*$per;
@@ -42,6 +44,8 @@ try {
             $where = "WHERE (v.placa LIKE ? OR v.marca LIKE ? OR p.nombre LIKE ? OR o.nombre LIKE ? OR c.numero_recibo LIKE ?)";
             $params = [$q, $q, $q, $q, $q];
             if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
+            if ($from !== '') { $where .= " AND c.fecha >= ?"; $params[] = $from; }
+            if ($to !== '') { $where .= " AND c.fecha <= ?"; $params[] = $to; }
 
             $totalStmt = $db->prepare("SELECT COUNT(*) FROM combustible c
                 LEFT JOIN vehiculos v ON v.id=c.vehiculo_id

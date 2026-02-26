@@ -253,7 +253,7 @@
 
 ### 11.3 Filtros
 - [x] Filtros básicos en varios módulos (texto, vehículo, estado, paginación)
-- [ ] Filtros avanzados comunes por rango de fecha y catálogos
+- [x] Filtros avanzados por rango de fecha (parcial, combustible)
 - [ ] Agrupaciones y ordenamientos avanzados
 
 **Aceptación**

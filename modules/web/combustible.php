@@ -19,6 +19,8 @@ ob_start();
     <option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['placa'].' '.$v['marca']) ?></option>
     <?php endforeach; ?>
   </select>
+  <input id="from-date" type="date" onchange="load()" style="max-width:170px" title="Desde">
+  <input id="to-date" type="date" onchange="load()" style="max-width:170px" title="Hasta">
   <?php if(can('create')): ?>
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Registrar Carga</button>
   <?php endif; ?>
@@ -93,7 +95,9 @@ function calcTotal() {
 async function load() {
   const q   = document.getElementById('search-comb').value;
   const vid = document.getElementById('filter-veh').value;
-  const data = await api(`/api/combustible.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&page=${pager.page}&per=${pager.perPage}`);
+  const from = document.getElementById('from-date').value;
+  const to = document.getElementById('to-date').value;
+  const data = await api(`/api/combustible.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&page=${pager.page}&per=${pager.perPage}`);
   pager.setTotal(data.total);
   // Pills
   document.getElementById('stat-pills').innerHTML = `

@@ -44,3 +44,4 @@
 - Módulo 5: Talleres autorizados y portal de taller
 - Módulo 6: Historial operativo por conductor
 - Módulo 7 (parcial): Bloqueo de combustible + override auditado + conductor/pago/recibo
+- Módulo 11 (parcial): Filtros avanzados por fecha en combustible
