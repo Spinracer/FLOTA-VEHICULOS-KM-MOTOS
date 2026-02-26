@@ -52,6 +52,14 @@ DB_PASS=
 
 `includes/db.php` e `install.php` ya leen estas variables automáticamente.
 
+### Nota de runtime en dev container
+
+En este entorno usa `php8.3` para ejecutar el servidor local (incluye `pdo_mysql`):
+
+```bash
+php8.3 -S 0.0.0.0:8000
+```
+
 ---
 
 ### 3. Ejecutar el instalador
@@ -128,6 +136,7 @@ flotacontrol/
 ├── operadores.php         ← Entrada (wrapper) al módulo
 ├── proveedores.php        ← Entrada (wrapper) al módulo
 ├── usuarios.php           ← Entrada (wrapper) al módulo
+├── catalogos.php          ← Entrada (wrapper) al módulo
 ├── install.php            ← Instalador (eliminar después de usar)
 │
 ├── api/                   ← Wrappers de endpoints JSON
@@ -138,7 +147,8 @@ flotacontrol/
 │   ├── recordatorios.php
 │   ├── operadores.php
 │   ├── proveedores.php
-│   └── usuarios.php
+│   ├── usuarios.php
+│   └── catalogos.php
 │
 ├── modules/
 │   ├── web/               ← Implementación real de páginas
@@ -147,6 +157,8 @@ flotacontrol/
 ├── includes/
 │   ├── db.php             ← Configuración PDO MySQL
 │   ├── auth.php           ← Sesiones y control de roles
+│   ├── audit.php          ← Bitácora de cambios críticos
+│   ├── odometro.php       ← Reglas y registro de odómetro
 │   └── layout.php         ← Sidebar/Header HTML compartido
 │
 └── assets/
@@ -176,6 +188,22 @@ DirectoryIndex index.php
 Header set X-Content-Type-Options "nosniff"
 Header set X-Frame-Options "SAMEORIGIN"
 ```
+
+---
+
+## 🧩 Avance por módulos
+
+- **Módulo 0**: reorganización en `modules/web` y `modules/api` con wrappers compatibles.
+- **Módulo 1**: auditoría base (`audit_logs`) y trazabilidad de auth + CRUD.
+- **Módulo 2**: odómetro base (`odometer_logs`) con validación de no decremento y override.
+- **Módulo 3**: catálogos base y configuración global con UI admin (`catalogos.php`).
+
+---
+
+## 📚 Documentación adicional
+
+- Guía de despliegue: `DEPLOY.md`
+- Tecnologías usadas: `TECNOLOGIAS.md`
 
 ---
 

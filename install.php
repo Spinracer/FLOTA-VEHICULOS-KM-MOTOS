@@ -199,6 +199,52 @@ $tables = [
   CONSTRAINT fk_odometer_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehiculos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+"catalogo_categorias_gasto" => "CREATE TABLE IF NOT EXISTS catalogo_categorias_gasto (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  descripcion VARCHAR(255) NULL,
+  activo      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"catalogo_unidades" => "CREATE TABLE IF NOT EXISTS catalogo_unidades (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  clave       VARCHAR(20) NULL,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  activo      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"catalogo_tipos_mantenimiento" => "CREATE TABLE IF NOT EXISTS catalogo_tipos_mantenimiento (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  activo      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"catalogo_estados_vehiculo" => "CREATE TABLE IF NOT EXISTS catalogo_estados_vehiculo (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  activo      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"catalogo_servicios_taller" => "CREATE TABLE IF NOT EXISTS catalogo_servicios_taller (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  nombre      VARCHAR(120) NOT NULL UNIQUE,
+  activo      TINYINT(1) NOT NULL DEFAULT 1,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"system_settings" => "CREATE TABLE IF NOT EXISTS system_settings (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  key_name    VARCHAR(160) NOT NULL UNIQUE,
+  value_text  VARCHAR(255) NULL,
+  value_num   DECIMAL(14,4) NULL,
+  description VARCHAR(255) NULL,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 "audit_logs" => "CREATE TABLE IF NOT EXISTS audit_logs (
   id           BIGINT AUTO_INCREMENT PRIMARY KEY,
   user_id      INT NULL,
@@ -223,6 +269,25 @@ foreach ($tables as $name => $sql) {
     step("Tabla '{$name}' creada", true);
   } catch (Throwable $e) {
     step("Tabla '{$name}'", false, $e->getMessage());
+  }
+}
+
+// 3.1 Datos semilla de catálogos base
+$seedCatalogs = [
+  ["INSERT IGNORE INTO catalogo_categorias_gasto (nombre,descripcion) VALUES ('Repuestos','Partes y refacciones'), ('Lubricantes','Aceites y fluidos'), ('Mano de obra','Servicios técnicos'), ('Llantas','Neumáticos y reparación')", 'Semilla categorías de gasto'],
+  ["INSERT IGNORE INTO catalogo_unidades (clave,nombre) VALUES ('L','Litros'), ('GAL','Galones'), ('PZA','Pieza'), ('SERV','Servicio')", 'Semilla unidades'],
+  ["INSERT IGNORE INTO catalogo_tipos_mantenimiento (nombre) VALUES ('Preventivo'), ('Correctivo'), ('Inspección'), ('Emergencia')", 'Semilla tipos de mantenimiento'],
+  ["INSERT IGNORE INTO catalogo_estados_vehiculo (nombre) VALUES ('Activo'), ('En mantenimiento'), ('Fuera de servicio')", 'Semilla estados de vehículo'],
+  ["INSERT IGNORE INTO catalogo_servicios_taller (nombre) VALUES ('Mecánica general'), ('Electricidad automotriz'), ('Llantería'), ('Alineación y balanceo')", 'Semilla servicios de taller'],
+  ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.anomaly_threshold',15,'Porcentaje mínimo bajo promedio para marcar anomalía')", 'Semilla configuración global'],
+];
+
+foreach ($seedCatalogs as [$sql, $label]) {
+  try {
+    $pdo->exec($sql);
+    step($label, true);
+  } catch (Throwable $e) {
+    step($label, false, $e->getMessage());
   }
 }
 

@@ -68,14 +68,14 @@
 ## 3) Catálogos base y configuración del sistema
 
 ### 3.1 Catálogos
-- [ ] Categorías de gasto
-- [ ] Unidades (L, gal, pza, servicio)
-- [ ] Tipos de mantenimiento
-- [ ] Estados de vehículo del dominio objetivo
-- [ ] Servicios de taller
+- [x] Categorías de gasto
+- [x] Unidades (L, gal, pza, servicio)
+- [x] Tipos de mantenimiento
+- [x] Estados de vehículo del dominio objetivo
+- [x] Servicios de taller
 
 ### 3.2 Configuración
-- [ ] Umbral de consumo anómalo
+- [x] Umbral de consumo anómalo (setting base)
 - [ ] Máximo de litros por evento (opcional)
 - [ ] Umbral de aprobación de mantenimiento
 - [ ] Intervalos preventivos por vehículo

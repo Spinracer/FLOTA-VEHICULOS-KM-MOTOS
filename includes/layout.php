@@ -61,6 +61,9 @@ function render_layout(string $page_title, string $active_page, string $content)
 
     <?php if ($is_admin): ?>
     <div class="nav-section">Sistema</div>
+    <a href="/catalogos.php" class="nav-item <?= $active_page==='catalogos'?'active':'' ?>">
+      <span class="nav-icon">🗂️</span><span>Catálogos</span>
+    </a>
     <a href="/usuarios.php" class="nav-item <?= $active_page==='usuarios'?'active':'' ?>">
       <span class="nav-icon">🔑</span><span>Usuarios</span>
     </a>
