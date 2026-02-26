@@ -8,6 +8,28 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
 
+function combustible_bloqueo_mantenimiento(PDO $db, int $vehiculoId, ?int $excludeMaintenanceId = null): ?array {
+    $sql = "SELECT id, estado FROM mantenimientos WHERE vehiculo_id=? AND estado IN ('En proceso','Pendiente')";
+    $params = [$vehiculoId];
+    if ($excludeMaintenanceId) {
+        $sql .= " AND id<>?";
+        $params[] = $excludeMaintenanceId;
+    }
+    $sql .= " ORDER BY id DESC LIMIT 1";
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    $row = $stmt->fetch();
+    if ($row) {
+        return [
+            'reason' => 'El vehículo tiene mantenimiento activo. No se permite carga de combustible.',
+            'blocking_type' => 'mantenimiento',
+            'blocking_id' => (int)$row['id'],
+            'estado' => $row['estado'],
+        ];
+    }
+    return null;
+}
+
 try {
     switch ($method) {
         case 'GET':
@@ -65,9 +87,16 @@ try {
                 break;
             }
             $d = json_decode(file_get_contents('php://input'), true);
+            $vehiculoId = (int)($d['vehiculo_id'] ?? 0);
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
-            odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
+            $bloqueo = combustible_bloqueo_mantenimiento($db, $vehiculoId);
+            if ($bloqueo && !$allowOverride) {
+                http_response_code(409);
+                echo json_encode(['error' => $bloqueo['reason'], 'reason' => $bloqueo['reason'], 'blocking_type' => $bloqueo['blocking_type'], 'blocking_id' => $bloqueo['blocking_id']]);
+                break;
+            }
+            odometro_validar_km($db, $vehiculoId, $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $l = (float)$d['litros']; $c = (float)$d['costo_litro'];
             $stmt = $db->prepare("INSERT INTO combustible (fecha,vehiculo_id,litros,costo_litro,total,km,proveedor_id,tipo_carga,notas) VALUES (?,?,?,?,?,?,?,?,?)");
             $stmt->execute([$d['fecha'],$d['vehiculo_id'],$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['tipo_carga']??'Lleno',$d['notas']?:null]);
@@ -76,6 +105,9 @@ try {
                 odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
             }
             $newId = (int)$db->lastInsertId();
+            if ($allowOverride && $bloqueo) {
+                audit_log('combustible', 'maintenance_override', $newId, [], ['vehiculo_id' => $vehiculoId], ['reason' => $d['override_reason'], 'bloqueo' => $bloqueo]);
+            }
             if ($allowOverride) {
                 audit_log('combustible', 'odometro_override', $newId, [], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
             }
@@ -93,9 +125,16 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM combustible WHERE id=? LIMIT 1");
             $prevStmt->execute([(int)$d['id']]);
             $prev = $prevStmt->fetch() ?: [];
+            $vehiculoId = (int)($d['vehiculo_id'] ?? 0);
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
-            odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
+            $bloqueo = combustible_bloqueo_mantenimiento($db, $vehiculoId);
+            if ($bloqueo && !$allowOverride) {
+                http_response_code(409);
+                echo json_encode(['error' => $bloqueo['reason'], 'reason' => $bloqueo['reason'], 'blocking_type' => $bloqueo['blocking_type'], 'blocking_id' => $bloqueo['blocking_id']]);
+                break;
+            }
+            odometro_validar_km($db, $vehiculoId, $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $l=(float)$d['litros']; $c=(float)$d['costo_litro'];
             $stmt = $db->prepare("UPDATE combustible SET fecha=?,vehiculo_id=?,litros=?,costo_litro=?,total=?,km=?,proveedor_id=?,tipo_carga=?,notas=? WHERE id=?");
             $stmt->execute([$d['fecha'],$d['vehiculo_id'],$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['tipo_carga'],$d['notas']?:null,$d['id']]);
@@ -103,6 +142,9 @@ try {
                 odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
             }
             if ($allowOverride) {
+                if ($bloqueo) {
+                    audit_log('combustible', 'maintenance_override', (int)$d['id'], $prev, ['vehiculo_id' => $vehiculoId], ['reason' => $d['override_reason'], 'bloqueo' => $bloqueo]);
+                }
                 audit_log('combustible', 'odometro_override', (int)$d['id'], ['km_anterior' => $prev['km'] ?? null], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
             }
             audit_log('combustible', 'update', (int)$d['id'], $prev, $d);

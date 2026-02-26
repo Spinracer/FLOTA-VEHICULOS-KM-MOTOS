@@ -216,8 +216,8 @@
 - [ ] Adjuntos (foto de recibo y odómetro)
 
 ### 10.2 Reglas de bloqueo
-- [ ] Bloquear carga si vehículo está en mantenimiento activo
-- [ ] Flujo de excepción con motivo/posible aprobación/auditoría
+- [x] Bloquear carga si vehículo está en mantenimiento activo
+- [x] Flujo de excepción con motivo/posible aprobación/auditoría
 
 ### 10.3 Consumo y anomalías
 - [x] Cálculo de km/L por registro (en consulta, no persistido)

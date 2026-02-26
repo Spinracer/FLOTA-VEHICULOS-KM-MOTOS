@@ -202,6 +202,7 @@ Header set X-Frame-Options "SAMEORIGIN"
 - **Módulo 4**: asignaciones con reglas de bloqueo + cierre con control de km y override.
 - **Módulo 5**: talleres autorizados + usuario tipo taller con límites en mantenimientos.
 - **Módulo 6**: historial consolidado por operador (asignaciones, combustible e incidentes).
+- **Módulo 7 (parcial)**: combustible bloqueado por mantenimiento activo con excepción auditada.
 
 ---
 

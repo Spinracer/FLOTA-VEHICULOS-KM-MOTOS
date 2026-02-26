@@ -61,6 +61,7 @@ ob_start();
           <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option>
           <?php endforeach; ?>
         </select></div>
+      <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar bloqueo por mantenimiento u odómetro."></textarea></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
     </div>
     <div class="modal-actions">
