@@ -12,6 +12,70 @@ $db = getDB();
 try {
     switch ($method) {
         case 'GET':
+            // Perfil 360: ?action=profile&id=X
+            if (($_GET['action'] ?? '') === 'profile') {
+                $id = (int)($_GET['id'] ?? 0);
+                if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'ID inválido']); break; }
+
+                $veh = $db->prepare("SELECT v.*, o.nombre AS operador_nombre FROM vehiculos v LEFT JOIN operadores o ON o.id=v.operador_id WHERE v.id=? LIMIT 1");
+                $veh->execute([$id]);
+                $vehiculo = $veh->fetch();
+                if (!$vehiculo) { http_response_code(404); echo json_encode(['error' => 'Vehículo no encontrado']); break; }
+
+                // Asignación activa
+                $asgStmt = $db->prepare("SELECT a.*, o.nombre AS operador_nombre FROM asignaciones a JOIN operadores o ON o.id=a.operador_id WHERE a.vehiculo_id=? AND a.estado='Activa' ORDER BY a.id DESC LIMIT 1");
+                $asgStmt->execute([$id]);
+                $asignacionActiva = $asgStmt->fetch() ?: null;
+
+                // Mantenimiento activo
+                $mntStmt = $db->prepare("SELECT m.*, p.nombre AS proveedor_nombre FROM mantenimientos m LEFT JOIN proveedores p ON p.id=m.proveedor_id WHERE m.vehiculo_id=? AND m.estado IN ('En proceso','Pendiente') ORDER BY m.id DESC LIMIT 1");
+                $mntStmt->execute([$id]);
+                $mantenimientoActivo = $mntStmt->fetch() ?: null;
+
+                // Último odómetro
+                $odoStmt = $db->prepare("SELECT reading_km, source, recorded_at FROM odometer_logs WHERE vehicle_id=? ORDER BY recorded_at DESC LIMIT 1");
+                $odoStmt->execute([$id]);
+                $ultimoOdo = $odoStmt->fetch() ?: null;
+
+                // Último combustible
+                $fuelStmt = $db->prepare("SELECT fecha, litros, total, km FROM combustible WHERE vehiculo_id=? ORDER BY fecha DESC, id DESC LIMIT 1");
+                $fuelStmt->execute([$id]);
+                $ultimoComb = $fuelStmt->fetch() ?: null;
+
+                // Totales
+                $totalesStmt = $db->prepare("SELECT
+                    (SELECT COUNT(*) FROM asignaciones WHERE vehiculo_id=?) AS total_asignaciones,
+                    (SELECT COUNT(*) FROM mantenimientos WHERE vehiculo_id=?) AS total_mantenimientos,
+                    (SELECT COALESCE(SUM(costo),0) FROM mantenimientos WHERE vehiculo_id=?) AS gasto_mantenimiento,
+                    (SELECT COUNT(*) FROM combustible WHERE vehiculo_id=?) AS total_cargas,
+                    (SELECT COALESCE(SUM(litros),0) FROM combustible WHERE vehiculo_id=?) AS total_litros,
+                    (SELECT COALESCE(SUM(total),0) FROM combustible WHERE vehiculo_id=?) AS gasto_combustible,
+                    (SELECT COUNT(*) FROM incidentes WHERE vehiculo_id=?) AS total_incidentes
+                ");
+                $totalesStmt->execute([$id,$id,$id,$id,$id,$id,$id]);
+                $totales = $totalesStmt->fetch();
+
+                // Historial reciente mantenimientos
+                $histMnt = $db->prepare("SELECT m.id,m.fecha,m.tipo,m.costo,m.estado,p.nombre AS proveedor_nombre FROM mantenimientos m LEFT JOIN proveedores p ON p.id=m.proveedor_id WHERE m.vehiculo_id=? ORDER BY m.fecha DESC LIMIT 10");
+                $histMnt->execute([$id]);
+
+                // Historial reciente combustible
+                $histFuel = $db->prepare("SELECT id,fecha,litros,total,km FROM combustible WHERE vehiculo_id=? ORDER BY fecha DESC LIMIT 10");
+                $histFuel->execute([$id]);
+
+                echo json_encode([
+                    'vehiculo' => $vehiculo,
+                    'asignacion_activa' => $asignacionActiva,
+                    'mantenimiento_activo' => $mantenimientoActivo,
+                    'ultimo_odometro' => $ultimoOdo,
+                    'ultimo_combustible' => $ultimoComb,
+                    'totales' => $totales,
+                    'historial_mantenimientos' => $histMnt->fetchAll(),
+                    'historial_combustible' => $histFuel->fetchAll(),
+                ]);
+                break;
+            }
+
             $q    = '%' . trim($_GET['q']    ?? '') . '%';
             $page = max(1, (int)($_GET['page'] ?? 1));
             $per  = min(100, max(5, (int)($_GET['per'] ?? 20)));
@@ -19,13 +83,13 @@ try {
 
             $total = $db->prepare("SELECT COUNT(*) FROM vehiculos v
                 LEFT JOIN operadores o ON o.id = v.operador_id
-                WHERE v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?");
+                WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)");
             $total->execute([$q,$q,$q,$q]);
 
             $stmt = $db->prepare("SELECT v.*, o.nombre AS operador_nombre
                 FROM vehiculos v
                 LEFT JOIN operadores o ON o.id = v.operador_id
-                WHERE v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?
+                WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)
                 ORDER BY v.placa ASC
                 LIMIT ? OFFSET ?");
             $stmt->execute([$q,$q,$q,$q,$per,$off]);
@@ -99,8 +163,9 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM vehiculos WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM vehiculos WHERE id = ?")->execute([$id]);
-            audit_log('vehiculos', 'delete', $id, $prev, []);
+            // Soft-delete: marcar como eliminado en vez de borrar
+            $db->prepare("UPDATE vehiculos SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('vehiculos', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok' => true]);
             break;
 

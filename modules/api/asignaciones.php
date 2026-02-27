@@ -110,21 +110,28 @@ try {
 
             odometro_validar_km($db, $vehiculoId, $startKm, $allowOverride, $overrideReason ?: null);
 
-            $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by)
-                VALUES (?,?,?,?,?,'Activa',?,?)");
-            $stmt->execute([
-                $vehiculoId,
-                $operadorId,
-                $d['start_at'] ?: date('Y-m-d H:i:s'),
-                $startKm,
-                $d['start_notes'] ?: null,
-                $allowOverride ? $overrideReason : null,
-                (int)($_SESSION['user_id'] ?? 0)
-            ]);
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by)
+                    VALUES (?,?,?,?,?,'Activa',?,?)");
+                $stmt->execute([
+                    $vehiculoId,
+                    $operadorId,
+                    $d['start_at'] ?: date('Y-m-d H:i:s'),
+                    $startKm,
+                    $d['start_notes'] ?: null,
+                    $allowOverride ? $overrideReason : null,
+                    (int)($_SESSION['user_id'] ?? 0)
+                ]);
 
-            $id = (int)$db->lastInsertId();
-            if ($startKm) {
-                odometro_registrar($db, $vehiculoId, $startKm, 'assignment_start', (int)($_SESSION['user_id'] ?? 0));
+                $id = (int)$db->lastInsertId();
+                if ($startKm) {
+                    odometro_registrar($db, $vehiculoId, $startKm, 'assignment_start', (int)($_SESSION['user_id'] ?? 0));
+                }
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
             }
 
             if ($allowOverride) {
@@ -176,19 +183,26 @@ try {
             $allowOverride = can('manage_permissions') && $overrideReason !== '';
             odometro_validar_km($db, $vehiculoId, $endKm, $allowOverride, $overrideReason ?: null);
 
-            $stmt = $db->prepare("UPDATE asignaciones
-                SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?
-                WHERE id=?");
-            $stmt->execute([
-                $d['end_at'] ?: date('Y-m-d H:i:s'),
-                $endKm,
-                $d['end_notes'] ?: null,
-                $allowOverride ? $overrideReason : null,
-                (int)($_SESSION['user_id'] ?? 0),
-                $id
-            ]);
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("UPDATE asignaciones
+                    SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?
+                    WHERE id=?");
+                $stmt->execute([
+                    $d['end_at'] ?: date('Y-m-d H:i:s'),
+                    $endKm,
+                    $d['end_notes'] ?: null,
+                    $allowOverride ? $overrideReason : null,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    $id
+                ]);
 
-            odometro_registrar($db, $vehiculoId, $endKm, 'assignment_end', (int)($_SESSION['user_id'] ?? 0));
+                odometro_registrar($db, $vehiculoId, $endKm, 'assignment_end', (int)($_SESSION['user_id'] ?? 0));
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
+            }
 
             if ($allowOverride) {
                 audit_log('asignaciones', 'override_used', $id, ['km_anterior' => $prev['end_km'] ?? null], ['km_nuevo' => $endKm], ['reason' => $overrideReason]);

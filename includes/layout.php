@@ -51,6 +51,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/recordatorios.php" class="nav-item <?= $active_page==='recordatorios'?'active':'' ?>">
       <span class="nav-icon">🔔</span><span>Recordatorios</span>
     </a>
+    <a href="/reportes.php" class="nav-item <?= $active_page==='reportes'?'active':'' ?>">
+      <span class="nav-icon">📈</span><span>Reportes</span>
+    </a>
 
     <?php if ($can_edit || $is_admin): ?>
     <div class="nav-section">Administración</div>

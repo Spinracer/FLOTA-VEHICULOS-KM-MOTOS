@@ -30,12 +30,14 @@ try {
         case 'GET':
             $q    = '%'.trim($_GET['q']??'').'%';
             $vid  = (int)($_GET['vehiculo_id']??0);
+            $estado = trim($_GET['estado'] ?? '');
             $page = max(1,(int)($_GET['page']??1));
             $per  = min(100,max(5,(int)($_GET['per']??25)));
             $off  = ($page-1)*$per;
             $where = "WHERE (v.placa LIKE ? OR m.tipo LIKE ? OR m.descripcion LIKE ?)";
             $params = [$q, $q, $q];
             if ($vid) { $where .= " AND m.vehiculo_id=?"; $params[] = $vid; }
+            if ($estado !== '') { $where .= " AND m.estado=?"; $params[] = $estado; }
             if ($rol === 'taller') {
                 $ctx = taller_context($db, (int)($user['id'] ?? 0));
                 if (!$ctx || !$ctx['proveedor_id'] || !$ctx['autorizado']) {
@@ -82,12 +84,19 @@ try {
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado) VALUES (?,?,?,?,?,?,?,?,?)");
-            $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado']]);
-            if ($km) {
-                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado) VALUES (?,?,?,?,?,?,?,?,?)");
+                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado']]);
+                if ($km) {
+                    odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+                }
+                $newId = (int)$db->lastInsertId();
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
             }
-            $newId = (int)$db->lastInsertId();
             if ($allowOverride) {
                 audit_log('mantenimientos', 'odometro_override', $newId, [], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
             }
@@ -121,10 +130,17 @@ try {
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,proximo_km=?,proveedor_id=?,estado=? WHERE id=?");
-            $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado'],$d['id']]);
-            if ($km) {
-                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,proximo_km=?,proveedor_id=?,estado=? WHERE id=?");
+                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)$d['costo'],$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$d['estado'],$d['id']]);
+                if ($km) {
+                    odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+                }
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
             }
             if ($allowOverride) {
                 audit_log('mantenimientos', 'odometro_override', (int)$d['id'], ['km_anterior' => $prev['km'] ?? null], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);

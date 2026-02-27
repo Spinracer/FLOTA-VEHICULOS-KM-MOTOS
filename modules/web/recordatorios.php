@@ -32,7 +32,7 @@ ob_start();
 const pager=new Paginator('pgr',load,25);
 async function load(){
   const q=document.getElementById('s').value,est=document.getElementById('fest').value;
-  const data=await api(`/api/recordatorios.php?q=${encodeURIComponent(q+(est?' '+est:''))}&page=${pager.page}&per=${pager.perPage}`);
+  const data=await api(`/api/recordatorios.php?q=${encodeURIComponent(q)}&estado=${encodeURIComponent(est)}&page=${pager.page}&per=${pager.perPage}`);
   pager.setTotal(data.total);
   const tbody=document.getElementById('tbody');
   if(!data.rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">🔔</div><div class="empty-title">Sin recordatorios</div></div></td></tr>`;return;}

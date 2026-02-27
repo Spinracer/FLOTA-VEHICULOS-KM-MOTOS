@@ -47,11 +47,13 @@ try {
             if ($from !== '') { $where .= " AND c.fecha >= ?"; $params[] = $from; }
             if ($to !== '') { $where .= " AND c.fecha <= ?"; $params[] = $to; }
 
+            // Obtener total y consumir inmediatamente
             $totalStmt = $db->prepare("SELECT COUNT(*) FROM combustible c
                 LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
                 LEFT JOIN operadores o ON o.id=c.operador_id
                 LEFT JOIN proveedores p ON p.id=c.proveedor_id $where");
             $totalStmt->execute($params);
+            $total = (int)$totalStmt->fetchColumn();
 
             $statsStmt = $db->prepare("SELECT COALESCE(SUM(c.litros),0) as litros, COALESCE(SUM(c.total),0) as gasto
                 FROM combustible c LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
@@ -63,7 +65,9 @@ try {
             $listParams = $params;
             $listParams[] = $per;
             $listParams[] = $off;
-            $stmt = $db->prepare("SELECT c.*, v.placa, v.marca, p.nombre AS proveedor_nombre, o.nombre AS operador_nombre
+            // Incluir la carga previa con LAG() para evitar N+1 queries en rendimiento
+            $stmt = $db->prepare("SELECT c.*, v.placa, v.marca, p.nombre AS proveedor_nombre, o.nombre AS operador_nombre,
+                (SELECT c2.km FROM combustible c2 WHERE c2.vehiculo_id=c.vehiculo_id AND c2.km>0 AND c2.km<c.km AND c2.litros>0 ORDER BY c2.km DESC LIMIT 1) AS prev_km
                 FROM combustible c
                 LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
                 LEFT JOIN operadores o ON o.id=c.operador_id
@@ -72,19 +76,18 @@ try {
             $stmt->execute($listParams);
             $rows = $stmt->fetchAll();
 
-            // Calcular rendimiento para cada fila
+            // Calcular rendimiento usando prev_km ya obtenido (sin N+1)
             foreach ($rows as &$row) {
-                if ($row['km'] > 0) {
-                    $prev = $db->prepare("SELECT km, litros FROM combustible WHERE vehiculo_id=? AND km>0 AND km<? AND litros>0 ORDER BY km DESC LIMIT 1");
-                    $prev->execute([$row['vehiculo_id'], $row['km']]);
-                    $p = $prev->fetch();
-                    $row['rendimiento'] = ($p && $row['litros'] > 0) ? ($row['km'] - $p['km']) / $row['litros'] : null;
+                if ($row['km'] > 0 && $row['prev_km'] > 0 && $row['litros'] > 0) {
+                    $row['rendimiento'] = round(($row['km'] - $row['prev_km']) / $row['litros'], 2);
                 } else {
                     $row['rendimiento'] = null;
                 }
+                unset($row['prev_km']);
             }
+            unset($row);
 
-            echo json_encode(['total'=>(int)$totalStmt->fetchColumn() ?: count($rows)+$off, 'stats'=>$stats, 'rows'=>$rows]);
+            echo json_encode(['total' => $total, 'stats' => $stats, 'rows' => $rows]);
             break;
 
         case 'POST':
@@ -119,13 +122,20 @@ try {
             }
             odometro_validar_km($db, $vehiculoId, $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $l = (float)$d['litros']; $c = (float)$d['costo_litro'];
-            $stmt = $db->prepare("INSERT INTO combustible (fecha,vehiculo_id,operador_id,litros,costo_litro,total,km,proveedor_id,metodo_pago,numero_recibo,tipo_carga,notas) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-            $stmt->execute([$d['fecha'],$d['vehiculo_id'],$operadorId,$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['metodo_pago'] ?: 'Efectivo',$d['numero_recibo']?:null,$d['tipo_carga']??'Lleno',$d['notas']?:null]);
-            // Actualizar km del vehículo si es mayor
-            if ($km) {
-                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("INSERT INTO combustible (fecha,vehiculo_id,operador_id,litros,costo_litro,total,km,proveedor_id,metodo_pago,numero_recibo,tipo_carga,notas) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$operadorId,$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['metodo_pago'] ?: 'Efectivo',$d['numero_recibo']?:null,$d['tipo_carga']??'Lleno',$d['notas']?:null]);
+                // Actualizar km del vehículo si es mayor
+                if ($km) {
+                    odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
+                }
+                $newId = (int)$db->lastInsertId();
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
             }
-            $newId = (int)$db->lastInsertId();
             if ($allowOverride && $bloqueo) {
                 audit_log('combustible', 'maintenance_override', $newId, [], ['vehiculo_id' => $vehiculoId], ['reason' => $d['override_reason'], 'bloqueo' => $bloqueo]);
             }
@@ -171,10 +181,17 @@ try {
             }
             odometro_validar_km($db, $vehiculoId, $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $l=(float)$d['litros']; $c=(float)$d['costo_litro'];
-            $stmt = $db->prepare("UPDATE combustible SET fecha=?,vehiculo_id=?,operador_id=?,litros=?,costo_litro=?,total=?,km=?,proveedor_id=?,metodo_pago=?,numero_recibo=?,tipo_carga=?,notas=? WHERE id=?");
-            $stmt->execute([$d['fecha'],$d['vehiculo_id'],$operadorId,$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['metodo_pago'] ?: 'Efectivo',$d['numero_recibo']?:null,$d['tipo_carga'],$d['notas']?:null,$d['id']]);
-            if ($km) {
-                odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
+            $db->beginTransaction();
+            try {
+                $stmt = $db->prepare("UPDATE combustible SET fecha=?,vehiculo_id=?,operador_id=?,litros=?,costo_litro=?,total=?,km=?,proveedor_id=?,metodo_pago=?,numero_recibo=?,tipo_carga=?,notas=? WHERE id=?");
+                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$operadorId,$l,$c,round($l*$c,2),$d['km']?:null,$d['proveedor_id']?:null,$d['metodo_pago'] ?: 'Efectivo',$d['numero_recibo']?:null,$d['tipo_carga'],$d['notas']?:null,$d['id']]);
+                if ($km) {
+                    odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'fuel', (int)($_SESSION['user_id'] ?? 0));
+                }
+                $db->commit();
+            } catch (Throwable $txe) {
+                $db->rollBack();
+                throw $txe;
             }
             if ($allowOverride) {
                 if ($bloqueo) {

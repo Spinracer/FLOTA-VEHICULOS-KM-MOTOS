@@ -10,15 +10,26 @@ try {
     switch ($method) {
         case 'GET':
             $q='%'.trim($_GET['q']??'').'%';
+            $estado = trim($_GET['estado'] ?? '');
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $total=$db->prepare("SELECT COUNT(*) FROM recordatorios r LEFT JOIN vehiculos v ON v.id=r.vehiculo_id WHERE v.placa LIKE ? OR r.tipo LIKE ? OR r.descripcion LIKE ?");
-            $total->execute([$q,$q,$q]);
+
+            $where = "WHERE (v.placa LIKE ? OR r.tipo LIKE ? OR r.descripcion LIKE ?)";
+            $params = [$q,$q,$q];
+            if ($estado !== '') { $where .= " AND r.estado = ?"; $params[] = $estado; }
+
+            $total=$db->prepare("SELECT COUNT(*) FROM recordatorios r LEFT JOIN vehiculos v ON v.id=r.vehiculo_id $where");
+            $total->execute($params);
+            $totalCount = (int)$total->fetchColumn();
+
+            $listParams = $params;
+            $listParams[] = $per;
+            $listParams[] = $off;
             $stmt=$db->prepare("SELECT r.*, v.placa, v.marca, DATEDIFF(r.fecha_limite, CURDATE()) as dias
                 FROM recordatorios r LEFT JOIN vehiculos v ON v.id=r.vehiculo_id
-                WHERE v.placa LIKE ? OR r.tipo LIKE ? OR r.descripcion LIKE ?
+                $where
                 ORDER BY r.fecha_limite ASC LIMIT ? OFFSET ?");
-            $stmt->execute([$q,$q,$q,$per,$off]);
-            echo json_encode(['total'=>(int)$total->fetchColumn(),'rows'=>$stmt->fetchAll()]);
+            $stmt->execute($listParams);
+            echo json_encode(['total'=>$totalCount,'rows'=>$stmt->fetchAll()]);
             break;
         case 'POST':
             if (!can('create')) {

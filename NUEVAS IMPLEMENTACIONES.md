@@ -56,8 +56,8 @@
 - [ ] Matriz de permisos granular por módulo objetivo (vehículos, asignaciones, mantenimiento, combustible, reportes)
 
 ### 2.3 Auditoría
-- [ ] Bitácora de cambios críticos (create/update/void/override)
-- [ ] Guardar before/after, usuario, IP, fecha
+- [x] Bitácora de cambios críticos (create/update/void/override)
+- [x] Guardar before/after, usuario, IP, fecha
 - [ ] Endpoints de consulta de auditoría
 
 **Aceptación**
@@ -89,8 +89,8 @@
 
 ### 4.1 CRUD de vehículos
 - [x] Tabla y CRUD de vehículos (placa, marca, modelo, año, combustible, estado, km, notas)
-- [ ] Soft-delete con bloqueo por historial
-- [ ] Endpoint perfil 360 con asignación activa, mantenimiento activo, último odómetro/combustible y totales
+- [x] Soft-delete con bloqueo por historial
+- [x] Endpoint perfil 360 con asignación activa, mantenimiento activo, último odómetro/combustible y totales
 
 ### 4.2 Fotos y documentos
 - [ ] Adjuntar múltiples fotos
@@ -200,7 +200,7 @@
 ### 9.5 Historial y exportación
 - [x] Listado histórico con filtros básicos (vehículo/texto)
 - [ ] Filtros avanzados (rango costo, taller, tipo, estado)
-- [ ] Exportar CSV/XLSX/PDF
+- [x] Exportar CSV (implementado; XLSX/PDF pendiente)
 
 **Aceptación**
 - OT como fuente única, exportable y auditable.
@@ -239,17 +239,17 @@
 ## 11) Reportes y exportaciones (CSV/XLSX/PDF)
 
 ### 11.1 Motor reusable
-- [ ] `ReportQueryBuilder` con filtros
-- [ ] `ReportExportService` con CSV/XLSX/PDF
+- [x] `ReportQueryBuilder` con filtros (includes/export.php + modules/api/reportes.php)
+- [x] `ReportExportService` con CSV (XLSX/PDF pendiente)
 - [ ] Colas para exportes grandes
-- [ ] Trazabilidad de exportes
+- [x] Trazabilidad de exportes (audit_log en cada export)
 
 ### 11.2 Reportes mínimos
-- [ ] Costos de mantenimiento
-- [ ] Combustible (totales/km-L/costo por km)
-- [ ] Utilización de vehículos
-- [ ] Top vehículos más costosos
-- [ ] Desempeño por taller
+- [x] Costos de mantenimiento
+- [x] Combustible (totales/km-L/costo por km)
+- [x] Utilización de vehículos
+- [x] Top vehículos más costosos
+- [x] Desempeño por taller
 
 ### 11.3 Filtros
 - [x] Filtros básicos en varios módulos (texto, vehículo, estado, paginación)
@@ -275,9 +275,9 @@
 
 ## 13) Integridad, concurrencia y performance
 
-- [ ] Índices compuestos críticos
-- [ ] Transacciones en operaciones críticas
-- [ ] Restricción de únicos activos (asignación/mantenimiento)
+- [x] Índices compuestos críticos (8 índices añadidos)
+- [x] Transacciones en operaciones críticas (combustible, asignaciones, mantenimientos)
+- [x] Restricción de únicos activos (asignación/mantenimiento)
 - [ ] Pruebas automatizadas de reglas duras
 - [x] Restricciones básicas existentes (FK y `placa` única)
 

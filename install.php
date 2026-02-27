@@ -438,7 +438,7 @@ try {
 $seedCatalogs = [
   ["INSERT IGNORE INTO catalogo_categorias_gasto (nombre,descripcion) VALUES ('Repuestos','Partes y refacciones'), ('Lubricantes','Aceites y fluidos'), ('Mano de obra','Servicios técnicos'), ('Llantas','Neumáticos y reparación')", 'Semilla categorías de gasto'],
   ["INSERT IGNORE INTO catalogo_unidades (clave,nombre) VALUES ('L','Litros'), ('GAL','Galones'), ('PZA','Pieza'), ('SERV','Servicio')", 'Semilla unidades'],
-  ["INSERT IGNORE INTO catalogo_tipos_mantenimiento (nombre) VALUES ('Preventivo'), ('Correctivo'), ('Inspección'), ('Emergencia')", 'Semilla tipos de mantenimiento'],
+  ["INSERT IGNORE INTO catalogo_tipos_mantenimiento (nombre) VALUES ('Preventivo'), ('Correctivo'), ('Inspección'), ('Emergencia'), ('Aceite y Filtros'), ('Frenos'), ('Llantas'), ('Batería'), ('Revisión general')", 'Semilla tipos de mantenimiento'],
   ["INSERT IGNORE INTO catalogo_estados_vehiculo (nombre) VALUES ('Activo'), ('En mantenimiento'), ('Fuera de servicio')", 'Semilla estados de vehículo'],
   ["INSERT IGNORE INTO catalogo_servicios_taller (nombre) VALUES ('Mecánica general'), ('Electricidad automotriz'), ('Llantería'), ('Alineación y balanceo')", 'Semilla servicios de taller'],
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.anomaly_threshold',15,'Porcentaje mínimo bajo promedio para marcar anomalía')", 'Semilla configuración global'],
@@ -450,6 +450,45 @@ foreach ($seedCatalogs as [$sql, $label]) {
     step($label, true);
   } catch (Throwable $e) {
     step($label, false, $e->getMessage());
+  }
+}
+
+// 3.2 Soft-delete: añadir columna deleted_at a tablas principales
+$softDeleteTables = ['vehiculos', 'operadores', 'proveedores', 'mantenimientos', 'combustible', 'incidentes', 'recordatorios'];
+foreach ($softDeleteTables as $tbl) {
+  try {
+    if (!$existsColumn($tbl, 'deleted_at')) {
+      $pdo->exec("ALTER TABLE `{$tbl}` ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL");
+      step("Soft-delete: {$tbl}.deleted_at", true);
+    } else {
+      step("Soft-delete: {$tbl}.deleted_at", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Soft-delete: {$tbl}.deleted_at", false, $e->getMessage());
+  }
+}
+
+// 3.3 Índices compuestos para rendimiento
+$compositeIndexes = [
+  ['combustible', 'idx_combustible_fecha', '(fecha)'],
+  ['combustible', 'idx_combustible_vehiculo_km', '(vehiculo_id, km)'],
+  ['mantenimientos', 'idx_mantenimientos_fecha', '(fecha)'],
+  ['mantenimientos', 'idx_mantenimientos_vehiculo_estado', '(vehiculo_id, estado)'],
+  ['incidentes', 'idx_incidentes_fecha', '(fecha)'],
+  ['incidentes', 'idx_incidentes_vehiculo_estado', '(vehiculo_id, estado)'],
+  ['recordatorios', 'idx_recordatorios_fecha_estado', '(fecha_limite, estado)'],
+  ['asignaciones', 'idx_asignaciones_created_at', '(created_at)'],
+];
+foreach ($compositeIndexes as [$tbl, $idx, $cols]) {
+  try {
+    if (!$existsIndex($tbl, $idx)) {
+      $pdo->exec("ALTER TABLE `{$tbl}` ADD INDEX {$idx} {$cols}");
+      step("Índice: {$tbl}.{$idx}", true);
+    } else {
+      step("Índice: {$tbl}.{$idx}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Índice: {$tbl}.{$idx}", false, $e->getMessage());
   }
 }
 

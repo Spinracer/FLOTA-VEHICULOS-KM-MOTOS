@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../../includes/layout.php';
+require_once __DIR__ . '/../../includes/catalogos.php';
 require_login();
 $db = getDB();
 $vehiculos   = $db->query("SELECT id,placa,marca,modelo FROM vehiculos ORDER BY placa")->fetchAll();
 $proveedores = $db->query("SELECT id,nombre FROM proveedores ORDER BY nombre")->fetchAll();
+$tiposMantenimiento = catalogo_items('tipos_mantenimiento');
 ob_start();
 ?>
 <div class="toolbar">
@@ -12,6 +14,10 @@ ob_start();
   <select id="fv" onchange="load()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
     <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'])?></option><?php endforeach; ?>
+  </select>
+  <select id="fest" onchange="load()" style="max-width:140px">
+    <option value="">Todos los estados</option>
+    <option>Completado</option><option>En proceso</option><option>Pendiente</option>
   </select>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Mantenimiento</button><?php endif; ?>
 </div>
@@ -26,7 +32,10 @@ ob_start();
       <input type="hidden" name="id">
       <div class="form-group"><label>Fecha *</label><input name="fecha" type="date"></div>
       <div class="form-group"><label>Vehículo *</label><select name="vehiculo_id"><option value="">— Seleccionar —</option><?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo'])?></option><?php endforeach; ?></select></div>
-      <div class="form-group"><label>Tipo</label><select name="tipo"><option>Preventivo</option><option>Correctivo</option><option>Aceite y Filtros</option><option>Frenos</option><option>Llantas</option><option>Batería</option><option>Revisión general</option><option>Otro</option></select></div>
+      <div class="form-group"><label>Tipo</label><select name="tipo">
+        <?php foreach($tiposMantenimiento as $tm): ?><option value="<?=htmlspecialchars($tm['nombre'])?>"><?=htmlspecialchars($tm['nombre'])?></option><?php endforeach; ?>
+        <?php if(empty($tiposMantenimiento)): ?><option>Preventivo</option><option>Correctivo</option><?php endif; ?>
+      </select></div>
       <div class="form-group"><label>Costo ($)</label><input name="costo" type="number" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>KM al momento</label><input name="km" type="number" step="0.1" placeholder="46500"></div>
       <div class="form-group"><label>Próximo servicio (km)</label><input name="proximo_km" type="number" placeholder="56500"></div>
@@ -40,8 +49,8 @@ ob_start();
 <script>
 const pager=new Paginator('pgr',load,25);
 async function load(){
-  const q=document.getElementById('s').value,vid=document.getElementById('fv').value;
-  const data=await api(`/api/mantenimientos.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&page=${pager.page}&per=${pager.perPage}`);
+  const q=document.getElementById('s').value,vid=document.getElementById('fv').value,est=document.getElementById('fest').value;
+  const data=await api(`/api/mantenimientos.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&estado=${encodeURIComponent(est)}&page=${pager.page}&per=${pager.perPage}`);
   pager.setTotal(data.total);
   const EB={'Completado':'badge-green','En proceso':'badge-orange','Pendiente':'badge-blue'};
   const tbody=document.getElementById('tbody');

@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/../../includes/layout.php';
+require_once __DIR__ . '/../../includes/catalogos.php';
 require_login();
 
 $db = getDB();
 $operadores = $db->query("SELECT id, nombre FROM operadores WHERE estado='Activo' ORDER BY nombre")->fetchAll();
+$estadosVehiculo = catalogo_items('estados_vehiculo');
 
 ob_start();
 ?>
@@ -56,7 +58,10 @@ ob_start();
       <div class="form-group"><label>Color</label><input name="color" placeholder="Blanco"></div>
       <div class="form-group"><label>No. Serie / VIN</label><input name="vin" placeholder="1HGCM82633A004352"></div>
       <div class="form-group"><label>Estado</label>
-        <select name="estado"><option>Activo</option><option>En mantenimiento</option><option>Fuera de servicio</option></select></div>
+        <select name="estado">
+          <?php foreach($estadosVehiculo as $ev): ?><option value="<?=htmlspecialchars($ev['nombre'])?>"><?=htmlspecialchars($ev['nombre'])?></option><?php endforeach; ?>
+          <?php if(empty($estadosVehiculo)): ?><option>Activo</option><option>En mantenimiento</option><option>Fuera de servicio</option><?php endif; ?>
+        </select></div>
       <div class="form-group"><label>Operador asignado</label>
         <select name="operador_id">
           <option value="">— Ninguno —</option>
@@ -70,6 +75,19 @@ ob_start();
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-veh')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PERFIL 360 -->
+<div class="modal-bg" id="modal-profile">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-title" id="profile-title">📋 Perfil del Vehículo</div>
+    <div id="profile-content" style="max-height:70vh;overflow-y:auto;">
+      <div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-profile')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -100,6 +118,7 @@ async function loadVehiculos() {
         <td>${Number(v.km_actual).toLocaleString()} km</td>
         <?php if(can('edit')): ?>
         <td><div class="action-btns">
+          <button class="btn btn-ghost btn-sm" onclick="verPerfil(${v.id})" title="Perfil 360">📋</button>
           <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(v)})'>✏️</button>
           <?php if(can('delete')): ?>
           <button class="btn btn-danger btn-sm" onclick="eliminar(${v.id})">🗑️</button>
@@ -148,6 +167,59 @@ async function eliminar(id) {
       loadVehiculos();
     } catch(e) {}
   });
+}
+
+async function verPerfil(id) {
+  const cnt = document.getElementById('profile-content');
+  cnt.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>';
+  openModal('modal-profile');
+  try {
+    const d = await api(`/api/vehiculos.php?action=profile&id=${id}`);
+    const v = d.vehiculo;
+    const t = d.totales;
+    const badges = {'Activo':'badge-green','En mantenimiento':'badge-orange','Fuera de servicio':'badge-red'};
+    let html = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div><strong style="color:var(--accent)">${v.placa}</strong> — ${v.marca} ${v.modelo} ${v.anio||''}</div>
+        <div style="text-align:right"><span class="badge ${badges[v.estado]||'badge-gray'}">${v.estado}</span> — ${Number(v.km_actual).toLocaleString()} km</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_asignaciones}</div><div class="kpi-sub">Asignaciones</div></div>
+        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_mantenimientos}</div><div class="kpi-sub">Mantenimientos</div></div>
+        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${Number(t.total_litros).toFixed(0)} L</div><div class="kpi-sub">Litros total</div></div>
+        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">$${Number(t.gasto_combustible).toFixed(0)}</div><div class="kpi-sub">Gasto combustible</div></div>
+      </div>`;
+
+    if (d.asignacion_activa) {
+      const a = d.asignacion_activa;
+      html += `<div class="alert-item" style="margin-bottom:8px"><div class="alert-dot"></div><div class="alert-text"><strong>Asignación activa:</strong> ${a.operador_nombre} — desde ${a.start_at}</div></div>`;
+    }
+    if (d.mantenimiento_activo) {
+      const m = d.mantenimiento_activo;
+      html += `<div class="alert-item critical" style="margin-bottom:8px"><div class="alert-dot"></div><div class="alert-text"><strong>Mantenimiento activo:</strong> ${m.tipo} — ${m.proveedor_nombre||'Sin taller'} (${m.estado})</div></div>`;
+    }
+
+    if (d.historial_mantenimientos.length) {
+      html += '<div class="section-title" style="margin:12px 0 6px">🔧 Últimos mantenimientos</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Costo</th><th>Estado</th><th>Proveedor</th></tr></thead><tbody>';
+      d.historial_mantenimientos.forEach(m => {
+        html += `<tr><td>${m.fecha}</td><td>${m.tipo}</td><td>$${Number(m.costo).toFixed(2)}</td><td><span class="badge">${m.estado}</span></td><td>${m.proveedor_nombre||'—'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    if (d.historial_combustible.length) {
+      html += '<div class="section-title" style="margin:12px 0 6px">⛽ Últimas cargas</div><table><thead><tr><th>Fecha</th><th>Litros</th><th>Total</th><th>KM</th></tr></thead><tbody>';
+      d.historial_combustible.forEach(f => {
+        html += `<tr><td>${f.fecha}</td><td>${Number(f.litros).toFixed(1)} L</td><td>$${Number(f.total).toFixed(2)}</td><td>${f.km?Number(f.km).toLocaleString()+' km':'—'}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
+    document.getElementById('profile-title').textContent = `📋 Perfil: ${v.placa} — ${v.marca} ${v.modelo}`;
+    cnt.innerHTML = html;
+  } catch(e) {
+    cnt.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-title">Error al cargar perfil</div></div>';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', loadVehiculos);

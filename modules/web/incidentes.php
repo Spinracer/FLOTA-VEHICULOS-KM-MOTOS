@@ -40,7 +40,7 @@ const SB={'Baja':'badge-green','Media':'badge-yellow','Alta':'badge-orange','CrÃ
 const EB={'Abierto':'badge-red','En proceso':'badge-orange','Cerrado':'badge-green'};
 async function load(){
   const q=document.getElementById('s').value,vid=document.getElementById('fv').value,est=document.getElementById('fest').value;
-  const data=await api(`/api/incidentes.php?q=${encodeURIComponent(q+(est?' '+est:''))}&vehiculo_id=${vid}&page=${pager.page}&per=${pager.perPage}`);
+  const data=await api(`/api/incidentes.php?q=${encodeURIComponent(q)}&estado=${encodeURIComponent(est)}&vehiculo_id=${vid}&page=${pager.page}&per=${pager.perPage}`);
   pager.setTotal(data.total);
   const tbody=document.getElementById('tbody');
   if(!data.rows.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">âœ…</div><div class="empty-title">Sin incidentes</div></div></td></tr>`;return;}

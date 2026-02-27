@@ -10,18 +10,21 @@ try {
     switch ($method) {
         case 'GET':
             $q='%'.trim($_GET['q']??'').'%'; $vid=(int)($_GET['vehiculo_id']??0);
+            $estado = trim($_GET['estado'] ?? '');
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $where="WHERE (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ? OR i.estado LIKE ?)";
-            $params=[$q,$q,$q,$q];
+            $where="WHERE (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ?)";
+            $params=[$q,$q,$q];
             if ($vid){$where.=" AND i.vehiculo_id=?"; $params[] = $vid;}
+            if ($estado !== ''){$where.=" AND i.estado=?"; $params[] = $estado;}
             $total=$db->prepare("SELECT COUNT(*) FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id $where");
             $total->execute($params);
+            $totalCount = (int)$total->fetchColumn();
             $listParams = $params;
             $listParams[] = $per;
             $listParams[] = $off;
             $stmt=$db->prepare("SELECT i.*,v.placa,v.marca FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id $where ORDER BY i.fecha DESC,i.id DESC LIMIT ? OFFSET ?");
             $stmt->execute($listParams);
-            echo json_encode(['total'=>(int)$total->fetchColumn(),'rows'=>$stmt->fetchAll()]);
+            echo json_encode(['total'=>$totalCount,'rows'=>$stmt->fetchAll()]);
             break;
         case 'POST':
             if (!can('create')) {
