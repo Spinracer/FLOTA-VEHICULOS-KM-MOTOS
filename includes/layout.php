@@ -54,6 +54,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/reportes.php" class="nav-item <?= $active_page==='reportes'?'active':'' ?>">
       <span class="nav-icon">📈</span><span>Reportes</span>
     </a>
+    <a href="/componentes.php" class="nav-item <?= $active_page==='componentes'?'active':'' ?>">
+      <span class="nav-icon">🧰</span><span>Componentes</span>
+    </a>
 
     <?php if ($can_edit || $is_admin): ?>
     <div class="nav-section">Administración</div>
@@ -72,6 +75,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     </a>
     <a href="/usuarios.php" class="nav-item <?= $active_page==='usuarios'?'active':'' ?>">
       <span class="nav-icon">🔑</span><span>Usuarios</span>
+    </a>
+    <a href="/auditoria.php" class="nav-item <?= $active_page==='auditoria'?'active':'' ?>">
+      <span class="nav-icon">📜</span><span>Auditoría</span>
     </a>
     <?php endif; ?>
   </nav>

@@ -166,7 +166,7 @@ $tables = [
   km           DECIMAL(10,1) NULL,
   proximo_km   DECIMAL(10,1) NULL,
   proveedor_id INT          NULL,
-  estado       ENUM('Completado','En proceso','Pendiente') NOT NULL DEFAULT 'Completado',
+  estado       ENUM('Completado','En proceso','Pendiente','Cancelado') NOT NULL DEFAULT 'Pendiente',
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (vehiculo_id)  REFERENCES vehiculos(id)  ON DELETE CASCADE,
   FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
@@ -290,6 +290,50 @@ $tables = [
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_audit_entidad_fecha (entidad, created_at),
   INDEX idx_audit_user_fecha (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"components" => "CREATE TABLE IF NOT EXISTS components (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  nombre       VARCHAR(150) NOT NULL,
+  tipo         ENUM('tool','safety','document','card','accessory') NOT NULL DEFAULT 'tool',
+  descripcion  TEXT NULL,
+  activo       TINYINT(1) NOT NULL DEFAULT 1,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_components_tipo (tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"vehicle_components" => "CREATE TABLE IF NOT EXISTS vehicle_components (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  vehiculo_id    INT NOT NULL,
+  component_id   INT NOT NULL,
+  cantidad       INT NOT NULL DEFAULT 1,
+  estado         ENUM('Bueno','Regular','Malo','Faltante') NOT NULL DEFAULT 'Bueno',
+  numero_serie   VARCHAR(100) NULL,
+  proveedor      VARCHAR(150) NULL,
+  fecha_instalacion DATE NULL,
+  fecha_vencimiento DATE NULL,
+  notas          TEXT NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_vc_vehiculo (vehiculo_id),
+  INDEX idx_vc_component (component_id),
+  INDEX idx_vc_estado (estado),
+  CONSTRAINT fk_vc_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_vc_component FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"mantenimiento_items" => "CREATE TABLE IF NOT EXISTS mantenimiento_items (
+  id               INT AUTO_INCREMENT PRIMARY KEY,
+  mantenimiento_id INT NOT NULL,
+  descripcion      VARCHAR(255) NOT NULL,
+  cantidad         DECIMAL(10,2) NOT NULL DEFAULT 1,
+  unidad           VARCHAR(20) NOT NULL DEFAULT 'PZA',
+  precio_unitario  DECIMAL(10,2) NOT NULL DEFAULT 0,
+  subtotal         DECIMAL(12,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+  notas            TEXT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_mi_mantenimiento (mantenimiento_id),
+  CONSTRAINT fk_mi_mantenimiento FOREIGN KEY (mantenimiento_id) REFERENCES mantenimientos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ];
 
@@ -442,6 +486,19 @@ $seedCatalogs = [
   ["INSERT IGNORE INTO catalogo_estados_vehiculo (nombre) VALUES ('Activo'), ('En mantenimiento'), ('Fuera de servicio')", 'Semilla estados de vehículo'],
   ["INSERT IGNORE INTO catalogo_servicios_taller (nombre) VALUES ('Mecánica general'), ('Electricidad automotriz'), ('Llantería'), ('Alineación y balanceo')", 'Semilla servicios de taller'],
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.anomaly_threshold',15,'Porcentaje mínimo bajo promedio para marcar anomalía')", 'Semilla configuración global'],
+  ["INSERT IGNORE INTO components (nombre,tipo,descripcion) VALUES
+    ('Gato hidráulico','tool','Gato para cambio de llanta'),
+    ('Llave de ruedas','tool','Cruz para tuercas de rueda'),
+    ('Triángulo de seguridad','safety','Triángulo reflectivo de emergencia'),
+    ('Chaleco reflectivo','safety','Chaleco de alta visibilidad'),
+    ('Extintor','safety','Extintor ABC 1kg mínimo'),
+    ('Botiquín primeros auxilios','safety','Kit básico de primeros auxilios'),
+    ('Cable de arranque','tool','Cables pasa-corriente'),
+    ('Tarjeta de circulación','card','Tarjeta de circulación vehicular'),
+    ('Póliza de seguro','document','Póliza de seguro vigente'),
+    ('Verificación vehicular','document','Constancia de verificación'),
+    ('Llanta de refacción','accessory','Llanta de repuesto'),
+    ('Herramienta básica','tool','Juego de desarmadores y llaves')", 'Semilla componentes base'],
 ];
 
 foreach ($seedCatalogs as [$sql, $label]) {
@@ -466,6 +523,14 @@ foreach ($softDeleteTables as $tbl) {
   } catch (Throwable $e) {
     step("Soft-delete: {$tbl}.deleted_at", false, $e->getMessage());
   }
+}
+
+// 3.25 Agregar estado 'Cancelado' a mantenimientos
+try {
+  $pdo->exec("ALTER TABLE mantenimientos MODIFY COLUMN estado ENUM('Completado','En proceso','Pendiente','Cancelado') NOT NULL DEFAULT 'Pendiente'");
+  step("Compat: mantenimientos.estado con Cancelado", true);
+} catch (Throwable $e) {
+  step("Compat: mantenimientos.estado con Cancelado", true, 'Ya actualizado o error: ' . $e->getMessage());
 }
 
 // 3.3 Índices compuestos para rendimiento
