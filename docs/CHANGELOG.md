@@ -1,5 +1,22 @@
 # FlotaControl — Changelog
 
+## [2.2.0] — 2026-02-27
+
+### Nuevas Funcionalidades
+- **Módulo de Componentes/Inventario**: Catálogo maestro de componentes (`components`) con tipos (tool, safety, document, card, accessory) + inventario por vehículo (`vehicle_components`). UI con tabs catálogo/vehículo, KPIs de estado, filtros.
+- **Máquina de Estados OT**: Transiciones formales Pendiente → En proceso → Completado/Cancelado. Solo admin puede cancelar desde "En proceso". Transiciones producen audit_log automático y actualizan estado del vehículo.
+- **Partidas de Mantenimiento**: Tabla `mantenimiento_items` con descripción, cantidad, unidad, precio unitario, subtotal calculado. El costo total de la OT se recalcula automáticamente desde partidas.
+- **Bloqueo de edición**: Las OTs completadas no se pueden editar ni agregar partidas.
+- **Endpoint de Auditoría**: Nuevo módulo `/auditoria.php` (solo admin) con filtros por entidad, acción, usuario, rango de fecha. Modal de detalle con vista antes/después en JSON.
+- **12 componentes semilla**: Gato hidráulico, llave de ruedas, triángulo de seguridad, chaleco, extintor, botiquín, cables de arranque, tarjeta de circulación, póliza de seguro, verificación, llanta refacción, herramienta básica.
+
+### Mejoras
+- Sidebar: Nuevos enlaces para Componentes (sección Gestión) y Auditoría (sección Sistema, solo admin).
+- Mantenimientos ENUM: Añadido estado `Cancelado` con migración de compatibilidad.
+- Vehículos: Query de listado filtra `deleted_at IS NULL` en mantenimientos web.
+
+---
+
 ## [2.1.0] — 2026-02-27
 
 ### Nuevas Funcionalidades

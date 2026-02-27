@@ -19,6 +19,8 @@
 ├── incidentes.php         # → modules/web/incidentes.php
 ├── recordatorios.php      # → modules/web/recordatorios.php
 ├── reportes.php           # → modules/web/reportes.php
+├── componentes.php        # → modules/web/componentes.php
+├── auditoria.php          # → modules/web/auditoria.php (admin)
 ├── operadores.php         # → modules/web/operadores.php
 ├── proveedores.php        # → modules/web/proveedores.php
 ├── catalogos.php          # → modules/web/catalogos.php
@@ -32,6 +34,8 @@
 │   ├── incidentes.php
 │   ├── recordatorios.php
 │   ├── reportes.php       # Reportes y exportaciones CSV
+│   ├── componentes.php    # Catálogo + inventario por vehículo
+│   ├── auditoria.php      # Consulta de bitácora (admin)
 │   ├── operadores.php
 │   ├── proveedores.php
 │   ├── catalogos.php

@@ -58,7 +58,7 @@
 ### 2.3 Auditoría
 - [x] Bitácora de cambios críticos (create/update/void/override)
 - [x] Guardar before/after, usuario, IP, fecha
-- [ ] Endpoints de consulta de auditoría
+- [x] Endpoints de consulta de auditoría (módulo auditoria con UI admin)
 
 **Aceptación**
 - Todo cambio crítico es trazable a usuario y fecha.
@@ -112,10 +112,10 @@
 ## 5) Inventario de componentes/herramientas por vehículo
 
 ### 5.1 Catálogo y mapeo
-- [ ] Catálogo `components`
-- [ ] Tabla `vehicle_components`
-- [ ] Tipos (`tool`, `safety`, `documents`, `cards`)
-- [ ] Datos de tarjetas (máscara, proveedor, vencimiento, estado)
+- [x] Catálogo `components` (tabla + CRUD + semillas)
+- [x] Tabla `vehicle_components` (asignación por vehículo)
+- [x] Tipos (`tool`, `safety`, `document`, `card`, `accessory`)
+- [x] Datos de tarjetas (proveedor, vencimiento, estado, N° serie)
 
 ### 5.2 Checklist por asignación
 - [ ] Captura de faltantes/daños/fotos en entrega/retorno
@@ -176,14 +176,14 @@
 ## 9) Mantenimiento (OT + historial)
 
 ### 9.1 Orden de trabajo (OT)
-- [ ] Crear OT formal con máquina de estados completa
-- [x] Registro de mantenimientos con estado básico (`Completado`, `En proceso`, `Pendiente`)
+- [x] Crear OT formal con máquina de estados completa (Pendiente→En proceso→Completado/Cancelado)
+- [x] Registro de mantenimientos con estado básico (`Completado`, `En proceso`, `Pendiente`, `Cancelado`)
 - [ ] Adjuntos (diagnóstico, cotización, factura, fotos)
 
 ### 9.2 Ítems de mantenimiento
-- [ ] Tabla de partidas (cantidad, unidad, precio, subtotal)
-- [ ] Totales e impuestos
-- [ ] Bloqueo de edición al completar
+- [x] Tabla de partidas (cantidad, unidad, precio, subtotal) → `mantenimiento_items`
+- [x] Totales calculados automáticamente (costo OT = SUM partidas)
+- [x] Bloqueo de edición al completar
 
 ### 9.3 Programación preventiva
 - [x] Recordatorios preventivos básicos por fecha (parcial)

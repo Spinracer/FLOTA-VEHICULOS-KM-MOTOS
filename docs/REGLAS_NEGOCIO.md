@@ -22,10 +22,21 @@
 - **Rendimiento**: Se calcula como (km_actual - km_carga_anterior) / litros, usando la carga previa del mismo vehículo.
 - **Override**: Admin puede saltar bloqueos con justificación.
 
-## 4. Mantenimiento
+## 4. Mantenimiento (OT)
 - **Taller autorizado**: Solo proveedores con `es_taller_autorizado=1` pueden registrar.
 - **Restricción por rol taller**: Solo ven/editan sus propios mantenimientos.
-- **Estados**: Completado, En proceso, Pendiente.
+- **Máquina de estados OT**:
+  - Pendiente → En proceso
+  - Pendiente → Cancelado
+  - En proceso → Completado
+  - En proceso → Cancelado (solo admin)
+  - Completado → (sin transiciones)
+  - Cancelado → (sin transiciones)
+- **Transiciones automáticas de vehículo**:
+  - Al cambiar a "En proceso": vehículo se marca "En mantenimiento".
+  - Al cambiar a "Completado"/"Cancelado": vehículo vuelve a "Activo" (si no hay otras OT activas).
+- **Bloqueo de edición**: OTs completadas no se pueden editar ni agregar partidas.
+- **Partidas (mantenimiento_items)**: Cantidad, unidad, precio unitario, subtotal calculado. El costo total de la OT se recalcula automáticamente al agregar/editar/eliminar partidas.
 - **Odómetro**: Se registra automáticamente al crear/editar.
 
 ## 5. Vehículos
@@ -48,4 +59,11 @@
 
 ## 9. Transacciones
 - Las operaciones multi-query (INSERT + odómetro + km update) usan `beginTransaction/commit/rollBack`.
-- Aplica a: combustible (create/update), asignaciones (create/close), mantenimientos (create/update).
+- Aplica a: combustible (create/update), asignaciones (create/close), mantenimientos (create/update), partidas (create/update/delete con recálculo de costo).
+
+## 10. Componentes/Inventario
+- **Catálogo maestro**: Tabla `components` con tipos: tool, safety, document, card, accessory.
+- **Asignación por vehículo**: Tabla `vehicle_components` con estado (Bueno, Regular, Malo, Faltante), fechas, N° serie.
+- **Sin duplicados**: No se puede asignar el mismo componente dos veces al mismo vehículo (409).
+- **Soft-delete en catálogo**: Los componentes se desactivan (`activo=0`) en vez de borrarse.
+- **KPIs por vehículo**: Resumen de estados (Bueno/Regular/Malo/Faltante) en la respuesta API.
