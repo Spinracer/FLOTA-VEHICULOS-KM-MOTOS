@@ -67,3 +67,37 @@
 - **Sin duplicados**: No se puede asignar el mismo componente dos veces al mismo vehículo (409).
 - **Soft-delete en catálogo**: Los componentes se desactivan (`activo=0`) en vez de borrarse.
 - **KPIs por vehículo**: Resumen de estados (Bueno/Regular/Malo/Faltante) en la respuesta API.
+
+## 11. Snapshots de Componentes por Asignación
+- Al **crear asignación** se captura un snapshot "entrega" de todos los componentes del vehículo.
+- Al **cerrar asignación** se captura un snapshot "retorno" con posibilidad de reportar daños/observaciones.
+- Los overrides de estado en retorno actualizan `vehicle_components` automáticamente.
+- Tabla: `assignment_component_snapshots` con momento, estado, observaciones, created_by.
+
+## 12. Reglas de Cierre de OT
+- **exit_km obligatorio**: Al completar una OT se exige km de salida que debe ser ≥ km de entrada.
+- **Resumen obligatorio**: Se requiere texto describiendo los trabajos realizados.
+- **Odómetro automático**: El `exit_km` se registra en `odometer_logs` con source `maintenance_exit`.
+- **Timestamps**: Se registra `completed_at` y `completed_by` al cambiar estado a Completado.
+
+## 13. Alertas de Anomalías Combustible
+- **Promedio móvil**: Se calcula el rendimiento promedio (km/L) por vehículo historicamente.
+- **Rendimiento bajo**: Se alerta si un registro tiene rendimiento inferior al promedio por más del umbral configurado (`fuel.anomaly_threshold`).
+- **Cargas cercanas**: Se alerta si dos cargas del mismo vehículo ocurren en menos de 24 horas.
+- **Odómetro sospechoso**: Se alerta si hay retroceso de odómetro o saltos >2000 km con pocos litros.
+
+## 14. Mantenimiento Preventivo
+- **Intervalos por vehículo**: Configuración de mantenimientos recurrentes por km y/o días.
+- **Verificación de vencimientos**: Endpoint que compara km actual y fecha actual contra los intervalos configurados.
+- **Estados**: `vencido` (ya superó km o días) y `proximo` (dentro de 500 km o 15 días).
+- **Crear OT automática**: Un clic genera una OT Pendiente desde la alerta y actualiza el intervalo con el nuevo km/fecha.
+
+## 15. Settings del Sistema
+- `fuel.anomaly_threshold`: Porcentaje mínimo bajo promedio para marcar anomalía (default: 15).
+- `fuel.max_litros_evento`: Máximo de litros por carga, 0=sin límite (default: 200). Se valida en POST de combustible.
+- `maintenance.umbral_aprobacion`: Costo de OT que requiere aprobación especial (default: 5000).
+
+## 16. Soft-Delete Universal
+- Las tablas con `deleted_at` (vehiculos, operadores, proveedores, mantenimientos, combustible, incidentes, recordatorios) usan soft-delete en sus endpoints DELETE.
+- Todos los GETs filtran `deleted_at IS NULL` para excluir registros eliminados.
+- Los asignaciones se marcan como "Cerrada" en vez de borrarse.

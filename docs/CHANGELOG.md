@@ -1,5 +1,23 @@
 # FlotaControl — Changelog
 
+## [2.3.0] — 2026-02-27
+
+### Nuevas Funcionalidades
+- **Snapshots de Componentes por Asignación**: Al crear o cerrar una asignación se captura automáticamente un snapshot de todos los componentes del vehículo (tabla `assignment_component_snapshots`). Soporte para observaciones/daños en retorno con actualización de estado en `vehicle_components`.
+- **Reglas de Cierre OT**: Al completar una OT se exige `exit_km` (≥ entry km) y resumen de trabajo. Se registra automáticamente el odómetro de salida. Nuevas columnas: `exit_km`, `resumen`, `completed_at`, `completed_by`.
+- **Filtros Avanzados Mantenimientos**: Filtros por tipo, proveedor/taller, rango de costo y rango de fecha, además de los existentes (vehículo, estado, texto).
+- **Alertas de Anomalías Combustible**: Endpoint `?action=anomalias` que detecta rendimiento bajo vs promedio móvil, cargas muy cercanas en tiempo (<24h), retroceso de odómetro y saltos inusuales. UI con modal de anomalías.
+- **Mantenimiento Preventivo**: Nuevo módulo completo con tabla `preventive_intervals` para configurar intervalos por km/días por vehículo. Verificación de vencimientos con alertas visuales. Botón "Crear OT" desde alerta que genera OT automáticamente y actualiza el intervalo.
+- **Settings ampliados**: `fuel.max_litros_evento` (máx litros por carga), `maintenance.umbral_aprobacion` (costo que requiere aprobación).
+- **Validación max litros**: POST de combustible rechaza cargas que excedan el máximo configurado (sin override).
+
+### Mejoras
+- **Soft-delete universal**: Proveedores, mantenimientos, combustible, incidentes y recordatorios ahora usan soft-delete (`UPDATE deleted_at`) en vez de hard DELETE. Asignaciones se marcan como Cerradas. 7 GETs filtran `deleted_at IS NULL`.
+- **Sidebar**: Nuevo enlace "📅 Preventivos" en sección Gestión.
+- **UI OT**: Campos exit_km y resumen aparecen dinámicamente al seleccionar estado "Completado".
+
+---
+
 ## [2.2.0] — 2026-02-27
 
 ### Nuevas Funcionalidades

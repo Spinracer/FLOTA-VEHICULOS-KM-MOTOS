@@ -57,6 +57,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/componentes.php" class="nav-item <?= $active_page==='componentes'?'active':'' ?>">
       <span class="nav-icon">🧰</span><span>Componentes</span>
     </a>
+    <a href="/preventivos.php" class="nav-item <?= $active_page==='preventivos'?'active':'' ?>">
+      <span class="nav-icon">📅</span><span>Preventivos</span>
+    </a>
 
     <?php if ($can_edit || $is_admin): ?>
     <div class="nav-section">Administración</div>

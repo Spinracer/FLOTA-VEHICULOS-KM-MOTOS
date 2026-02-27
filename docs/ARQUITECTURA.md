@@ -21,6 +21,7 @@
 ├── reportes.php           # → modules/web/reportes.php
 ├── componentes.php        # → modules/web/componentes.php
 ├── auditoria.php          # → modules/web/auditoria.php (admin)
+├── preventivos.php        # → modules/web/preventivos.php
 ├── operadores.php         # → modules/web/operadores.php
 ├── proveedores.php        # → modules/web/proveedores.php
 ├── catalogos.php          # → modules/web/catalogos.php
@@ -36,6 +37,7 @@
 │   ├── reportes.php       # Reportes y exportaciones CSV
 │   ├── componentes.php    # Catálogo + inventario por vehículo
 │   ├── auditoria.php      # Consulta de bitácora (admin)
+│   ├── preventivos.php    # Intervalos preventivos y alertas
 │   ├── operadores.php
 │   ├── proveedores.php
 │   ├── catalogos.php

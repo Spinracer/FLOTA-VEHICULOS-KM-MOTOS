@@ -13,7 +13,7 @@ try {
             $estado = trim($_GET['estado'] ?? '');
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
 
-            $where = "WHERE (v.placa LIKE ? OR r.tipo LIKE ? OR r.descripcion LIKE ?)";
+            $where = "WHERE r.deleted_at IS NULL AND (v.placa LIKE ? OR r.tipo LIKE ? OR r.descripcion LIKE ?)";
             $params = [$q,$q,$q];
             if ($estado !== '') { $where .= " AND r.estado = ?"; $params[] = $estado; }
 
@@ -69,8 +69,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM recordatorios WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM recordatorios WHERE id=?")->execute([$id]);
-            audit_log('recordatorios', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE recordatorios SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('recordatorios', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok'=>true]);
             break;
     }

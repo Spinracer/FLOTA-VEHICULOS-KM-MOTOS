@@ -12,7 +12,7 @@ try {
             $q='%'.trim($_GET['q']??'').'%';
             $soloAut = (int)($_GET['solo_autorizados'] ?? 0);
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $where = "WHERE (nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ?)";
+            $where = "WHERE deleted_at IS NULL AND (nombre LIKE ? OR tipo LIKE ? OR telefono LIKE ?)";
             $params = [$q, $q, $q];
             if ($soloAut === 1) {
                 $where .= " AND es_taller_autorizado=1";
@@ -61,8 +61,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM proveedores WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM proveedores WHERE id=?")->execute([$id]);
-            audit_log('proveedores', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE proveedores SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('proveedores', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok'=>true]);
             break;
     }

@@ -76,9 +76,9 @@
 
 ### 3.2 Configuración
 - [x] Umbral de consumo anómalo (setting base)
-- [ ] Máximo de litros por evento (opcional)
-- [ ] Umbral de aprobación de mantenimiento
-- [ ] Intervalos preventivos por vehículo
+- [x] Máximo de litros por evento (opcional)
+- [x] Umbral de aprobación de mantenimiento
+- [x] Intervalos preventivos por vehículo
 
 **Aceptación**
 - Formularios usan IDs de catálogo, sin texto libre.
@@ -118,8 +118,8 @@
 - [x] Datos de tarjetas (proveedor, vencimiento, estado, N° serie)
 
 ### 5.2 Checklist por asignación
-- [ ] Captura de faltantes/daños/fotos en entrega/retorno
-- [ ] Snapshot `assignment_component_snapshots`
+- [x] Captura de faltantes/daños/fotos en entrega/retorno
+- [x] Snapshot `assignment_component_snapshots`
 
 **Aceptación**
 - Trazabilidad de herramientas/tarjetas por evento.
@@ -187,19 +187,19 @@
 
 ### 9.3 Programación preventiva
 - [x] Recordatorios preventivos básicos por fecha (parcial)
-- [ ] Programación por km/días con vencimientos automáticos
-- [ ] Crear OT desde alerta en un clic
+- [x] Programación por km/días con vencimientos automáticos
+- [x] Crear OT desde alerta en un clic
 
 ### 9.4 Reglas de cierre
-- [ ] `exit_km` obligatorio y validado
-- [ ] Resumen de trabajo obligatorio
+- [x] `exit_km` obligatorio y validado
+- [x] Resumen de trabajo obligatorio
 - [ ] Adjuntos obligatorios sobre umbral
-- [ ] Odómetro automático
-- [ ] Actualización de estado operativo según asignación
+- [x] Odómetro automático
+- [x] Actualización de estado operativo según asignación
 
 ### 9.5 Historial y exportación
 - [x] Listado histórico con filtros básicos (vehículo/texto)
-- [ ] Filtros avanzados (rango costo, taller, tipo, estado)
+- [x] Filtros avanzados (rango costo, taller, tipo, estado)
 - [x] Exportar CSV (implementado; XLSX/PDF pendiente)
 
 **Aceptación**
@@ -222,8 +222,8 @@
 ### 10.3 Consumo y anomalías
 - [x] Cálculo de km/L por registro (en consulta, no persistido)
 - [x] Cálculo de total automático y KPIs de litros/gasto
-- [ ] Promedio móvil persistido por vehículo
-- [ ] Alertas por anomalías (cargas muy cercanas, exceso de capacidad, odómetro sospechoso)
+- [x] Promedio móvil persistido por vehículo
+- [x] Alertas por anomalías (cargas muy cercanas, exceso de capacidad, odómetro sospechoso)
 
 ### 10.4 PDF autorización con firmas
 - [ ] PDF por registro y por lote

@@ -24,6 +24,7 @@ ob_start();
   <?php if(can('create')): ?>
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Registrar Carga</button>
   <?php endif; ?>
+  <button class="btn btn-ghost" onclick="verAnomalias()" title="Detectar anomalías">⚠️ Anomalías</button>
 </div>
 
 <div class="table-wrap">
@@ -82,6 +83,19 @@ ob_start();
       <button class="btn btn-ghost" onclick="closeModal('modal-comb')">Cancelar</button>
       <button class="btn btn-primary" onclick="guardar()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL ANOMALÍAS -->
+<div class="modal-bg" id="modal-anomalias">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-title">⚠️ Detección de Anomalías</div>
+    <div id="anomalias-info" style="margin-bottom:12px;font-size:13px;color:#8892a4"></div>
+    <div class="table-wrap" style="max-height:500px;overflow-y:auto">
+      <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Litros</th><th>KM</th><th>Rend.</th><th>Alertas</th></tr></thead>
+      <tbody id="tbody-anomalias"></tbody></table>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-anomalias')">Cerrar</button></div>
   </div>
 </div>
 
@@ -155,5 +169,26 @@ async function eliminar(id) {
   });
 }
 document.addEventListener('DOMContentLoaded', load);
+
+async function verAnomalias() {
+  const vid = document.getElementById('filter-veh').value;
+  const data = await api(`/api/combustible.php?action=anomalias&vehiculo_id=${vid}&limit=100`);
+  document.getElementById('anomalias-info').innerHTML = `Umbral: <strong>${data.threshold}%</strong> bajo promedio | Alertas encontradas: <strong>${data.alertas.length}</strong>`;
+  const tbody = document.getElementById('tbody-anomalias');
+  if (!data.alertas.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Sin anomalías detectadas</div></div></td></tr>';
+  } else {
+    const sev = {'alta':'badge-red','media':'badge-orange','baja':'badge-yellow'};
+    tbody.innerHTML = data.alertas.map(a => `<tr>
+      <td>${a.fecha}</td>
+      <td><strong style="color:var(--accent2)">${a.placa} ${a.marca}</strong></td>
+      <td>${a.litros} L</td>
+      <td>${Number(a.km).toLocaleString()} km</td>
+      <td>${a.rendimiento !== null ? a.rendimiento + ' km/L' : '—'}</td>
+      <td>${a.alertas.map(al => `<span class="badge ${sev[al.severidad]||'badge-gray'}" title="${al.tipo}">${al.msg}</span>`).join('<br>')}</td>
+    </tr>`).join('');
+  }
+  openModal('modal-anomalias');
+}
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Control de Combustible','combustible',$content); ?>

@@ -12,7 +12,7 @@ try {
             $q='%'.trim($_GET['q']??'').'%'; $vid=(int)($_GET['vehiculo_id']??0);
             $estado = trim($_GET['estado'] ?? '');
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $where="WHERE (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ?)";
+            $where="WHERE i.deleted_at IS NULL AND (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ?)";
             $params=[$q,$q,$q];
             if ($vid){$where.=" AND i.vehiculo_id=?"; $params[] = $vid;}
             if ($estado !== ''){$where.=" AND i.estado=?"; $params[] = $estado;}
@@ -64,8 +64,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM incidentes WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM incidentes WHERE id=?")->execute([$id]);
-            audit_log('incidentes', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE incidentes SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('incidentes', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok'=>true]);
             break;
     }

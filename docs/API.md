@@ -226,3 +226,66 @@ GET /api/auditoria.php?q=&entidad=vehiculos&accion=create&user_id=1&desde=2026-0
 Respuesta: `{ "total": 100, "rows": [...], "entidades": ["auth","vehiculos",...], "acciones": ["create","update",...] }`
 
 Cada fila incluye `antes`, `despues`, `meta` (JSON decodificado).
+
+---
+
+## Asignaciones — Snapshots (`/api/asignaciones.php`)
+
+### GET - Consultar snapshots
+```
+GET /api/asignaciones.php?action=snapshots&asignacion_id=1&momento=entrega
+```
+Respuesta: `{ "snapshots": [...] }`
+
+### POST - Crear snapshot de retorno manual
+```json
+{ "items": [{ "component_id": 3, "estado": "Malo", "observaciones": "Pantalla rota" }] }
+```
+URL: `POST /api/asignaciones.php?action=snapshots&asignacion_id=1`
+
+---
+
+## Combustible — Anomalías (`/api/combustible.php`)
+
+### GET - Detectar anomalías
+```
+GET /api/combustible.php?action=anomalias&vehiculo_id=0&limit=100
+```
+Respuesta: `{ "alertas": [{ "registro_id": 5, "fecha": "2026-02-20", "placa": "ABC-123", "rendimiento": 4.5, "alertas": [{ "tipo": "rendimiento_bajo", "msg": "...", "severidad": "media" }] }], "promedios": { "1": 8.5 }, "threshold": 15 }`
+
+Tipos de alerta: `rendimiento_bajo`, `carga_cercana`, `odometro_retroceso`, `salto_odometro`.
+
+---
+
+## Mantenimiento Preventivo (`/api/preventivos.php`)
+
+### GET - Listar intervalos
+```
+GET /api/preventivos.php?action=intervals&vehiculo_id=0
+```
+Respuesta: `{ "rows": [...] }`
+
+### POST - Crear intervalo
+```json
+{ "vehiculo_id": 1, "tipo": "Aceite y Filtros", "cada_km": 5000, "cada_dias": 90, "ultimo_km": 45000, "ultima_fecha": "2026-01-15", "proveedor_id": 2 }
+```
+
+### GET - Verificar vencimientos
+```
+GET /api/preventivos.php?action=check&vehiculo_id=0
+```
+Respuesta: `{ "alertas": [{ "interval_id": 1, "placa": "ABC-123", "tipo": "Aceite", "estado": "vencido", "km_restante": -200, "dias_restante": -5 }], "total_intervals": 10 }`
+
+### POST - Crear OT desde alerta
+```json
+{ "interval_id": 1 }
+```
+URL: `POST /api/preventivos.php?action=create_ot`
+Respuesta: `{ "ok": true, "ot_id": 42 }`
+
+### Reglas de cierre OT (PUT mantenimientos)
+Al cambiar estado a `Completado`:
+- `exit_km` obligatorio (debe ser ≥ km de entrada)
+- `resumen` obligatorio (texto del trabajo realizado)
+- Se registra odómetro automáticamente con `exit_km`
+- Se actualiza `completed_at` y `completed_by`

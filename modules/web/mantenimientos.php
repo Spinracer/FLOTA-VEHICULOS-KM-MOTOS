@@ -20,7 +20,21 @@ ob_start();
     <option value="">Todos los estados</option>
     <option>Pendiente</option><option>En proceso</option><option>Completado</option><option>Cancelado</option>
   </select>
+  <select id="ftipo" onchange="load()" style="max-width:140px">
+    <option value="">Todos los tipos</option>
+    <?php foreach($tiposMantenimiento as $tm): ?><option value="<?=htmlspecialchars($tm['nombre'])?>"><?=htmlspecialchars($tm['nombre'])?></option><?php endforeach; ?>
+  </select>
+  <select id="fprov" onchange="load()" style="max-width:160px">
+    <option value="">Todos los talleres</option>
+    <?php foreach($proveedores as $p): ?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['nombre'])?></option><?php endforeach; ?>
+  </select>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Nueva OT</button><?php endif; ?>
+</div>
+<div class="toolbar" style="padding-top:0;gap:8px;flex-wrap:wrap">
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Desde <input type="date" id="ffrom" onchange="load()" style="max-width:140px"></label>
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Hasta <input type="date" id="fto" onchange="load()" style="max-width:140px"></label>
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo mín <input type="number" id="fcmin" step="0.01" min="0" oninput="load()" placeholder="0" style="max-width:100px"></label>
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo máx <input type="number" id="fcmax" step="0.01" min="0" oninput="load()" placeholder="∞" style="max-width:100px"></label>
 </div>
 <div class="table-wrap">
   <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Descripción</th><th>Costo</th><th>Items</th><th>KM</th><th>Proveedor</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
@@ -44,6 +58,8 @@ ob_start();
       <div class="form-group"><label>Próximo servicio (km)</label><input name="proximo_km" type="number" placeholder="56500"></div>
       <div class="form-group"><label>Proveedor / Taller</label><select name="proveedor_id"><option value="">— Ninguno —</option><?php foreach($proveedores as $p): ?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['nombre'])?></option><?php endforeach; ?></select></div>
       <div class="form-group"><label>Estado</label><select name="estado" id="selEstadoOT"><option>Pendiente</option><option>En proceso</option><option>Completado</option><option>Cancelado</option></select></div>
+      <div class="form-group" id="grpExitKm" style="display:none"><label>KM Salida *</label><input name="exit_km" type="number" step="0.1" placeholder="KM al salir del taller"></div>
+      <div class="form-group full" id="grpResumen" style="display:none"><label>Resumen de trabajo *</label><textarea name="resumen" placeholder="Describa los trabajos realizados..."></textarea></div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Detalles del servicio..."></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
@@ -93,7 +109,17 @@ const EB={'Completado':'badge-green','En proceso':'badge-orange','Pendiente':'ba
 
 async function load(){
   const q=document.getElementById('s').value,vid=document.getElementById('fv').value,est=document.getElementById('fest').value;
-  const data=await api(`/api/mantenimientos.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&estado=${encodeURIComponent(est)}&page=${pager.page}&per=${pager.perPage}`);
+  const tipo=document.getElementById('ftipo').value,prov=document.getElementById('fprov').value;
+  const from=document.getElementById('ffrom').value,to=document.getElementById('fto').value;
+  const cmin=document.getElementById('fcmin').value,cmax=document.getElementById('fcmax').value;
+  let url=`/api/mantenimientos.php?q=${encodeURIComponent(q)}&vehiculo_id=${vid}&estado=${encodeURIComponent(est)}&page=${pager.page}&per=${pager.perPage}`;
+  if(tipo)url+=`&tipo=${encodeURIComponent(tipo)}`;
+  if(prov)url+=`&proveedor_id=${prov}`;
+  if(from)url+=`&from=${from}`;
+  if(to)url+=`&to=${to}`;
+  if(cmin)url+=`&costo_min=${cmin}`;
+  if(cmax)url+=`&costo_max=${cmax}`;
+  const data=await api(url);
   pager.setTotal(data.total);
   const tbody=document.getElementById('tbody');
   if(!data.rows.length){tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">Sin mantenimientos</div></div></td></tr>`;return;}
@@ -118,13 +144,23 @@ function abrirNuevo(){
   document.getElementById('mtitle').textContent='🔧 Nueva Orden de Trabajo';
   document.getElementById('inputCostoOT').removeAttribute('readonly');
   resetForm('modal');openModal('modal');
+  toggleCierreFields();
 }
 function editar(r){
   document.getElementById('mtitle').textContent='✏️ Editar OT #'+r.id;
   document.getElementById('inputCostoOT').setAttribute('readonly','');
-  fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,descripcion:r.descripcion});
+  fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,exit_km:r.exit_km||'',proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,resumen:r.resumen||'',descripcion:r.descripcion});
   openModal('modal');
+  toggleCierreFields();
 }
+
+function toggleCierreFields(){
+  const est=document.getElementById('selEstadoOT').value;
+  const show=est==='Completado';
+  document.getElementById('grpExitKm').style.display=show?'':'none';
+  document.getElementById('grpResumen').style.display=show?'':'none';
+}
+document.getElementById('selEstadoOT').addEventListener('change', toggleCierreFields);
 async function guardar(){
   const d=getForm('modal');
   if(!d.vehiculo_id){toast('Selecciona un vehículo','error');return;}

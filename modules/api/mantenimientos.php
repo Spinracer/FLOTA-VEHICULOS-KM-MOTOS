@@ -198,11 +198,25 @@ try {
             $q    = '%'.trim($_GET['q']??'').'%';
             $vid  = (int)($_GET['vehiculo_id']??0);
             $estado = trim($_GET['estado'] ?? '');
+            $tipo   = trim($_GET['tipo'] ?? '');
+            $provId = (int)($_GET['proveedor_id'] ?? 0);
+            $costoMin = trim($_GET['costo_min'] ?? '');
+            $costoMax = trim($_GET['costo_max'] ?? '');
+            $from = trim($_GET['from'] ?? '');
+            $to   = trim($_GET['to'] ?? '');
             $page = max(1,(int)($_GET['page']??1));
             $per  = min(100,max(5,(int)($_GET['per']??25)));
             $off  = ($page-1)*$per;
-            $where = "WHERE (v.placa LIKE ? OR m.tipo LIKE ? OR m.descripcion LIKE ?)";
+            $where = "WHERE m.deleted_at IS NULL AND (v.placa LIKE ? OR m.tipo LIKE ? OR m.descripcion LIKE ?)";
             $params = [$q, $q, $q];
+            if ($vid)    { $where .= " AND m.vehiculo_id=?"; $params[] = $vid; }
+            if ($estado !== '') { $where .= " AND m.estado=?";  $params[] = $estado; }
+            if ($tipo !== '')   { $where .= " AND m.tipo=?";    $params[] = $tipo; }
+            if ($provId)        { $where .= " AND m.proveedor_id=?"; $params[] = $provId; }
+            if ($costoMin !== '') { $where .= " AND m.costo >= ?"; $params[] = (float)$costoMin; }
+            if ($costoMax !== '') { $where .= " AND m.costo <= ?"; $params[] = (float)$costoMax; }
+            if ($from !== '') { $where .= " AND m.fecha >= ?"; $params[] = $from; }
+            if ($to   !== '') { $where .= " AND m.fecha <= ?"; $params[] = $to; }
             if ($vid) { $where .= " AND m.vehiculo_id=?"; $params[] = $vid; }
             if ($estado !== '') { $where .= " AND m.estado=?"; $params[] = $estado; }
             if ($rol === 'taller') {
@@ -310,6 +324,28 @@ try {
                 break;
             }
 
+            // ═══ Reglas de cierre: validar al completar ═══
+            if ($estadoNuevo === 'Completado' && $estadoAnterior !== 'Completado') {
+                $exitKm = isset($d['exit_km']) && $d['exit_km'] !== '' ? (float)$d['exit_km'] : null;
+                $resumen = trim((string)($d['resumen'] ?? ''));
+                if ($exitKm === null || $exitKm <= 0) {
+                    http_response_code(422);
+                    echo json_encode(['error' => 'El km de salida (exit_km) es obligatorio para completar la OT.']);
+                    break;
+                }
+                $entryKm = (float)($prev['km'] ?? 0);
+                if ($entryKm > 0 && $exitKm < $entryKm) {
+                    http_response_code(422);
+                    echo json_encode(['error' => "El km de salida ({$exitKm}) no puede ser menor al km de entrada ({$entryKm})."]);
+                    break;
+                }
+                if ($resumen === '') {
+                    http_response_code(422);
+                    echo json_encode(['error' => 'El resumen de trabajo es obligatorio para completar la OT.']);
+                    break;
+                }
+            }
+
             if ($rol === 'taller') {
                 $ctx = taller_context($db, (int)($user['id'] ?? 0));
                 if (!$ctx || !$ctx['proveedor_id'] || !$ctx['autorizado']) {
@@ -329,10 +365,31 @@ try {
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,proximo_km=?,proveedor_id=?,estado=? WHERE id=?");
-                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)($d['costo']??0),$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$estadoNuevo,$d['id']]);
+                $completedAt = null;
+                $completedBy = null;
+                if ($estadoNuevo === 'Completado' && $estadoAnterior !== 'Completado') {
+                    $completedAt = date('Y-m-d H:i:s');
+                    $completedBy = (int)($_SESSION['user_id'] ?? 0);
+                }
+                $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,exit_km=?,proximo_km=?,proveedor_id=?,estado=?,resumen=?,completed_at=COALESCE(?,completed_at),completed_by=COALESCE(?,completed_by) WHERE id=?");
+                $stmt->execute([
+                    $d['fecha'], $d['vehiculo_id'], $d['tipo'], $d['descripcion'] ?: null,
+                    (float)($d['costo'] ?? 0), $d['km'] ?: null,
+                    $d['exit_km'] ?? null,
+                    $d['proximo_km'] ?: null, $d['proveedor_id'] ?: null, $estadoNuevo,
+                    $d['resumen'] ?? null,
+                    $completedAt, $completedBy,
+                    $d['id']
+                ]);
                 if ($km) {
                     odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
+                }
+                // Auto-registrar exit_km en odómetro al completar
+                if ($estadoNuevo === 'Completado' && $estadoAnterior !== 'Completado') {
+                    $exitKm = isset($d['exit_km']) ? (float)$d['exit_km'] : null;
+                    if ($exitKm && $exitKm > 0) {
+                        odometro_registrar($db, (int)$d['vehiculo_id'], $exitKm, 'maintenance_exit', (int)($_SESSION['user_id'] ?? 0));
+                    }
                 }
 
                 // Transiciones de estado → actualizar vehículo
@@ -347,8 +404,12 @@ try {
                         $otherActive = $db->prepare("SELECT COUNT(*) FROM mantenimientos WHERE vehiculo_id = ? AND estado = 'En proceso' AND id != ?");
                         $otherActive->execute([$vehiculoId, (int)$d['id']]);
                         if ((int)$otherActive->fetchColumn() === 0) {
-                            $db->prepare("UPDATE vehiculos SET estado = 'Activo' WHERE id = ? AND estado = 'En mantenimiento'")
-                               ->execute([$vehiculoId]);
+                            // Restablecer a Activo si no hay asignación activa, sino mantener como está
+                            $activeAsig = $db->prepare("SELECT COUNT(*) FROM asignaciones WHERE vehiculo_id = ? AND estado = 'Activa'");
+                            $activeAsig->execute([$vehiculoId]);
+                            $newVehEstado = (int)$activeAsig->fetchColumn() > 0 ? 'Activo' : 'Activo';
+                            $db->prepare("UPDATE vehiculos SET estado = ? WHERE id = ? AND estado = 'En mantenimiento'")
+                               ->execute([$newVehEstado, $vehiculoId]);
                         }
                     }
                     audit_log('mantenimientos', 'estado_change', (int)$d['id'], ['estado' => $estadoAnterior], ['estado' => $estadoNuevo]);
@@ -380,8 +441,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM mantenimientos WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM mantenimientos WHERE id=?")->execute([$id]);
-            audit_log('mantenimientos', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE mantenimientos SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('mantenimientos', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok'=>true]);
             break;
     }

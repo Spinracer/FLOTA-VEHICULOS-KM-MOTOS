@@ -9,6 +9,45 @@ header('Content-Type: application/json');
 $db = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
+/**
+ * Captura un snapshot de todos los componentes asignados al vehículo
+ */
+function snapshot_componentes(PDO $db, int $asignacionId, int $vehiculoId, string $momento, int $userId, ?array $overrides = null): int {
+    $stmt = $db->prepare("
+        SELECT vc.component_id, c.nombre, c.tipo, vc.estado, vc.cantidad, vc.numero_serie
+        FROM vehicle_components vc
+        JOIN components c ON c.id = vc.component_id
+        WHERE vc.vehiculo_id = ?
+        ORDER BY c.tipo, c.nombre
+    ");
+    $stmt->execute([$vehiculoId]);
+    $items = $stmt->fetchAll();
+    $count = 0;
+
+    $ins = $db->prepare("INSERT INTO assignment_component_snapshots
+        (asignacion_id, vehiculo_id, momento, component_id, componente_nombre, componente_tipo, estado, cantidad, numero_serie, observaciones, created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+
+    foreach ($items as $item) {
+        $compId = (int)$item['component_id'];
+        // Si hay overrides del usuario (para retorno con observaciones), aplicar
+        $estado = $item['estado'];
+        $obs    = null;
+        if ($overrides && isset($overrides[$compId])) {
+            $estado = $overrides[$compId]['estado'] ?? $estado;
+            $obs    = $overrides[$compId]['observaciones'] ?? null;
+        }
+        $ins->execute([
+            $asignacionId, $vehiculoId, $momento,
+            $compId, $item['nombre'], $item['tipo'],
+            $estado, (int)$item['cantidad'], $item['numero_serie'],
+            $obs, $userId
+        ]);
+        $count++;
+    }
+    return $count;
+}
+
 function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
     $stmt = $db->prepare("SELECT id FROM asignaciones WHERE vehiculo_id=? AND estado='Activa' ORDER BY id DESC LIMIT 1");
     $stmt->execute([$vehiculoId]);
@@ -39,6 +78,51 @@ function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
 }
 
 try {
+    // ─── Sub-endpoint: snapshots de componentes ───
+    $subAction = trim($_GET['action'] ?? '');
+    if ($subAction === 'snapshots') {
+        $asigId = (int)($_GET['asignacion_id'] ?? 0);
+        if ($method === 'GET' && $asigId > 0) {
+            $momento = trim($_GET['momento'] ?? '');
+            $where = "WHERE s.asignacion_id = ?";
+            $params = [$asigId];
+            if ($momento !== '') { $where .= " AND s.momento = ?"; $params[] = $momento; }
+            $stmt = $db->prepare("SELECT s.* FROM assignment_component_snapshots s $where ORDER BY s.momento ASC, s.componente_tipo ASC, s.componente_nombre ASC");
+            $stmt->execute($params);
+            echo json_encode(['snapshots' => $stmt->fetchAll()]);
+            exit;
+        }
+        // POST manual de snapshot retorno con observaciones
+        if ($method === 'POST' && $asigId > 0) {
+            if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            $asig = $db->prepare("SELECT * FROM asignaciones WHERE id = ? LIMIT 1");
+            $asig->execute([$asigId]);
+            $asigRow = $asig->fetch();
+            if (!$asigRow) { http_response_code(404); echo json_encode(['error' => 'Asignación no encontrada.']); exit; }
+            $overrides = $d['items'] ?? [];
+            $ovMap = [];
+            foreach ($overrides as $o) {
+                $cid = (int)($o['component_id'] ?? 0);
+                if ($cid > 0) $ovMap[$cid] = $o;
+            }
+            $cnt = snapshot_componentes($db, $asigId, (int)$asigRow['vehiculo_id'], 'retorno', (int)($_SESSION['user_id'] ?? 0), $ovMap);
+            // Actualizar vehicle_components con los nuevos estados reportados
+            foreach ($ovMap as $cid => $ov) {
+                if (!empty($ov['estado'])) {
+                    $db->prepare("UPDATE vehicle_components SET estado = ? WHERE vehiculo_id = ? AND component_id = ?")
+                       ->execute([$ov['estado'], (int)$asigRow['vehiculo_id'], $cid]);
+                }
+            }
+            audit_log('assignment_snapshots', 'retorno_manual', $asigId, [], ['items' => count($ovMap)]);
+            echo json_encode(['ok' => true, 'snapshot_count' => $cnt]);
+            exit;
+        }
+        http_response_code(400);
+        echo json_encode(['error' => 'Parámetros inválidos para snapshots.']);
+        exit;
+    }
+
     switch ($method) {
         case 'GET':
             $q = '%' . trim($_GET['q'] ?? '') . '%';
@@ -128,6 +212,8 @@ try {
                 if ($startKm) {
                     odometro_registrar($db, $vehiculoId, $startKm, 'assignment_start', (int)($_SESSION['user_id'] ?? 0));
                 }
+                // Snapshot de componentes al momento de entrega
+                snapshot_componentes($db, $id, $vehiculoId, 'entrega', (int)($_SESSION['user_id'] ?? 0));
                 $db->commit();
             } catch (Throwable $txe) {
                 $db->rollBack();
@@ -198,6 +284,22 @@ try {
                 ]);
 
                 odometro_registrar($db, $vehiculoId, $endKm, 'assignment_end', (int)($_SESSION['user_id'] ?? 0));
+                // Snapshot de componentes al momento de retorno
+                $componentOverrides = [];
+                if (!empty($d['component_overrides']) && is_array($d['component_overrides'])) {
+                    foreach ($d['component_overrides'] as $o) {
+                        $cid = (int)($o['component_id'] ?? 0);
+                        if ($cid > 0) $componentOverrides[$cid] = $o;
+                    }
+                }
+                snapshot_componentes($db, $id, $vehiculoId, 'retorno', (int)($_SESSION['user_id'] ?? 0), $componentOverrides ?: null);
+                // Si hay overrides, actualizar vehicle_components
+                foreach ($componentOverrides as $cid => $ov) {
+                    if (!empty($ov['estado'])) {
+                        $db->prepare("UPDATE vehicle_components SET estado = ? WHERE vehiculo_id = ? AND component_id = ?")
+                           ->execute([$ov['estado'], $vehiculoId, $cid]);
+                    }
+                }
                 $db->commit();
             } catch (Throwable $txe) {
                 $db->rollBack();
@@ -222,8 +324,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM asignaciones WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM asignaciones WHERE id=?")->execute([$id]);
-            audit_log('asignaciones', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE asignaciones SET estado = 'Cerrada' WHERE id = ?")->execute([$id]);
+            audit_log('asignaciones', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok' => true]);
             break;
 

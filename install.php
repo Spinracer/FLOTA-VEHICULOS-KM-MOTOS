@@ -164,9 +164,13 @@ $tables = [
   descripcion  TEXT         NULL,
   costo        DECIMAL(10,2) NOT NULL DEFAULT 0,
   km           DECIMAL(10,1) NULL,
+  exit_km      DECIMAL(10,1) NULL,
   proximo_km   DECIMAL(10,1) NULL,
   proveedor_id INT          NULL,
   estado       ENUM('Completado','En proceso','Pendiente','Cancelado') NOT NULL DEFAULT 'Pendiente',
+  resumen      TEXT         NULL,
+  completed_at DATETIME     NULL,
+  completed_by INT          NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (vehiculo_id)  REFERENCES vehiculos(id)  ON DELETE CASCADE,
   FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
@@ -335,6 +339,46 @@ $tables = [
   INDEX idx_mi_mantenimiento (mantenimiento_id),
   CONSTRAINT fk_mi_mantenimiento FOREIGN KEY (mantenimiento_id) REFERENCES mantenimientos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"assignment_component_snapshots" => "CREATE TABLE IF NOT EXISTS assignment_component_snapshots (
+  id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  asignacion_id   BIGINT NOT NULL,
+  vehiculo_id     INT NOT NULL,
+  momento         ENUM('entrega','retorno') NOT NULL,
+  component_id    INT NOT NULL,
+  componente_nombre VARCHAR(150) NOT NULL,
+  componente_tipo VARCHAR(30) NOT NULL,
+  estado          ENUM('Bueno','Regular','Malo','Faltante') NOT NULL,
+  cantidad        INT NOT NULL DEFAULT 1,
+  numero_serie    VARCHAR(100) NULL,
+  observaciones   TEXT NULL,
+  created_by      INT NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_acs_asignacion (asignacion_id),
+  INDEX idx_acs_vehiculo_momento (vehiculo_id, momento),
+  CONSTRAINT fk_acs_asignacion FOREIGN KEY (asignacion_id) REFERENCES asignaciones(id) ON DELETE CASCADE,
+  CONSTRAINT fk_acs_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_acs_component FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"preventive_intervals" => "CREATE TABLE IF NOT EXISTS preventive_intervals (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  vehiculo_id     INT NOT NULL,
+  tipo            VARCHAR(60) NOT NULL,
+  cada_km         DECIMAL(10,1) NULL COMMENT 'Cada cuántos km',
+  cada_dias       INT NULL COMMENT 'Cada cuántos días',
+  ultimo_km       DECIMAL(10,1) NULL COMMENT 'KM del último servicio',
+  ultima_fecha    DATE NULL COMMENT 'Fecha del último servicio',
+  proveedor_id    INT NULL,
+  activo          TINYINT(1) NOT NULL DEFAULT 1,
+  notas           TEXT NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_pi_vehiculo (vehiculo_id),
+  INDEX idx_pi_activo (activo),
+  CONSTRAINT fk_pi_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pi_proveedor FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ];
 
 foreach ($tables as $name => $sql) {
@@ -486,6 +530,8 @@ $seedCatalogs = [
   ["INSERT IGNORE INTO catalogo_estados_vehiculo (nombre) VALUES ('Activo'), ('En mantenimiento'), ('Fuera de servicio')", 'Semilla estados de vehículo'],
   ["INSERT IGNORE INTO catalogo_servicios_taller (nombre) VALUES ('Mecánica general'), ('Electricidad automotriz'), ('Llantería'), ('Alineación y balanceo')", 'Semilla servicios de taller'],
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.anomaly_threshold',15,'Porcentaje mínimo bajo promedio para marcar anomalía')", 'Semilla configuración global'],
+  ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.max_litros_evento',200,'Máximo de litros permitidos por carga (0=sin límite)')", 'Semilla max litros'],
+  ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('maintenance.umbral_aprobacion',5000,'Costo de OT que requiere aprobación especial (0=sin umbral)')", 'Semilla umbral aprobación'],
   ["INSERT IGNORE INTO components (nombre,tipo,descripcion) VALUES
     ('Gato hidráulico','tool','Gato para cambio de llanta'),
     ('Llave de ruedas','tool','Cruz para tuercas de rueda'),
@@ -531,6 +577,26 @@ try {
   step("Compat: mantenimientos.estado con Cancelado", true);
 } catch (Throwable $e) {
   step("Compat: mantenimientos.estado con Cancelado", true, 'Ya actualizado o error: ' . $e->getMessage());
+}
+
+// 3.26 Columnas de cierre OT: exit_km, resumen, completed_at, completed_by
+$mantNewCols = [
+  ['exit_km', "DECIMAL(10,1) NULL AFTER km"],
+  ['resumen', "TEXT NULL AFTER estado"],
+  ['completed_at', "DATETIME NULL AFTER resumen"],
+  ['completed_by', "INT NULL AFTER completed_at"],
+];
+foreach ($mantNewCols as [$col, $def]) {
+  try {
+    if (!$existsColumn('mantenimientos', $col)) {
+      $pdo->exec("ALTER TABLE mantenimientos ADD COLUMN {$col} {$def}");
+      step("Compat: mantenimientos.{$col}", true);
+    } else {
+      step("Compat: mantenimientos.{$col}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Compat: mantenimientos.{$col}", false, $e->getMessage());
+  }
 }
 
 // 3.3 Índices compuestos para rendimiento

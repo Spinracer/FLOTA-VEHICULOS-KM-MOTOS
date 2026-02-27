@@ -31,6 +31,109 @@ function combustible_bloqueo_mantenimiento(PDO $db, int $vehiculoId, ?int $exclu
 }
 
 try {
+    // ─── Sub-endpoint: Anomalías de combustible ───
+    $action = trim($_GET['action'] ?? '');
+    if ($action === 'anomalias') {
+        // Genera alertas por: cargas muy cercanas, rendimiento muy bajo, odómetro sospechoso
+        $vid = (int)($_GET['vehiculo_id'] ?? 0);
+        $limit = min(200, max(10, (int)($_GET['limit'] ?? 50)));
+
+        // Obtener umbral de configuración
+        $threshStmt = $db->prepare("SELECT value_num FROM system_settings WHERE key_name = 'fuel.anomaly_threshold' LIMIT 1");
+        $threshStmt->execute();
+        $threshold = (float)($threshStmt->fetchColumn() ?: 15);
+
+        $where = "WHERE c.km > 0 AND c.litros > 0";
+        $params = [];
+        if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
+
+        $stmt = $db->prepare("
+            SELECT c.id, c.fecha, c.vehiculo_id, c.litros, c.km, c.total, v.placa, v.marca,
+                   LAG(c.km) OVER (PARTITION BY c.vehiculo_id ORDER BY c.km ASC) AS prev_km,
+                   LAG(c.fecha) OVER (PARTITION BY c.vehiculo_id ORDER BY c.fecha ASC, c.id ASC) AS prev_fecha,
+                   LAG(c.litros) OVER (PARTITION BY c.vehiculo_id ORDER BY c.km ASC) AS prev_litros
+            FROM combustible c
+            JOIN vehiculos v ON v.id = c.vehiculo_id
+            $where
+            ORDER BY c.fecha DESC, c.id DESC
+            LIMIT ?
+        ");
+        $params[] = $limit;
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        // Calcular promedio móvil por vehículo (últimos 10 registros)
+        $avgStmt = $db->prepare("
+            SELECT vehiculo_id,
+                   AVG((km - prev_km) / litros) AS avg_kml
+            FROM (
+                SELECT c2.vehiculo_id, c2.litros, c2.km,
+                       LAG(c2.km) OVER (PARTITION BY c2.vehiculo_id ORDER BY c2.km ASC) AS prev_km
+                FROM combustible c2
+                WHERE c2.km > 0 AND c2.litros > 0
+            ) sub
+            WHERE prev_km IS NOT NULL AND prev_km > 0 AND km > prev_km
+            GROUP BY vehiculo_id
+        ");
+        $avgStmt->execute();
+        $promedios = [];
+        while ($r = $avgStmt->fetch()) {
+            $promedios[(int)$r['vehiculo_id']] = round((float)$r['avg_kml'], 2);
+        }
+
+        $alertas = [];
+        foreach ($rows as $r) {
+            $alerts_for_row = [];
+            $kml = null;
+            if ($r['prev_km'] && $r['km'] > $r['prev_km'] && $r['litros'] > 0) {
+                $kml = round(($r['km'] - $r['prev_km']) / $r['litros'], 2);
+            }
+
+            // 1) Rendimiento muy bajo vs promedio
+            $avgVeh = $promedios[(int)$r['vehiculo_id']] ?? null;
+            if ($kml !== null && $avgVeh !== null && $avgVeh > 0) {
+                $desvPct = round((($avgVeh - $kml) / $avgVeh) * 100, 1);
+                if ($desvPct >= $threshold) {
+                    $alerts_for_row[] = ['tipo' => 'rendimiento_bajo', 'msg' => "Rendimiento {$kml} km/L vs promedio {$avgVeh} km/L ({$desvPct}% menor)", 'severidad' => $desvPct >= 40 ? 'alta' : 'media'];
+                }
+            }
+
+            // 2) Cargas muy cercanas en tiempo (< 24h entre cargas)
+            if ($r['prev_fecha']) {
+                $diff = (strtotime($r['fecha']) - strtotime($r['prev_fecha'])) / 3600;
+                if ($diff >= 0 && $diff < 24) {
+                    $alerts_for_row[] = ['tipo' => 'carga_cercana', 'msg' => "Carga a " . round($diff, 1) . " horas de la anterior", 'severidad' => $diff < 6 ? 'alta' : 'media'];
+                }
+            }
+
+            // 3) Odómetro sospechoso (retroceso o salto enorme > 2000 km entre cargas)
+            if ($r['prev_km'] && $r['km'] > 0) {
+                if ($r['km'] < $r['prev_km']) {
+                    $alerts_for_row[] = ['tipo' => 'odometro_retroceso', 'msg' => "Odómetro retrocedió: {$r['km']} < {$r['prev_km']}", 'severidad' => 'alta'];
+                } elseif (($r['km'] - $r['prev_km']) > 2000 && $r['litros'] < 80) {
+                    $alerts_for_row[] = ['tipo' => 'salto_odometro', 'msg' => "Salto inusual de " . ($r['km'] - $r['prev_km']) . " km con solo {$r['litros']} L", 'severidad' => 'media'];
+                }
+            }
+
+            if (!empty($alerts_for_row)) {
+                $alertas[] = [
+                    'registro_id' => (int)$r['id'],
+                    'fecha' => $r['fecha'],
+                    'vehiculo_id' => (int)$r['vehiculo_id'],
+                    'placa' => $r['placa'],
+                    'marca' => $r['marca'],
+                    'litros' => (float)$r['litros'],
+                    'km' => (float)$r['km'],
+                    'rendimiento' => $kml,
+                    'alertas' => $alerts_for_row,
+                ];
+            }
+        }
+
+        echo json_encode(['alertas' => $alertas, 'promedios' => $promedios, 'threshold' => $threshold]);
+        exit;
+    }
+
     switch ($method) {
         case 'GET':
             $q    = '%'.trim($_GET['q']??'').'%';
@@ -41,7 +144,7 @@ try {
             $per  = min(100,max(5,(int)($_GET['per']??25)));
             $off  = ($page-1)*$per;
 
-            $where = "WHERE (v.placa LIKE ? OR v.marca LIKE ? OR p.nombre LIKE ? OR o.nombre LIKE ? OR c.numero_recibo LIKE ?)";
+            $where = "WHERE c.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR p.nombre LIKE ? OR o.nombre LIKE ? OR c.numero_recibo LIKE ?)";
             $params = [$q, $q, $q, $q, $q];
             if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
             if ($from !== '') { $where .= " AND c.fecha >= ?"; $params[] = $from; }
@@ -121,7 +224,16 @@ try {
                 break;
             }
             odometro_validar_km($db, $vehiculoId, $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
+            // Validar máximo de litros por evento
+            $maxLitrosStmt = $db->prepare("SELECT value_num FROM system_settings WHERE key_name = 'fuel.max_litros_evento' LIMIT 1");
+            $maxLitrosStmt->execute();
+            $maxLitros = (float)($maxLitrosStmt->fetchColumn() ?: 0);
             $l = (float)$d['litros']; $c = (float)$d['costo_litro'];
+            if ($maxLitros > 0 && $l > $maxLitros && !$allowOverride) {
+                http_response_code(422);
+                echo json_encode(['error' => "La cantidad de litros ({$l}) excede el máximo permitido ({$maxLitros} L). Requiere justificación de override."]);
+                break;
+            }
             $db->beginTransaction();
             try {
                 $stmt = $db->prepare("INSERT INTO combustible (fecha,vehiculo_id,operador_id,litros,costo_litro,total,km,proveedor_id,metodo_pago,numero_recibo,tipo_carga,notas) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
@@ -213,8 +325,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM combustible WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM combustible WHERE id=?")->execute([$id]);
-            audit_log('combustible', 'delete', $id, $prev, []);
+            $db->prepare("UPDATE combustible SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            audit_log('combustible', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok'=>true]);
             break;
     }
