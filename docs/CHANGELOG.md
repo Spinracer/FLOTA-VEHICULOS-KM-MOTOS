@@ -1,5 +1,22 @@
 # FlotaControl — Changelog
 
+## [2.4.0] — 2026-02-27
+
+### Nuevas Funcionalidades
+- **Matriz de Permisos Granular por Módulo**: Tabla `role_module_permissions` con permisos (view/create/edit/delete) por rol y módulo. UI admin en `/permisos.php` con tabs por rol, checkboxes por módulo y guardado masivo. Función `can_module(módulo, permiso)` en auth.php. Carga async de permisos en frontend via `userCanModule()`.
+- **Sistema de Adjuntos Reutilizable**: Tabla `attachments` + helper `includes/attachments.php` con upload, listado, descarga y soft-delete. API genérica `/api/attachments.php` con soporte multi-archivo. Validación de tipo MIME, extensión y tamaño (10MB max). Carpeta `/uploads/` con .gitignore.
+- **Dashboard Mejorado**: Nuevos paneles: alertas preventivas (vencidos/próximos) y OTs activas (pendientes/en proceso). Total 4 paneles informativos en dashboard.
+- **Reporte de Overrides**: Nuevo tipo `?report=overrides` que consulta audit_logs por acciones de override. Muestra motivo, usuario, IP, entidad. Resúmenes por usuario y por entidad. UI en reportes con tabla.
+- **Perfil Operador 360**: Nuevo tipo `?report=operador_360` con KPIs (asignaciones, litros, km, incidentes), historial de asignaciones, combustible vinculado e incidentes. UI con selector de operador y KPIs visuales.
+- **Agrupaciones y Ordenamientos Avanzados**: Parámetros `group_by`, `order_by`, `order_dir` en reportes de combustible (vehiculo/mes/semana/proveedor/tipo_carga/metodo_pago) y mantenimiento (vehiculo/mes/semana/tipo/proveedor/estado). UI con toolbar de agrupación dinámico y tabla agrupada separada.
+- **Pruebas Automatizadas**: Suite `tests/test_rules.php` con 10 secciones: auth, odómetro, bloqueo asignaciones, bloqueo combustible, máquina estados OT, reglas cierre, soft-delete, adjuntos, esquema BD, settings.
+
+### Mejoras
+- **Sidebar**: Nuevo enlace "🔐 Permisos" en sección Sistema (solo admin).
+- **Frontend Permisos**: `loadModulePerms()` async + `userCanModule(mod, perm)` disponible globalmente.
+
+---
+
 ## [2.3.0] — 2026-02-27
 
 ### Nuevas Funcionalidades

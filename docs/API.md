@@ -289,3 +289,78 @@ Al cambiar estado a `Completado`:
 - `resumen` obligatorio (texto del trabajo realizado)
 - Se registra odómetro automáticamente con `exit_km`
 - Se actualiza `completed_at` y `completed_by`
+
+---
+
+## Permisos Granulares (`/api/permisos.php`)
+
+Solo accesible por administradores (coordinador_it/admin).
+
+### GET - Obtener matriz
+```
+GET /api/permisos.php
+```
+Respuesta: `{ "matrix": { "soporte": { "vehiculos": ["view","create","edit"], ... }}, "modulos": [...], "permisos": [...], "roles": [...] }`
+
+### PUT - Actualizar permisos de un rol/módulo
+```json
+{ "rol": "soporte", "modulo": "vehiculos", "permisos": ["view", "create", "edit"] }
+```
+Respuesta: `{ "ok": true, "rol": "soporte", "modulo": "vehiculos", "permisos": ["view","create","edit"] }`
+
+---
+
+## Adjuntos (`/api/attachments.php`)
+
+### GET - Listar adjuntos
+```
+GET /api/attachments.php?entidad=vehiculos&entidad_id=1
+```
+Respuesta: `{ "attachments": [{ "id": 1, "filename": "...", "original_name": "foto.jpg", "mime_type": "image/jpeg", "size_bytes": 123456, ... }] }`
+
+### GET - Descargar archivo
+```
+GET /api/attachments.php?action=download&id=1
+```
+Respuesta: Archivo binario con content-type y content-disposition.
+
+### POST - Subir archivo(s)
+Enviar como `multipart/form-data`:
+- `entidad` (string): vehiculos, mantenimientos, combustible, etc.
+- `entidad_id` (int): ID del registro
+- `archivo` (file): Archivo(s) a subir (máx 10MB, tipos: jpg/png/gif/webp/pdf/doc/docx/xls/xlsx)
+
+Respuesta: `{ "ok": true, "uploaded": [{ "id": 1, "filename": "...", "original_name": "...", ... }] }`
+
+### DELETE - Eliminar adjunto
+```
+DELETE /api/attachments.php?id=1
+```
+Respuesta: `{ "ok": true, "deleted": 1 }`
+
+---
+
+## Reportes — Nuevos tipos
+
+### GET - Reporte Overrides
+```
+GET /api/reportes.php?report=overrides&from=2024-01-01&to=2024-12-31
+```
+Respuesta: `{ "total": 5, "rows": [...], "por_usuario": {...}, "por_entidad": {...} }`
+
+### GET - Perfil Operador 360
+```
+GET /api/reportes.php?report=operador_360&operador_id=1
+```
+Respuesta: `{ "operador": {...}, "totales": {...}, "asignaciones": [...], "combustible": [...], "incidentes": [...] }`
+
+### Agrupaciones avanzadas (combustible y mantenimiento)
+Parámetros adicionales:
+- `group_by`: vehiculo, mes, semana, proveedor, tipo_carga, metodo_pago (combustible) / vehiculo, mes, semana, tipo, proveedor, estado (mantenimiento)
+- `order_by`: gasto, cargas, litros, servicios
+- `order_dir`: ASC, DESC
+
+```
+GET /api/reportes.php?report=combustible&group_by=mes&order_by=gasto&order_dir=DESC
+```
+Respuesta agrega campo `agrupado`: `[{ "grupo": "2024-01", "litros": 500, "gasto": 12000, "cargas": 20 }]`

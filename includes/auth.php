@@ -110,6 +110,46 @@ function can(string $action): bool {
 }
 
 /**
+ * Verifica permiso granular por módulo.
+ * Primero consulta role_module_permissions; si no existe la tabla, cae al can() global.
+ */
+function can_module(string $modulo, string $permiso): bool {
+    $rol = $_SESSION['user_rol'] ?? '';
+    // coordinador_it y admin siempre tienen acceso total
+    if (in_array($rol, ['coordinador_it', 'admin'])) return true;
+    try {
+        $db = getDB();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM role_module_permissions WHERE rol = ? AND modulo = ? AND permiso = ?"
+        );
+        $stmt->execute([$rol, $modulo, $permiso]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        // Tabla no existe → fallback a permisos globales
+        return can($permiso);
+    }
+}
+
+/**
+ * Requiere permiso granular en módulo, o devuelve 403.
+ */
+function require_module_permission(string $modulo, string $permiso): void {
+    require_login();
+    if (!can_module($modulo, $permiso)) {
+        http_response_code(403);
+        if (php_sapi_name() !== 'cli' && !headers_sent()) {
+            if (str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/')) {
+                header('Content-Type: application/json');
+                echo json_encode(['error' => "Sin permisos: {$permiso} en {$modulo}"]);
+                exit;
+            }
+        }
+        include __DIR__ . '/403.php';
+        exit;
+    }
+}
+
+/**
  * Retorna la etiqueta CSS del badge para el rol.
  */
 function role_badge(string $rol): string {

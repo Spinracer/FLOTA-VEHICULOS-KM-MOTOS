@@ -38,6 +38,8 @@
 │   ├── componentes.php    # Catálogo + inventario por vehículo
 │   ├── auditoria.php      # Consulta de bitácora (admin)
 │   ├── preventivos.php    # Intervalos preventivos y alertas
+│   ├── permisos.php       # Matriz permisos granular (admin)
+│   ├── attachments.php    # API genérica de adjuntos
 │   ├── operadores.php
 │   ├── proveedores.php
 │   ├── catalogos.php
@@ -52,6 +54,7 @@
 │   ├── auth.php           # Roles, permisos, sesiones, login/logout
 │   ├── audit.php          # Bitácora de auditoría
 │   ├── odometro.php       # Validación y registro de odómetro
+│   ├── attachments.php    # Servicio de adjuntos (upload/list/download/delete)
 │   ├── catalogos.php      # Helper para cargar catálogos dinámicos
 │   ├── export.php         # Motor de exportación CSV
 │   ├── layout.php         # Layout principal con sidebar
@@ -62,10 +65,15 @@
 │   └── style.css          # Tema dark con CSS variables
 │
 └── docs/                  # Documentación del proyecto
-    ├── ARQUITECTURA.md    # Este archivo
-    ├── CHANGELOG.md       # Historial de cambios
-    ├── API.md             # Documentación de endpoints
-    └── REGLAS_NEGOCIO.md  # Reglas de negocio documentadas
+│   ├── ARQUITECTURA.md    # Este archivo
+│   ├── CHANGELOG.md       # Historial de cambios
+│   ├── API.md             # Documentación de endpoints
+│   └── REGLAS_NEGOCIO.md  # Reglas de negocio documentadas
+│
+├── tests/                 # Pruebas automatizadas
+│   └── test_rules.php     # Tests de reglas de negocio
+│
+└── uploads/               # Archivos adjuntos (excluido de git)
 ```
 
 ## Patrón Arquitectural
@@ -84,7 +92,7 @@
 3. **Módulos API**: Endpoints JSON con reglas de negocio, validación, auditoría
 4. **Includes**: Servicios transversales (DB, Auth, Audit, Odómetro, Catálogos, Export)
 
-## Base de Datos (18 tablas)
+## Base de Datos (24 tablas)
 
 | Tabla | Descripción |
 |-------|------------|
@@ -94,11 +102,18 @@
 | `vehiculos` | Inventario de vehículos |
 | `combustible` | Registros de carga de combustible |
 | `mantenimientos` | Bitácora de mantenimientos |
+| `mantenimiento_items` | Partidas por OT (cantidad, unidad, precio) |
 | `asignaciones` | Asignaciones vehículo-operador |
 | `incidentes` | Registro de incidentes |
 | `recordatorios` | Alertas y recordatorios |
 | `odometer_logs` | Log de lecturas de odómetro |
 | `audit_logs` | Bitácora de auditoría |
+| `components` | Catálogo maestro de componentes |
+| `vehicle_components` | Inventario de componentes por vehículo |
+| `assignment_component_snapshots` | Snapshots componentes por asignación |
+| `preventive_intervals` | Intervalos de mantenimiento preventivo |
+| `role_module_permissions` | **Nuevo** Permisos granulares por rol y módulo |
+| `attachments` | **Nuevo** Archivos adjuntos por entidad |
 | `catalogo_categorias_gasto` | Catálogo: categorías de gasto |
 | `catalogo_unidades` | Catálogo: unidades de medida |
 | `catalogo_tipos_mantenimiento` | Catálogo: tipos de mantenimiento |

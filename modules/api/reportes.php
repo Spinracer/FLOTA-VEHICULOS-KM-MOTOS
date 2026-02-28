@@ -26,6 +26,10 @@ $from = trim($_GET['from'] ?? '');
 $to = trim($_GET['to'] ?? '');
 $vid = (int)($_GET['vehiculo_id'] ?? 0);
 $provId = (int)($_GET['proveedor_id'] ?? 0);
+$groupBy = trim($_GET['group_by'] ?? '');
+$orderBy = trim($_GET['order_by'] ?? '');
+$orderDir = strtoupper(trim($_GET['order_dir'] ?? 'DESC'));
+if (!in_array($orderDir, ['ASC','DESC'])) $orderDir = 'DESC';
 
 try {
     // ─── EXPORTACIONES ───
@@ -163,7 +167,36 @@ try {
             $stmt->execute($params);
             $porMes = $stmt->fetchAll();
 
-            echo json_encode(['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_mes' => $porMes]);
+            // Agrupación avanzada
+            $agrupado = null;
+            $validGroups = ['vehiculo','mes','semana','proveedor','tipo_carga','metodo_pago'];
+            if ($groupBy && in_array($groupBy, $validGroups)) {
+                $groupCol = match($groupBy) {
+                    'vehiculo'    => 'v.placa',
+                    'mes'         => "DATE_FORMAT(c.fecha, '%Y-%m')",
+                    'semana'      => "DATE_FORMAT(c.fecha, '%x-W%v')",
+                    'proveedor'   => "COALESCE(p.nombre, 'Sin proveedor')",
+                    'tipo_carga'  => 'c.tipo_carga',
+                    'metodo_pago' => 'c.metodo_pago',
+                };
+                $orderCol = match($orderBy) {
+                    'cargas'  => 'cargas',
+                    'litros'  => 'litros',
+                    'gasto'   => 'gasto',
+                    default   => 'gasto',
+                };
+                $stmt = $db->prepare("SELECT {$groupCol} as grupo, SUM(c.litros) as litros, SUM(c.total) as gasto, COUNT(*) as cargas
+                    FROM combustible c
+                    LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
+                    LEFT JOIN proveedores p ON p.id=c.proveedor_id
+                    $where GROUP BY grupo ORDER BY {$orderCol} {$orderDir}");
+                $stmt->execute($params);
+                $agrupado = $stmt->fetchAll();
+            }
+
+            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_mes' => $porMes];
+            if ($agrupado !== null) $result['agrupado'] = $agrupado;
+            echo json_encode($result);
             break;
 
         case 'mantenimiento':
@@ -189,7 +222,35 @@ try {
             $stmt->execute($params);
             $porTipo = $stmt->fetchAll();
 
-            echo json_encode(['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_tipo' => $porTipo]);
+            // Agrupación avanzada
+            $agrupado = null;
+            $validGroups = ['vehiculo','mes','semana','tipo','proveedor','estado'];
+            if ($groupBy && in_array($groupBy, $validGroups)) {
+                $groupCol = match($groupBy) {
+                    'vehiculo'  => 'v.placa',
+                    'mes'       => "DATE_FORMAT(m.fecha, '%Y-%m')",
+                    'semana'    => "DATE_FORMAT(m.fecha, '%x-W%v')",
+                    'tipo'      => 'm.tipo',
+                    'proveedor' => "COALESCE(p.nombre, 'Sin proveedor')",
+                    'estado'    => 'm.estado',
+                };
+                $orderCol = match($orderBy) {
+                    'servicios' => 'servicios',
+                    'gasto'     => 'gasto',
+                    default     => 'gasto',
+                };
+                $stmt = $db->prepare("SELECT {$groupCol} as grupo, SUM(m.costo) as gasto, COUNT(*) as servicios
+                    FROM mantenimientos m
+                    LEFT JOIN vehiculos v ON v.id=m.vehiculo_id
+                    LEFT JOIN proveedores p ON p.id=m.proveedor_id
+                    $where GROUP BY grupo ORDER BY {$orderCol} {$orderDir}");
+                $stmt->execute($params);
+                $agrupado = $stmt->fetchAll();
+            }
+
+            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_tipo' => $porTipo];
+            if ($agrupado !== null) $result['agrupado'] = $agrupado;
+            echo json_encode($result);
             break;
 
         case 'vehiculos':
@@ -243,8 +304,103 @@ try {
             echo json_encode(['rows' => $stmt->fetchAll()]);
             break;
 
+        case 'overrides':
+            // Reporte de overrides: todas las acciones de override registradas en auditoría
+            $where = "WHERE (a.accion LIKE '%override%' OR a.meta_json LIKE '%override%' OR a.despues_json LIKE '%override%')";
+            $params = [];
+            if ($from) { $where .= " AND a.created_at >= ?"; $params[] = $from . ' 00:00:00'; }
+            if ($to) { $where .= " AND a.created_at <= ?"; $params[] = $to . ' 23:59:59'; }
+            $stmt = $db->prepare("SELECT a.id, a.user_email, a.user_rol, a.entidad, a.entidad_id, a.accion,
+                a.antes_json, a.despues_json, a.meta_json, a.ip, a.created_at
+                FROM audit_logs a $where ORDER BY a.created_at DESC LIMIT 200");
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+
+            // Enriquecer con el motivo de override
+            foreach ($rows as &$r) {
+                $meta = $r['meta_json'] ? json_decode($r['meta_json'], true) : [];
+                $after = $r['despues_json'] ? json_decode($r['despues_json'], true) : [];
+                $r['override_reason'] = $meta['override_reason'] ?? $after['override_reason'] ?? $meta['justificacion'] ?? $after['justificacion'] ?? '—';
+                $r['antes'] = $r['antes_json'] ? json_decode($r['antes_json'], true) : null;
+                $r['despues'] = $r['despues_json'] ? json_decode($r['despues_json'], true) : null;
+                $r['meta'] = $meta;
+                unset($r['antes_json'], $r['despues_json'], $r['meta_json']);
+            }
+            unset($r);
+
+            // Resumen
+            $byUser = []; $byEntity = [];
+            foreach ($rows as $r) {
+                $byUser[$r['user_email']] = ($byUser[$r['user_email']] ?? 0) + 1;
+                $byEntity[$r['entidad']] = ($byEntity[$r['entidad']] ?? 0) + 1;
+            }
+            arsort($byUser); arsort($byEntity);
+
+            echo json_encode([
+                'total' => count($rows),
+                'rows' => $rows,
+                'por_usuario' => $byUser,
+                'por_entidad' => $byEntity,
+            ]);
+            break;
+
+        case 'operador_360':
+            // Perfil 360 del operador
+            $opId = (int)($_GET['operador_id'] ?? 0);
+            if ($opId <= 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'operador_id es obligatorio.']);
+                break;
+            }
+            $opStmt = $db->prepare("SELECT id, nombre, estado, licencia, categoria_lic, venc_licencia, telefono, email FROM operadores WHERE id=? LIMIT 1");
+            $opStmt->execute([$opId]);
+            $operador = $opStmt->fetch();
+            if (!$operador) { http_response_code(404); echo json_encode(['error' => 'Operador no encontrado.']); break; }
+
+            // Asignaciones
+            $asgStmt = $db->prepare("SELECT a.id, v.placa, v.marca, a.start_at, a.end_at, a.start_km, a.end_km, a.estado FROM asignaciones a JOIN vehiculos v ON v.id=a.vehiculo_id WHERE a.operador_id=? ORDER BY a.start_at DESC LIMIT 50");
+            $asgStmt->execute([$opId]);
+            $asignaciones = $asgStmt->fetchAll();
+
+            // Combustible asociado
+            $fuelStmt = $db->prepare("SELECT c.id, c.fecha, v.placa, c.litros, c.total, c.km FROM combustible c
+                JOIN asignaciones a ON a.vehiculo_id=c.vehiculo_id AND a.operador_id=? AND c.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))
+                JOIN vehiculos v ON v.id=c.vehiculo_id ORDER BY c.fecha DESC LIMIT 100");
+            $fuelStmt->execute([$opId]);
+            $combustible = $fuelStmt->fetchAll();
+
+            // Incidentes
+            $incStmt = $db->prepare("SELECT i.id, i.fecha, v.placa, i.tipo, i.severidad, i.estado FROM incidentes i
+                JOIN asignaciones a ON a.vehiculo_id=i.vehiculo_id AND a.operador_id=? AND i.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))
+                JOIN vehiculos v ON v.id=i.vehiculo_id ORDER BY i.fecha DESC LIMIT 50");
+            $incStmt->execute([$opId]);
+            $incidentes = $incStmt->fetchAll();
+
+            // Totales
+            $totales = [
+                'asignaciones' => count($asignaciones),
+                'litros_total' => array_sum(array_column($combustible, 'litros')),
+                'gasto_combustible' => array_sum(array_column($combustible, 'total')),
+                'incidentes' => count($incidentes),
+                'km_total' => 0,
+            ];
+            foreach ($asignaciones as $a) {
+                if ($a['end_km'] && $a['start_km']) {
+                    $totales['km_total'] += max(0, (float)$a['end_km'] - (float)$a['start_km']);
+                }
+            }
+
+            echo json_encode([
+                'operador' => $operador,
+                'totales' => $totales,
+                'asignaciones' => $asignaciones,
+                'combustible' => $combustible,
+                'incidentes' => $incidentes,
+            ]);
+            break;
+
         default:
-            echo json_encode(['error' => 'Reporte no especificado. Use: combustible, mantenimiento, vehiculos, top_costosos, talleres']);
+            echo json_encode(['error' => 'Reporte no especificado. Use: combustible, mantenimiento, vehiculos, top_costosos, talleres, overrides, operador_360']);
     }
 } catch (Throwable $e) {
     http_response_code(500);

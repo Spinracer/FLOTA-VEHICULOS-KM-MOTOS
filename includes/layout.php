@@ -82,6 +82,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/auditoria.php" class="nav-item <?= $active_page==='auditoria'?'active':'' ?>">
       <span class="nav-icon">📜</span><span>Auditoría</span>
     </a>
+    <a href="/permisos.php" class="nav-item <?= $active_page==='permisos'?'active':'' ?>">
+      <span class="nav-icon">🔐</span><span>Permisos</span>
+    </a>
     <?php endif; ?>
   </nav>
 
@@ -119,6 +122,23 @@ function render_layout(string $page_title, string $active_page, string $content)
 const USER_ROLE = <?= json_encode($rol) ?>;
 const USER_CAN  = <?= json_encode(array_values(ROLE_PERMISSIONS[$rol] ?? [])) ?>;
 function userCan(perm) { return USER_CAN.includes(perm); }
+
+// Permisos granulares por módulo (cargado async)
+let MODULE_PERMS = {};
+async function loadModulePerms() {
+  try {
+    const r = await fetch('/api/permisos.php');
+    if (r.ok) {
+      const d = await r.json();
+      MODULE_PERMS = (d.matrix && d.matrix[USER_ROLE]) || {};
+    }
+  } catch(e) {}
+}
+function userCanModule(mod, perm) {
+  if (['coordinador_it','admin'].includes(USER_ROLE)) return true;
+  return MODULE_PERMS[mod] && MODULE_PERMS[mod].includes(perm);
+}
+if (USER_ROLE !== 'coordinador_it') loadModulePerms();
 </script>
 </body>
 </html>

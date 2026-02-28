@@ -101,3 +101,27 @@
 - Las tablas con `deleted_at` (vehiculos, operadores, proveedores, mantenimientos, combustible, incidentes, recordatorios) usan soft-delete en sus endpoints DELETE.
 - Todos los GETs filtran `deleted_at IS NULL` para excluir registros eliminados.
 - Los asignaciones se marcan como "Cerrada" en vez de borrarse.
+
+## 17. Permisos Granulares por Módulo
+- Tabla `role_module_permissions` con combinaciones (rol, módulo, permiso).
+- Módulos: vehiculos, asignaciones, mantenimientos, combustible, incidentes, recordatorios, operadores, proveedores, componentes, preventivos, reportes, catalogos, usuarios, auditoria.
+- Permisos: view, create, edit, delete.
+- `coordinador_it` y `admin` tienen acceso total sin restricción (hardcoded).
+- `taller` solo tiene permisos en mantenimientos, proveedores, componentes y preventivos. El resto solo view.
+- `monitoreo` solo tiene view en módulos funcionales, sin acceso a usuarios/catálogos.
+- Función `can_module(módulo, permiso)` verifica en BD con fallback al `can()` global si la tabla no existe.
+- UI admin permite editar checkbox por módulo para cada rol.
+
+## 18. Sistema de Adjuntos
+- Tabla `attachments` con entidad genérica (polimórfica por nombre).
+- Almacena en `/uploads/{entidad}/{entidad_id}/`.
+- Validaciones: tipos MIME (imágenes, PDF, Office), extensiones whitelist, tamaño máximo 10 MB.
+- Soporte multi-archivo en una sola petición.
+- Soft-delete con `deleted_at`.
+- Audit log en upload y delete.
+
+## 19. Pruebas Automatizadas
+- Suite en `tests/test_rules.php` con 10 secciones de verificación.
+- Verifica: roles y permisos, odómetro (validación y override), bloqueos de asignación, bloqueos de combustible, máquina de estados OT, reglas de cierre, soft-delete en todas las tablas, adjuntos (constantes y validación), integridad de esquema (todas las tablas), settings del sistema.
+- Ejecutar: `php tests/test_rules.php`.
+- Exit code 0 = todo pasó, 1 = hay fallos.

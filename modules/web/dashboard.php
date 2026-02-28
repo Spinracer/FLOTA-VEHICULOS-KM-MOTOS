@@ -55,6 +55,65 @@ $mant_chart = $db->query("
     ORDER BY value DESC LIMIT 6
 ")->fetchAll();
 
+// Alertas preventivos: intervalos vencidos o próximos
+$preventivo_alertas = [];
+try {
+    $piStmt = $db->query("
+        SELECT pi.id, pi.tipo, pi.cada_km, pi.cada_dias, pi.ultimo_km, pi.ultima_fecha,
+               v.id AS vid, v.placa, v.marca, v.km_actual
+        FROM preventive_intervals pi
+        JOIN vehiculos v ON v.id = pi.vehiculo_id
+        WHERE pi.activo = 1
+        ORDER BY v.placa
+    ");
+    $piRows = $piStmt->fetchAll();
+    foreach ($piRows as $pi) {
+        $alerts = [];
+        if ($pi['cada_km'] && $pi['ultimo_km'] !== null) {
+            $nextKm = (float)$pi['ultimo_km'] + (float)$pi['cada_km'];
+            $kmAct  = (float)$pi['km_actual'];
+            if ($kmAct >= $nextKm) {
+                $alerts[] = ['tipo' => 'vencido', 'msg' => 'Km excedido: ' . number_format($kmAct,0) . ' / ' . number_format($nextKm,0)];
+            } elseif ($kmAct >= $nextKm - 500) {
+                $alerts[] = ['tipo' => 'proximo', 'msg' => 'Faltan ' . number_format($nextKm - $kmAct,0) . ' km'];
+            }
+        }
+        if ($pi['cada_dias'] && $pi['ultima_fecha']) {
+            $nextDate = date('Y-m-d', strtotime($pi['ultima_fecha'] . " +{$pi['cada_dias']} days"));
+            $today    = date('Y-m-d');
+            $diff     = (int)((strtotime($nextDate) - strtotime($today)) / 86400);
+            if ($diff <= 0) {
+                $alerts[] = ['tipo' => 'vencido', 'msg' => 'Fecha vencida: ' . $nextDate];
+            } elseif ($diff <= 15) {
+                $alerts[] = ['tipo' => 'proximo', 'msg' => "Faltan {$diff} días"];
+            }
+        }
+        foreach ($alerts as $a) {
+            $preventivo_alertas[] = array_merge($a, [
+                'interval_id' => $pi['id'],
+                'placa' => $pi['placa'],
+                'marca' => $pi['marca'],
+                'servicio' => $pi['tipo'],
+            ]);
+        }
+    }
+} catch (Throwable $e) {
+    // Tabla no existe aún → ignorar
+}
+
+// OTs pendientes/en proceso
+$ots_activas = $db->query("
+    SELECT m.id, m.tipo, m.estado, m.fecha, m.costo,
+           v.placa, v.marca, p.nombre AS proveedor
+    FROM mantenimientos m
+    JOIN vehiculos v ON v.id = m.vehiculo_id
+    LEFT JOIN proveedores p ON p.id = m.proveedor_id
+    WHERE m.estado IN ('Pendiente','En proceso')
+      AND m.deleted_at IS NULL
+    ORDER BY m.fecha DESC
+    LIMIT 8
+")->fetchAll();
+
 ob_start();
 ?>
 <!-- KPIs -->
@@ -139,6 +198,45 @@ ob_start();
           <div class="alert-dot"></div>
           <div class="alert-text"><strong><?= htmlspecialchars($i['placa']) ?> <?= htmlspecialchars($i['marca']) ?></strong> — <?= htmlspecialchars(mb_substr($i['descripcion'],0,55)) ?><?= strlen($i['descripcion'])>55?'...':'' ?></div>
           <div class="alert-meta"><?= $i['fecha'] ?></div>
+        </div>
+      <?php endforeach; endif; ?>
+    </div>
+  </div>
+</div>
+
+<!-- Preventivos & OTs activas -->
+<div class="two-col" style="margin-top:18px;">
+  <div>
+    <div class="section-title">📅 Alertas Preventivas</div>
+    <div class="alert-list">
+      <?php if (!$preventivo_alertas): ?>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Sin alertas preventivas</div></div>
+      <?php else: foreach (array_slice($preventivo_alertas, 0, 8) as $pa):
+        $cls = $pa['tipo'] === 'vencido' ? 'critical' : 'info';
+      ?>
+        <div class="alert-item <?= $cls ?>">
+          <div class="alert-dot"></div>
+          <div class="alert-text"><strong><?= htmlspecialchars($pa['placa']) ?></strong> — <?= htmlspecialchars($pa['servicio']) ?></div>
+          <div class="alert-meta"><?= htmlspecialchars($pa['msg']) ?></div>
+        </div>
+      <?php endforeach; endif; ?>
+      <?php if (count($preventivo_alertas) > 8): ?>
+        <a href="/preventivos.php" style="font-size:12px;color:#47ffe8;text-decoration:none;display:block;text-align:right;margin-top:6px;">Ver todas →</a>
+      <?php endif; ?>
+    </div>
+  </div>
+  <div>
+    <div class="section-title">🔧 OTs Activas</div>
+    <div class="alert-list">
+      <?php if (!$ots_activas): ?>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Sin OTs pendientes</div></div>
+      <?php else: foreach ($ots_activas as $ot):
+        $cls = $ot['estado'] === 'En proceso' ? '' : 'info';
+      ?>
+        <div class="alert-item <?= $cls ?>">
+          <div class="alert-dot"></div>
+          <div class="alert-text"><strong><?= htmlspecialchars($ot['placa']) ?></strong> — <?= htmlspecialchars($ot['tipo']) ?> (<?= htmlspecialchars($ot['estado']) ?>)</div>
+          <div class="alert-meta">$<?= number_format($ot['costo'],0) ?> · <?= $ot['fecha'] ?></div>
         </div>
       <?php endforeach; endif; ?>
     </div>

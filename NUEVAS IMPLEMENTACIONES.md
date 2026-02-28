@@ -53,7 +53,7 @@
 - [x] Roles base implementados (`coordinador_it`, `soporte`, `monitoreo`)
 - [x] Permisos base por acción (`view/create/edit/delete`)
 - [x] Protección de rutas sensibles (ej. usuarios admin)
-- [ ] Matriz de permisos granular por módulo objetivo (vehículos, asignaciones, mantenimiento, combustible, reportes)
+- [x] Matriz de permisos granular por módulo objetivo (vehículos, asignaciones, mantenimiento, combustible, reportes)
 
 ### 2.3 Auditoría
 - [x] Bitácora de cambios críticos (create/update/void/override)
@@ -93,10 +93,10 @@
 - [x] Endpoint perfil 360 con asignación activa, mantenimiento activo, último odómetro/combustible y totales
 
 ### 4.2 Fotos y documentos
-- [ ] Adjuntar múltiples fotos
-- [ ] Adjuntar documentos (seguro, permisos, etc.)
-- [ ] Validar tipo/tamaño de archivo
-- [ ] URLs firmadas o descarga controlada
+- [x] Adjuntar múltiples fotos
+- [x] Adjuntar documentos (seguro, permisos, etc.)
+- [x] Validar tipo/tamaño de archivo
+- [x] URLs firmadas o descarga controlada
 
 ### 4.3 Odómetro
 - [x] Tabla `odometer_logs`
@@ -254,7 +254,7 @@
 ### 11.3 Filtros
 - [x] Filtros básicos en varios módulos (texto, vehículo, estado, paginación)
 - [x] Filtros avanzados por rango de fecha (parcial, combustible)
-- [ ] Agrupaciones y ordenamientos avanzados
+- [x] Agrupaciones y ordenamientos avanzados
 
 **Aceptación**
 - Todos los reportes exportables y filtrables mínimo por vehículo + fecha.
@@ -278,7 +278,7 @@
 - [x] Índices compuestos críticos (8 índices añadidos)
 - [x] Transacciones en operaciones críticas (combustible, asignaciones, mantenimientos)
 - [x] Restricción de únicos activos (asignación/mantenimiento)
-- [ ] Pruebas automatizadas de reglas duras
+- [x] Pruebas automatizadas de reglas duras
 - [x] Restricciones básicas existentes (FK y `placa` única)
 
 **Aceptación**
@@ -292,7 +292,7 @@
 - [ ] Notificaciones (email/WhatsApp)
 - [ ] Multi-sucursal
 - [ ] Módulo de incidentes avanzados con seguros
-- [ ] Reporte de overrides
+- [x] Reporte de overrides
 
 ---
 

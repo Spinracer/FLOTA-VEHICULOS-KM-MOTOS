@@ -361,6 +361,30 @@ $tables = [
   CONSTRAINT fk_acs_component FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+"role_module_permissions" => "CREATE TABLE IF NOT EXISTS role_module_permissions (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  rol         VARCHAR(30) NOT NULL,
+  modulo      VARCHAR(60) NOT NULL,
+  permiso     VARCHAR(30) NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rmp (rol, modulo, permiso)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"attachments" => "CREATE TABLE IF NOT EXISTS attachments (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  entidad         VARCHAR(60) NOT NULL,
+  entidad_id      INT NOT NULL,
+  filename        VARCHAR(255) NOT NULL,
+  original_name   VARCHAR(255) NOT NULL,
+  mime_type       VARCHAR(100) NOT NULL,
+  size_bytes      INT NOT NULL DEFAULT 0,
+  uploaded_by     INT NULL,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at      DATETIME NULL,
+  INDEX idx_att_entidad (entidad, entidad_id),
+  INDEX idx_att_user (uploaded_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 "preventive_intervals" => "CREATE TABLE IF NOT EXISTS preventive_intervals (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   vehiculo_id     INT NOT NULL,
@@ -597,6 +621,48 @@ foreach ($mantNewCols as [$col, $def]) {
   } catch (Throwable $e) {
     step("Compat: mantenimientos.{$col}", false, $e->getMessage());
   }
+}
+
+// 3.27 Seed: matriz de permisos granular por módulo
+$modules = ['vehiculos','asignaciones','mantenimientos','combustible','incidentes','recordatorios','operadores','proveedores','componentes','preventivos','reportes','catalogos','usuarios','auditoria'];
+$permsByRole = [
+  'coordinador_it' => ['view','create','edit','delete'],
+  'admin'          => ['view','create','edit','delete'],
+  'soporte'        => ['view','create','edit'],
+  'taller'         => ['view','create','edit'],
+  'monitoreo'      => ['view'],
+  'operador'       => ['view','create','edit'],
+  'lectura'        => ['view'],
+];
+// Restricciones extras para taller (solo mant/proveedores)
+$tallerModules = ['mantenimientos','proveedores','componentes','preventivos'];
+try {
+  $checkRmp = $pdo->query("SELECT COUNT(*) FROM role_module_permissions");
+  $existingRmp = (int)$checkRmp->fetchColumn();
+  if ($existingRmp === 0) {
+    $insRmp = $pdo->prepare("INSERT IGNORE INTO role_module_permissions (rol,modulo,permiso) VALUES (?,?,?)");
+    foreach ($permsByRole as $rol => $perms) {
+      foreach ($modules as $mod) {
+        $effectivePerms = $perms;
+        // Taller solo puede editar ciertos módulos
+        if ($rol === 'taller' && !in_array($mod, $tallerModules)) {
+          $effectivePerms = ['view'];
+        }
+        // Monitoreo/lectura no accede a usuarios/auditoria
+        if (in_array($rol, ['monitoreo','lectura']) && in_array($mod, ['usuarios','catalogos'])) {
+          continue;
+        }
+        foreach ($effectivePerms as $perm) {
+          $insRmp->execute([$rol, $mod, $perm]);
+        }
+      }
+    }
+    step('Semilla: permisos granulares por módulo', true, count($modules).' módulos × '.count($permsByRole).' roles');
+  } else {
+    step('Semilla: permisos granulares', true, 'Ya existen '.$existingRmp.' registros');
+  }
+} catch (Throwable $e) {
+  step('Semilla: permisos granulares', false, $e->getMessage());
 }
 
 // 3.3 Índices compuestos para rendimiento
