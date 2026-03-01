@@ -1,5 +1,29 @@
 # FlotaControl — Changelog
 
+## [3.0.0] — 2026-03-01
+
+### Corrección de Errores
+- **Mantenimientos PDF**: Añadido tipo `mantenimiento` al generador de PDF con detalles completos de OT, vehículo, partidas/refacciones, costos totales y bloque de firmas. Botón 🖨️ en listado.
+- **Items en OT completada**: API ahora bloquea agregar/editar/eliminar items cuando la OT está en estado Completado. UI oculta botones de acción condicionalmente.
+- **Subida de archivos**: Añadidos tipos MIME `text/html` y `application/octet-stream` a la whitelist. Fallback de MIME del navegador cuando `mime_content_type()` falla. Aumentado límite de upload a 20MB.
+- **Permisos vacíos**: Añadidos módulos `sucursales` y `notificaciones` al array `$MODULOS` en API. Corregido `loadMatrix()` para usar helper `api()` con manejo de errores.
+- **Intervalos preventivos**: Eliminada actualización prematura de `ultimo_km`/`ultima_fecha` al crear OT. Ahora se actualiza al completar la OT. Añadida verificación de OT duplicada antes de crear.
+- **Filtros duplicados en mantenimientos**: Eliminadas adiciones duplicadas de filtros `$vid` y `$estado` en GET.
+- **Asignaciones DELETE**: Corregido para cerrar correctamente asignaciones activas con `end_at` + `deleted_at`.
+- **Variable `$id` indefinida**: Corregido `attachment_list('mantenimientos', $id)` → `attachment_list('mantenimientos', (int)$d['id'])` en PUT de mantenimientos.
+
+### Nuevas Funcionalidades
+- **Checklist de vehículos**: 6 nuevos campos en vehículos (`tiene_gata`, `tiene_herramientas`, `tiene_llanta_repuesto`, `tiene_bac_flota`, `revision_ok`, `detalles_checklist`). UI con checkboxes en grid + textarea de detalles. API actualizada en POST y PUT.
+- **Checklist de asignaciones**: 12 campos de checklist (6 entrega + 6 retorno) en asignaciones. Auto-llenado desde perfil del vehículo al seleccionar. Checklist visible en modal de cierre.
+- **Firma digital/física**: Sistema de firmas con 3 modalidades (ninguna, digital, física). Canvas de dibujo para firma digital con soporte mouse+touch. Generación de link externo con token para firma remota del operador. Página externa `firma.php` sin autenticación (token-based) optimizada para móvil. Campos: `firma_tipo`, `firma_data`, `firma_token`, `firma_fecha`, `firma_ip`.
+- **PDF de asignaciones mejorado**: Checklist de entrega y retorno incluidos en el PDF. Firma digital del operador renderizada como imagen con metadatos (fecha, IP, tipo).
+
+### Migraciones
+- **install.php §3.7**: 6 columnas de checklist en `vehiculos`.
+- **install.php §3.8**: 17 columnas en `asignaciones` (12 checklist + 5 firma).
+
+---
+
 ## [2.9.0] — 2026-03-01
 
 ### Nuevas Funcionalidades — Módulo 14: Mejoras para Escala

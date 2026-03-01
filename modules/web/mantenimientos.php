@@ -73,7 +73,7 @@ ob_start();
     <div class="modal-title" id="mtitleItems">📋 Partidas de OT #<span id="itemsOTId"></span></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div><strong style="color:#e8ff47">Total: $<span id="itemsTotal">0.00</span></strong></div>
-      <?php if(can('create')): ?><button class="btn btn-primary btn-sm" onclick="abrirNuevoItem()">+ Agregar partida</button><?php endif; ?>
+      <?php if(can('create')): ?><button class="btn btn-primary btn-sm" id="btnAddItem" onclick="abrirNuevoItem()">+ Agregar partida</button><?php endif; ?>
     </div>
     <div class="table-wrap" style="max-height:400px;overflow-y:auto">
       <table><thead><tr><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P.Unit.</th><th>Subtotal</th><th>Notas</th><?php if(can('edit')): ?><th>Acc.</th><?php endif; ?></tr></thead>
@@ -106,6 +106,7 @@ ob_start();
 
 <script>
 let currentMantId = null;
+let currentMantEstado = null;
 const pager=new Paginator('pgr',load,25);
 const EB={'Completado':'badge-green','En proceso':'badge-orange','Pendiente':'badge-blue','Cancelado':'badge-red'};
 const attMant = new AttachmentWidget('att-mant-wrap', 'mantenimientos');
@@ -132,11 +133,12 @@ async function load(){
     <td><span class="badge badge-yellow">${r.tipo}</span></td>
     <td class="td-truncate">${r.descripcion||'—'}</td>
     <td><strong style="color:var(--green)">$${Number(r.costo).toFixed(2)}</strong></td>
-    <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id})" title="Ver partidas">📋 ${r.items_count||0}</button></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
     <td>${r.proveedor_nombre||'—'}</td>
     <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
     <?php if(can('edit')): ?><td><div class="action-btns">
+      <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=mantenimiento&id=${r.id}','_blank')" title="Imprimir PDF">🖨️</button>
       <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="del(${r.id})">🗑️</button><?php endif; ?>
     </div></td><?php endif; ?>
@@ -181,9 +183,13 @@ async function guardar(){
 async function del(id){confirmDelete('¿Eliminar este mantenimiento?',async()=>{await api(`/api/mantenimientos.php?id=${id}`,'DELETE');toast('Eliminado','warning');load();});}
 
 /* ═══ PARTIDAS ═══ */
-async function verItems(mantId) {
+async function verItems(mantId, mantEstado) {
   currentMantId = mantId;
+  currentMantEstado = mantEstado || '';
   document.getElementById('itemsOTId').textContent = mantId;
+  // Hide add button if OT is completed
+  const addBtn = document.getElementById('btnAddItem');
+  if (addBtn) addBtn.style.display = (currentMantEstado === 'Completado') ? 'none' : '';
   openModal('modalItems');
   await loadItems();
   // Load attachments for this OT
@@ -208,8 +214,8 @@ async function loadItems() {
     <td><strong style="color:var(--green)">$${Number(i.subtotal).toFixed(2)}</strong></td>
     <td class="td-truncate">${i.notas||'—'}</td>
     <?php if(can('edit')): ?><td><div class="action-btns">
-      <button class="btn btn-ghost btn-sm" onclick='editarItem(${JSON.stringify(i)})'>✏️</button>
-      <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delItem(${i.id})">🗑️</button><?php endif; ?>
+      ${currentMantEstado !== 'Completado' ? `<button class="btn btn-ghost btn-sm" onclick='editarItem(${JSON.stringify(i)})'>✏️</button>` : ''}
+      <?php if(can('delete')): ?>${currentMantEstado !== 'Completado' ? `<button class="btn btn-danger btn-sm" onclick="delItem(${i.id})">🗑️</button>` : ''} <?php endif; ?>
     </div></td><?php endif; ?>
   </tr>`).join('');
 }

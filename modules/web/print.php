@@ -70,6 +70,33 @@ case 'asignacion':
     $content .= "<tr><td><strong>Notas:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['notas'] ?? '—') . "</td></tr>";
     $content .= '</tbody></table></div>';
 
+    // Checklist de entrega
+    $ck = fn($v) => ((int)$v) ? '☑' : '☐';
+    if (isset($a['checklist_gata'])) {
+        $content .= '<div class="section"><h3>Checklist de Entrega</h3>';
+        $content .= '<table class="info-table"><tbody>';
+        $content .= "<tr><td><strong>Gata:</strong></td><td>{$ck($a['checklist_gata'])}</td><td><strong>Herramientas:</strong></td><td>{$ck($a['checklist_herramientas'])}</td></tr>";
+        $content .= "<tr><td><strong>Llanta repuesto:</strong></td><td>{$ck($a['checklist_llanta'])}</td><td><strong>BAC Flota:</strong></td><td>{$ck($a['checklist_bac'])}</td></tr>";
+        $content .= "<tr><td><strong>Revisión OK:</strong></td><td>{$ck($a['checklist_revision'])}</td><td></td><td></td></tr>";
+        if ($a['checklist_detalles'] ?? '') {
+            $content .= "<tr><td><strong>Detalles:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['checklist_detalles']) . "</td></tr>";
+        }
+        $content .= '</tbody></table></div>';
+    }
+
+    // Checklist de retorno (si cerrada)
+    if ($a['end_at'] && isset($a['end_checklist_gata'])) {
+        $content .= '<div class="section"><h3>Checklist de Retorno</h3>';
+        $content .= '<table class="info-table"><tbody>';
+        $content .= "<tr><td><strong>Gata:</strong></td><td>{$ck($a['end_checklist_gata'])}</td><td><strong>Herramientas:</strong></td><td>{$ck($a['end_checklist_herramientas'])}</td></tr>";
+        $content .= "<tr><td><strong>Llanta repuesto:</strong></td><td>{$ck($a['end_checklist_llanta'])}</td><td><strong>BAC Flota:</strong></td><td>{$ck($a['end_checklist_bac'])}</td></tr>";
+        $content .= "<tr><td><strong>Revisión OK:</strong></td><td>{$ck($a['end_checklist_revision'])}</td><td></td><td></td></tr>";
+        if ($a['end_checklist_detalles'] ?? '') {
+            $content .= "<tr><td><strong>Detalles:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['end_checklist_detalles']) . "</td></tr>";
+        }
+        $content .= '</tbody></table></div>';
+    }
+
     if (count($snaps)) {
         $content .= '<div class="section"><h3>Checklist de Componentes (' . ucfirst($momento) . ')</h3>';
         $content .= '<table class="data-table"><thead><tr><th>#</th><th>Componente</th><th>Tipo</th><th>Cantidad</th><th>N° Serie</th><th>Estado</th><th>Observaciones</th></tr></thead><tbody>';
@@ -79,6 +106,15 @@ case 'asignacion':
             $n++;
         }
         $content .= '</tbody></table></div>';
+    }
+
+    // Firma digital del operador
+    if (!empty($a['firma_data'])) {
+        $content .= '<div class="section"><h3>Firma Digital del Operador</h3>';
+        $content .= '<div style="text-align:center;padding:8px">';
+        $content .= '<img src="' . htmlspecialchars($a['firma_data']) . '" alt="Firma" style="max-width:280px;border:1px solid #ccc;padding:4px;background:#fff">';
+        $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Tipo: ' . htmlspecialchars($a['firma_tipo'] ?? 'digital') . ' — Fecha: ' . ($a['firma_fecha'] ?? '—') . ' — IP: ' . ($a['firma_ip'] ?? '—') . '</p>';
+        $content .= '</div></div>';
     }
 
     // Signature block
@@ -175,6 +211,80 @@ case 'combustible_lote':
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Elaboró</strong></p><p>Responsable de Flota</p></div>';
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>Coordinación</p></div>';
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Vo.Bo.</strong></p><p>Contabilidad</p></div>';
+    $content .= '</div>';
+    break;
+
+// ─── PDF ORDEN DE TRABAJO (MANTENIMIENTO) ───────────
+case 'mantenimiento':
+    if ($id <= 0) die('ID de mantenimiento requerido.');
+    $stmt = $db->prepare("
+        SELECT m.*, v.placa, v.marca, v.modelo, v.anio, v.vin, v.km_actual,
+               p.nombre AS proveedor_nombre, p.contacto AS proveedor_contacto, p.telefono AS proveedor_tel,
+               uc.nombre AS completado_por_nombre
+        FROM mantenimientos m
+        LEFT JOIN vehiculos v ON v.id = m.vehiculo_id
+        LEFT JOIN proveedores p ON p.id = m.proveedor_id
+        LEFT JOIN usuarios uc ON uc.id = m.completed_by
+        WHERE m.id = ?
+    ");
+    $stmt->execute([$id]);
+    $m = $stmt->fetch();
+    if (!$m) die('Mantenimiento no encontrado.');
+
+    $title = 'Orden de Trabajo — Mantenimiento';
+    $folio = 'OT-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+
+    $estadoBadge = ['Completado'=>'🟢','En proceso'=>'🟡','Pendiente'=>'🔵','Cancelado'=>'🔴'][$m['estado']] ?? '⚪';
+
+    $content .= '<div class="section"><h3>Datos del Vehículo</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Placa:</strong></td><td>{$m['placa']}</td><td><strong>Marca/Modelo:</strong></td><td>{$m['marca']} {$m['modelo']} {$m['anio']}</td></tr>";
+    $content .= "<tr><td><strong>VIN:</strong></td><td>" . ($m['vin'] ?? '—') . "</td><td><strong>KM Actual:</strong></td><td>" . number_format((float)($m['km_actual'] ?? 0), 0) . " km</td></tr>";
+    $content .= '</tbody></table></div>';
+
+    $content .= '<div class="section"><h3>Datos de la OT</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>Fecha:</strong></td><td>{$m['fecha']}</td></tr>";
+    $content .= "<tr><td><strong>Tipo:</strong></td><td>{$m['tipo']}</td><td><strong>Estado:</strong></td><td>{$estadoBadge} {$m['estado']}</td></tr>";
+    $content .= "<tr><td><strong>KM Entrada:</strong></td><td>" . ($m['km'] ? number_format((float)$m['km'], 0) . ' km' : '—') . "</td><td><strong>KM Salida:</strong></td><td>" . ($m['exit_km'] ? number_format((float)$m['exit_km'], 0) . ' km' : '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Taller:</strong></td><td>" . htmlspecialchars($m['proveedor_nombre'] ?? '—') . "</td><td><strong>Próx. servicio:</strong></td><td>" . ($m['proximo_km'] ? number_format((float)$m['proximo_km'], 0) . ' km' : '—') . "</td></tr>";
+    if ($m['descripcion']) {
+        $content .= "<tr><td><strong>Descripción:</strong></td><td colspan=\"3\">" . htmlspecialchars($m['descripcion']) . "</td></tr>";
+    }
+    if ($m['resumen']) {
+        $content .= "<tr><td><strong>Resumen:</strong></td><td colspan=\"3\">" . htmlspecialchars($m['resumen']) . "</td></tr>";
+    }
+    if ($m['completed_at']) {
+        $content .= "<tr><td><strong>Completado:</strong></td><td>{$m['completed_at']}</td><td><strong>Por:</strong></td><td>" . htmlspecialchars($m['completado_por_nombre'] ?? '—') . "</td></tr>";
+    }
+    $content .= '</tbody></table></div>';
+
+    // Items / Partidas
+    $stItems = $db->prepare("SELECT * FROM mantenimiento_items WHERE mantenimiento_id = ? ORDER BY id ASC");
+    $stItems->execute([$id]);
+    $items = $stItems->fetchAll();
+    if (count($items)) {
+        $totalItems = 0;
+        $content .= '<div class="section"><h3>Partidas / Refacciones</h3>';
+        $content .= '<table class="data-table"><thead><tr><th>#</th><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P. Unitario</th><th>Subtotal</th><th>Notas</th></tr></thead><tbody>';
+        $n = 1;
+        foreach ($items as $it) {
+            $sub = (float)$it['subtotal'];
+            $totalItems += $sub;
+            $content .= "<tr><td>{$n}</td><td>" . htmlspecialchars($it['descripcion']) . "</td><td>" . number_format((float)$it['cantidad'], 2) . "</td><td>{$it['unidad']}</td><td>$" . number_format((float)$it['precio_unitario'], 2) . "</td><td><strong>$" . number_format($sub, 2) . "</strong></td><td>" . htmlspecialchars($it['notas'] ?? '') . "</td></tr>";
+            $n++;
+        }
+        $content .= "<tr class=\"total-row\"><td colspan=\"5\"><strong>TOTAL ({$n} partidas)</strong></td><td><strong>$" . number_format($totalItems, 2) . "</strong></td><td></td></tr>";
+        $content .= '</tbody></table></div>';
+    }
+
+    // Costo total
+    $content .= '<div class="section" style="text-align:right;font-size:14px;padding:10px 0"><strong>Costo Total OT: $' . number_format((float)$m['costo'], 2) . '</strong></div>';
+
+    $content .= '<div class="signatures">';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Ejecutó</strong></p><p>' . htmlspecialchars($m['proveedor_nombre'] ?? 'Taller') . '</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>Coordinación</p></div>';
     $content .= '</div>';
     break;
 
@@ -315,6 +425,7 @@ async function saveAsAttachment() {
   let entidad = '';
   let entidadId = id;
   if (type === 'asignacion') { entidad = 'asignaciones'; }
+  else if (type === 'mantenimiento') { entidad = 'mantenimientos'; }
   else if (type === 'combustible') { entidad = 'combustible'; }
   else if (type === 'combustible_lote') {
     alert('Para lotes, guarda cada registro individual.');

@@ -123,7 +123,7 @@ async function checkAlertas() {
     if (a.dias_restante !== null) info += (info ? ' | ' : '') + `Días: ${a.dias_restante > 0 ? a.dias_restante+' restantes' : Math.abs(a.dias_restante)+' excedidos'}`;
     return `<div style="background:${bg};border:1px solid ${border};color:${color};padding:10px 16px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px">
       <div>${icon} <strong>${a.placa} ${a.marca}</strong> — ${a.tipo} — ${info}</div>
-      ${userCan('create') ? `<button class="btn btn-primary btn-sm" onclick="crearOT(${a.interval_id})">+ Crear OT</button>` : ''}
+      ${<?= can('create') ? 'true' : 'false' ?> ? `<button class="btn btn-primary btn-sm" onclick="crearOT(${a.interval_id})">+ Crear OT</button>` : ''}
     </div>`;
   }).join('');
 }

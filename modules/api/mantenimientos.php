@@ -170,6 +170,14 @@ try {
                     echo json_encode(['error' => 'Sin permisos.']);
                     break;
                 }
+                // Bloquear delete si completado
+                $mantCheck = $db->prepare("SELECT estado FROM mantenimientos WHERE id = ?");
+                $mantCheck->execute([$mantId]);
+                if ($mantCheck->fetchColumn() === 'Completado') {
+                    http_response_code(409);
+                    echo json_encode(['error' => 'No se pueden eliminar partidas de un mantenimiento completado.']);
+                    break;
+                }
                 $id = (int)$_GET['item_id'];
                 $prev = $db->prepare("SELECT * FROM mantenimiento_items WHERE id = ?");
                 $prev->execute([$id]);
@@ -217,8 +225,6 @@ try {
             if ($costoMax !== '') { $where .= " AND m.costo <= ?"; $params[] = (float)$costoMax; }
             if ($from !== '') { $where .= " AND m.fecha >= ?"; $params[] = $from; }
             if ($to   !== '') { $where .= " AND m.fecha <= ?"; $params[] = $to; }
-            if ($vid) { $where .= " AND m.vehiculo_id=?"; $params[] = $vid; }
-            if ($estado !== '') { $where .= " AND m.estado=?"; $params[] = $estado; }
             if ($rol === 'taller') {
                 $ctx = taller_context($db, (int)($user['id'] ?? 0));
                 if (!$ctx || !$ctx['proveedor_id'] || !$ctx['autorizado']) {
@@ -356,7 +362,7 @@ try {
                     $costoOT = (float)($d['costo'] ?? $prev['costo'] ?? 0);
                     if ($costoOT >= $umbralAdjuntos) {
                         require_once __DIR__ . '/../../includes/attachments.php';
-                        $adjuntos = attachment_list('mantenimientos', $id);
+                        $adjuntos = attachment_list('mantenimientos', (int)$d['id']);
                         if (count($adjuntos) === 0) {
                             http_response_code(422);
                             echo json_encode(['error' => "OTs con costo ≥ \${$umbralAdjuntos} requieren al menos un adjunto (diagnóstico, cotización o factura)."]);
@@ -433,6 +439,20 @@ try {
                         }
                     }
                     audit_log('mantenimientos', 'estado_change', (int)$d['id'], ['estado' => $estadoAnterior], ['estado' => $estadoNuevo]);
+
+                    // Al completar, actualizar intervalos preventivos asociados
+                    if ($estadoNuevo === 'Completado') {
+                        try {
+                            // Buscar si esta OT fue creada desde un intervalo preventivo
+                            $descOT = $d['descripcion'] ?? $prev['descripcion'] ?? '';
+                            if (preg_match('/intervalo #(\d+)/', $descOT, $piMatch)) {
+                                $piId = (int)$piMatch[1];
+                                $exitKmVal = isset($d['exit_km']) ? (float)$d['exit_km'] : ((float)($d['km'] ?? $prev['km'] ?? 0));
+                                $db->prepare("UPDATE preventive_intervals SET ultimo_km = ?, ultima_fecha = CURDATE() WHERE id = ? AND activo = 1")
+                                   ->execute([$exitKmVal ?: null, $piId]);
+                            }
+                        } catch (Throwable $piEx) { /* no bloquear */ }
+                    }
 
                     // Notificación al cambiar estado
                     try {

@@ -80,6 +80,22 @@ function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
 try {
     // ─── Sub-endpoint: snapshots de componentes ───
     $subAction = trim($_GET['action'] ?? '');
+
+    // ─── Sub-endpoint: generar link de firma ───
+    if ($subAction === 'firma_link' && $method === 'POST') {
+        if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); exit; }
+        $d = json_decode(file_get_contents('php://input'), true);
+        $asigId = (int)($d['id'] ?? 0);
+        if ($asigId <= 0) { http_response_code(400); echo json_encode(['error' => 'ID inválido.']); exit; }
+        $token = bin2hex(random_bytes(32));
+        $db->prepare("UPDATE asignaciones SET firma_token = ? WHERE id = ?")->execute([$token, $asigId]);
+        $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                 . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $link = $baseUrl . '/firma.php?token=' . $token;
+        echo json_encode(['ok' => true, 'link' => $link, 'token' => $token]);
+        exit;
+    }
+
     if ($subAction === 'snapshots') {
         $asigId = (int)($_GET['asignacion_id'] ?? 0);
         if ($method === 'GET' && $asigId > 0) {
@@ -196,8 +212,8 @@ try {
 
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by)
-                    VALUES (?,?,?,?,?,'Activa',?,?)");
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_detalles)
+                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
@@ -205,7 +221,13 @@ try {
                     $startKm,
                     $d['start_notes'] ?: null,
                     $allowOverride ? $overrideReason : null,
-                    (int)($_SESSION['user_id'] ?? 0)
+                    (int)($_SESSION['user_id'] ?? 0),
+                    (int)($d['checklist_gata'] ?? 0),
+                    (int)($d['checklist_herramientas'] ?? 0),
+                    (int)($d['checklist_llanta'] ?? 0),
+                    (int)($d['checklist_bac'] ?? 0),
+                    (int)($d['checklist_revision'] ?? 0),
+                    $d['checklist_detalles'] ?: null,
                 ]);
 
                 $id = (int)$db->lastInsertId();
@@ -271,8 +293,18 @@ try {
 
             $db->beginTransaction();
             try {
+                // Generate firma token if digital signature requested
+                $firmaToken = null;
+                $firmaTipo = $d['firma_tipo'] ?? 'ninguna';
+                $firmaData = $d['firma_data'] ?? null;
+                if ($firmaTipo === 'digital' && !$firmaData) {
+                    $firmaToken = bin2hex(random_bytes(32));
+                }
+
                 $stmt = $db->prepare("UPDATE asignaciones
-                    SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?
+                    SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?,
+                        end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?, end_checklist_detalles=?,
+                        firma_tipo=?, firma_data=?, firma_token=?, firma_fecha=IF(?='ninguna',NULL,NOW()), firma_ip=?
                     WHERE id=?");
                 $stmt->execute([
                     $d['end_at'] ?: date('Y-m-d H:i:s'),
@@ -280,6 +312,17 @@ try {
                     $d['end_notes'] ?: null,
                     $allowOverride ? $overrideReason : null,
                     (int)($_SESSION['user_id'] ?? 0),
+                    (int)($d['end_checklist_gata'] ?? 0),
+                    (int)($d['end_checklist_herramientas'] ?? 0),
+                    (int)($d['end_checklist_llanta'] ?? 0),
+                    (int)($d['end_checklist_bac'] ?? 0),
+                    (int)($d['end_checklist_revision'] ?? 0),
+                    $d['end_checklist_detalles'] ?: null,
+                    $firmaTipo,
+                    $firmaData ?: null,
+                    $firmaToken,
+                    $firmaTipo,
+                    $_SERVER['REMOTE_ADDR'] ?? null,
                     $id
                 ]);
 
@@ -324,7 +367,13 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM asignaciones WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("UPDATE asignaciones SET estado = 'Cerrada' WHERE id = ?")->execute([$id]);
+            // If active, close it properly with current timestamp
+            if (($prev['estado'] ?? '') === 'Activa') {
+                $db->prepare("UPDATE asignaciones SET estado = 'Cerrada', end_at = NOW(), closed_by = ?, deleted_at = NOW() WHERE id = ?")
+                   ->execute([(int)($_SESSION['user_id'] ?? 0), $id]);
+            } else {
+                $db->prepare("UPDATE asignaciones SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
+            }
             audit_log('asignaciones', 'soft_delete', $id, $prev, []);
             echo json_encode(['ok' => true]);
             break;

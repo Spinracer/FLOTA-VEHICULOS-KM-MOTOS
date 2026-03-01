@@ -30,11 +30,11 @@ ob_start();
 </div>
 
 <div class="modal-bg" id="modal-new">
-  <div class="modal">
+  <div class="modal" style="max-width:700px">
     <div class="modal-title">📝 Nueva Asignación</div>
     <div class="form-grid">
       <div class="form-group"><label>Vehículo *</label>
-        <select name="vehiculo_id">
+        <select name="vehiculo_id" onchange="autoFillChecklist()">
           <option value="">— Seleccionar —</option>
           <?php foreach($vehiculos as $v): ?><option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo']) ?></option><?php endforeach; ?>
         </select>
@@ -48,6 +48,17 @@ ob_start();
       <div class="form-group"><label>Inicio *</label><input name="start_at" type="datetime-local"></div>
       <div class="form-group"><label>KM Inicio</label><input name="start_km" type="number" step="0.1" placeholder="45000"></div>
       <div class="form-group full"><label>Notas</label><textarea name="start_notes" placeholder="Observaciones de entrega..."></textarea></div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Entrega</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta repuesto</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión OK</label>
+        </div>
+        <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
+      </div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar un bloqueo."></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-new')">Cancelar</button><button class="btn btn-primary" onclick="saveNew()">Guardar</button></div>
@@ -55,13 +66,43 @@ ob_start();
 </div>
 
 <div class="modal-bg" id="modal-close">
-  <div class="modal">
+  <div class="modal" style="max-width:700px">
     <div class="modal-title">✅ Cerrar Asignación</div>
     <div class="form-grid">
       <input type="hidden" name="id">
       <div class="form-group"><label>Fin *</label><input name="end_at" type="datetime-local"></div>
       <div class="form-group"><label>KM Fin *</label><input name="end_km" type="number" step="0.1" placeholder="45500"></div>
       <div class="form-group full"><label>Notas de cierre</label><textarea name="end_notes" placeholder="Observaciones de retorno..."></textarea></div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Retorno</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta repuesto</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión OK</label>
+        </div>
+        <div style="margin-top:6px"><textarea name="end_checklist_detalles" placeholder="Detalles del checklist de retorno..." style="font-size:12px"></textarea></div>
+      </div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✍️ Firma del Operador</label>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="radio" name="firma_tipo" value="ninguna" checked> Sin firma</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="radio" name="firma_tipo" value="digital"> Firma digital</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer"><input type="radio" name="firma_tipo" value="fisica"> Firma física (imprimir)</label>
+        </div>
+        <div id="firma-digital-area" style="display:none">
+          <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Dibuje la firma en el recuadro o envíe un link al operador:</p>
+          <canvas id="firma-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#1a1e27;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="clearFirma()">Limpiar</button>
+            <button class="btn btn-ghost btn-sm" onclick="enviarLinkFirma()">📲 Enviar link al operador</button>
+          </div>
+        </div>
+        <div id="firma-fisica-area" style="display:none">
+          <p style="font-size:11px;color:var(--text2)">Imprima el acta, obtenga la firma física y luego suba una foto del documento firmado como adjunto.</p>
+        </div>
+      </div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar validación de odómetro."></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-close')">Cancelar</button><button class="btn btn-primary" onclick="saveClose()">Cerrar asignación</button></div>
@@ -70,6 +111,59 @@ ob_start();
 
 <script>
 const pager = new Paginator('pgr', load, 25);
+
+// ── Firma canvas ──
+let firmaDrawing = false;
+const firmaCanvas = document.getElementById('firma-canvas');
+const firmaCtx = firmaCanvas ? firmaCanvas.getContext('2d') : null;
+if (firmaCanvas) {
+  firmaCanvas.addEventListener('mousedown', e => { firmaDrawing = true; firmaCtx.beginPath(); firmaCtx.moveTo(e.offsetX, e.offsetY); });
+  firmaCanvas.addEventListener('mousemove', e => { if (!firmaDrawing) return; firmaCtx.lineTo(e.offsetX, e.offsetY); firmaCtx.strokeStyle = '#e8ff47'; firmaCtx.lineWidth = 2; firmaCtx.stroke(); });
+  firmaCanvas.addEventListener('mouseup', () => firmaDrawing = false);
+  firmaCanvas.addEventListener('mouseleave', () => firmaDrawing = false);
+  // Touch support
+  firmaCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaDrawing = true; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.beginPath(); firmaCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
+  firmaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaDrawing) return; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaCtx.strokeStyle = '#e8ff47'; firmaCtx.lineWidth = 2; firmaCtx.stroke(); });
+  firmaCanvas.addEventListener('touchend', () => firmaDrawing = false);
+}
+function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); } }
+
+// Firma type toggle
+document.querySelectorAll('[name="firma_tipo"]').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('firma-digital-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
+  document.getElementById('firma-fisica-area').style.display = r.value === 'fisica' && r.checked ? '' : 'none';
+}));
+
+// ── Auto-fill checklist from vehicle ──
+async function autoFillChecklist() {
+  const vid = document.querySelector('#modal-new [name="vehiculo_id"]').value;
+  if (!vid) return;
+  try {
+    const data = await api(`/api/vehiculos.php?action=profile&id=${vid}`);
+    const v = data.vehiculo;
+    if (v) {
+      document.querySelector('#modal-new [name="checklist_gata"]').checked = !!parseInt(v.tiene_gata);
+      document.querySelector('#modal-new [name="checklist_herramientas"]').checked = !!parseInt(v.tiene_herramientas);
+      document.querySelector('#modal-new [name="checklist_llanta"]').checked = !!parseInt(v.tiene_llanta_repuesto);
+      document.querySelector('#modal-new [name="checklist_bac"]').checked = !!parseInt(v.tiene_bac_flota);
+      document.querySelector('#modal-new [name="checklist_revision"]').checked = !!parseInt(v.revision_ok);
+      if (v.detalles_checklist) document.querySelector('#modal-new [name="checklist_detalles"]').value = v.detalles_checklist;
+      if (v.km_actual) document.querySelector('#modal-new [name="start_km"]').value = v.km_actual;
+    }
+  } catch(e) {}
+}
+
+async function enviarLinkFirma() {
+  const asigId = document.querySelector('#modal-close [name="id"]').value;
+  if (!asigId) { toast('Primero guarda la asignación','error'); return; }
+  try {
+    const res = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: parseInt(asigId) });
+    if (res.link) {
+      await navigator.clipboard.writeText(res.link);
+      toast('Link de firma copiado al portapapeles');
+    }
+  } catch(e) { toast('Error al generar link de firma','error'); }
+}
 
 async function load(){
   const q = document.getElementById('s').value;
@@ -121,6 +215,11 @@ async function saveNew(){
   const d = getForm('modal-new');
   if(!d.vehiculo_id || !d.operador_id || !d.start_at){ toast('Vehículo, operador e inicio son obligatorios','error'); return; }
   d.start_at = d.start_at.replace('T',' ')+':00';
+  // Checklist checkboxes
+  ['checklist_gata','checklist_herramientas','checklist_llanta','checklist_bac','checklist_revision'].forEach(f => {
+    const cb = document.querySelector(`#modal-new [name="${f}"]`);
+    d[f] = cb && cb.checked ? 1 : 0;
+  });
   await api('/api/asignaciones.php', 'POST', d);
   toast('Asignación creada');
   closeModal('modal-new');
@@ -140,6 +239,17 @@ async function saveClose(){
   const d = getForm('modal-close');
   if(!d.id || !d.end_at || !d.end_km){ toast('Fin y km fin son obligatorios','error'); return; }
   d.end_at = d.end_at.replace('T',' ')+':00';
+  // End checklist checkboxes
+  ['end_checklist_gata','end_checklist_herramientas','end_checklist_llanta','end_checklist_bac','end_checklist_revision'].forEach(f => {
+    const cb = document.querySelector(`#modal-close [name="${f}"]`);
+    d[f] = cb && cb.checked ? 1 : 0;
+  });
+  // Firma
+  const firmaRadio = document.querySelector('#modal-close [name="firma_tipo"]:checked');
+  d.firma_tipo = firmaRadio ? firmaRadio.value : 'ninguna';
+  if (d.firma_tipo === 'digital' && firmaCanvas) {
+    d.firma_data = firmaCanvas.toDataURL('image/png');
+  }
   await api('/api/asignaciones.php', 'PUT', { ...d, action: 'close' });
   toast('Asignación cerrada');
   closeModal('modal-close');

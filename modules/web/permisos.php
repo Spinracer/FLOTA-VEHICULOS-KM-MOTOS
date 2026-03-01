@@ -43,20 +43,23 @@ const MOD_LABELS = {
   combustible:'Combustible', incidentes:'Incidentes', recordatorios:'Recordatorios',
   operadores:'Operadores', proveedores:'Proveedores', componentes:'Componentes',
   preventivos:'Preventivos', reportes:'Reportes', catalogos:'Catálogos',
-  usuarios:'Usuarios', auditoria:'Auditoría'
+  usuarios:'Usuarios', auditoria:'Auditoría', sucursales:'Sucursales', notificaciones:'Notificaciones'
 };
 let matrix={}, modulos=[], permisos=[], roles=[], activeRole='';
 
 async function loadMatrix() {
-  const res = await fetch('/api/permisos.php');
-  const data = await res.json();
-  matrix  = data.matrix || {};
-  modulos = data.modulos || [];
-  permisos= data.permisos || [];
-  roles   = data.roles || [];
-  if (!activeRole && roles.length) activeRole = roles[0];
-  renderTabs();
-  renderTable();
+  try {
+    const data = await api('/api/permisos.php');
+    matrix  = data.matrix || {};
+    modulos = data.modulos || [];
+    permisos= data.permisos || [];
+    roles   = data.roles || [];
+    if (!activeRole && roles.length) activeRole = roles[0];
+    renderTabs();
+    renderTable();
+  } catch(e) {
+    console.error('Error loading permisos:', e);
+  }
 }
 
 function renderTabs() {

@@ -172,6 +172,16 @@ try {
         $interval = $pi->fetch();
         if (!$interval) { http_response_code(404); echo json_encode(['error' => 'Intervalo no encontrado.']); exit; }
 
+        // Check for existing active OT from this interval
+        $dupCheck = $db->prepare("SELECT id FROM mantenimientos WHERE vehiculo_id = ? AND tipo = ? AND estado IN ('Pendiente','En proceso') AND deleted_at IS NULL AND descripcion LIKE ? LIMIT 1");
+        $dupCheck->execute([(int)$interval['vehiculo_id'], $interval['tipo'], '%intervalo #' . $intervalId . '%']);
+        $dup = $dupCheck->fetch();
+        if ($dup) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Ya existe una OT activa (#' . $dup['id'] . ') para este intervalo.']);
+            exit;
+        }
+
         // Obtener km actual del vehículo
         $veh = $db->prepare("SELECT km_actual FROM vehiculos WHERE id = ?");
         $veh->execute([(int)$interval['vehiculo_id']]);
@@ -189,9 +199,8 @@ try {
                ]);
             $otId = (int)$db->lastInsertId();
 
-            // Actualizar último servicio en el intervalo
-            $db->prepare("UPDATE preventive_intervals SET ultimo_km = ?, ultima_fecha = CURDATE() WHERE id = ?")
-               ->execute([$kmActual ?: null, $intervalId]);
+            // NOTE: No actualizamos ultimo_km/ultima_fecha aquí.
+            // Se actualiza cuando la OT se marca Completado (en mantenimientos PUT).
 
             $db->commit();
         } catch (Throwable $txe) {

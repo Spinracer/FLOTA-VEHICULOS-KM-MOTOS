@@ -791,6 +791,61 @@ try {
   step('Tabla: notificaciones', false, $e->getMessage());
 }
 
+// 3.7 Checklist de vehículo
+$checklistCols = [
+  'tiene_gata'          => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_herramientas'  => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_llanta_repuesto' => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_bac_flota'     => "TINYINT(1) NOT NULL DEFAULT 0",
+  'revision_ok'         => "TINYINT(1) NOT NULL DEFAULT 0",
+  'detalles_checklist'  => "TEXT NULL",
+];
+foreach ($checklistCols as $col => $def) {
+  try {
+    if (!$existsColumn('vehiculos', $col)) {
+      $pdo->exec("ALTER TABLE vehiculos ADD COLUMN {$col} {$def}");
+      step("Checklist vehículo: {$col}", true);
+    } else {
+      step("Checklist vehículo: {$col}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Checklist vehículo: {$col}", false, $e->getMessage());
+  }
+}
+
+// 3.8 Checklist y firmas en asignaciones
+$asgExtraCols = [
+  'checklist_gata'         => "TINYINT(1) NOT NULL DEFAULT 0",
+  'checklist_herramientas' => "TINYINT(1) NOT NULL DEFAULT 0",
+  'checklist_llanta'       => "TINYINT(1) NOT NULL DEFAULT 0",
+  'checklist_bac'          => "TINYINT(1) NOT NULL DEFAULT 0",
+  'checklist_revision'     => "TINYINT(1) NOT NULL DEFAULT 0",
+  'checklist_detalles'     => "TEXT NULL",
+  'end_checklist_gata'         => "TINYINT(1) NOT NULL DEFAULT 0",
+  'end_checklist_herramientas' => "TINYINT(1) NOT NULL DEFAULT 0",
+  'end_checklist_llanta'       => "TINYINT(1) NOT NULL DEFAULT 0",
+  'end_checklist_bac'          => "TINYINT(1) NOT NULL DEFAULT 0",
+  'end_checklist_revision'     => "TINYINT(1) NOT NULL DEFAULT 0",
+  'end_checklist_detalles'     => "TEXT NULL",
+  'firma_tipo'            => "ENUM('digital','fisica','ninguna') NOT NULL DEFAULT 'ninguna'",
+  'firma_data'            => "LONGTEXT NULL",
+  'firma_token'           => "VARCHAR(128) NULL",
+  'firma_fecha'           => "DATETIME NULL",
+  'firma_ip'              => "VARCHAR(45) NULL",
+];
+foreach ($asgExtraCols as $col => $def) {
+  try {
+    if (!$existsColumn('asignaciones', $col)) {
+      $pdo->exec("ALTER TABLE asignaciones ADD COLUMN {$col} {$def}");
+      step("Asignación extra: {$col}", true);
+    } else {
+      step("Asignación extra: {$col}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Asignación extra: {$col}", false, $e->getMessage());
+  }
+}
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [

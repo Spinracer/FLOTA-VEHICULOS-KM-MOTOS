@@ -16,8 +16,10 @@ define('UPLOAD_ALLOWED_TYPES', [
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/html',
+    'application/octet-stream',
 ]);
-define('UPLOAD_ALLOWED_EXT', ['jpg','jpeg','png','gif','webp','pdf','doc','docx','xls','xlsx']);
+define('UPLOAD_ALLOWED_EXT', ['jpg','jpeg','png','gif','webp','pdf','doc','docx','xls','xlsx','html']);
 
 /**
  * Sube un archivo asociado a una entidad.
@@ -42,8 +44,15 @@ function attachment_upload(string $entidad, int $entidadId, array $file): array 
     }
 
     $mime = mime_content_type($file['tmp_name']);
+    // Also accept the browser-reported type for common images
+    $browserMime = $file['type'] ?? '';
     if (!in_array($mime, UPLOAD_ALLOWED_TYPES)) {
-        throw new RuntimeException("Tipo de archivo no permitido: {$mime}");
+        // Fallback: if extension is allowed and browser MIME is accepted, trust it
+        if (in_array($browserMime, UPLOAD_ALLOWED_TYPES) && in_array($ext, UPLOAD_ALLOWED_EXT)) {
+            $mime = $browserMime;
+        } else {
+            throw new RuntimeException("Tipo de archivo no permitido: {$mime}");
+        }
     }
 
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));

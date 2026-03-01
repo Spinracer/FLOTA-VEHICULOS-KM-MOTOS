@@ -81,6 +81,29 @@ ob_start();
           <?php foreach($sucursales as $s): ?><option value="<?=$s['id']?>"><?=htmlspecialchars($s['nombre'])?></option><?php endforeach; ?>
         </select></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist del Vehículo</label>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="tiene_gata" value="1" style="accent-color:#e8ff47"> Gata
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="tiene_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="tiene_llanta_repuesto" value="1" style="accent-color:#e8ff47"> Llanta de repuesto
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="tiene_bac_flota" value="1" style="accent-color:#e8ff47"> BAC Flota
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" name="revision_ok" value="1" style="accent-color:#e8ff47"> Revisión OK
+          </label>
+        </div>
+        <div style="margin-top:8px"><label style="font-size:12px;color:var(--text2)">Detalles adicionales</label>
+          <textarea name="detalles_checklist" placeholder="Detalle libre: estado de llantas, nivel de aceite, observaciones..." style="margin-top:4px"></textarea>
+        </div>
+      </div>
       <div class="form-group full" id="att-veh-wrap"></div>
     </div>
     <div class="modal-actions">
@@ -145,6 +168,8 @@ async function loadVehiculos() {
 function abrirNuevo() {
   document.getElementById('modal-veh-title').textContent = '🚗 Nuevo Vehículo';
   resetForm('modal-veh');
+  // Reset checkboxes
+  document.querySelectorAll('#modal-veh input[type=checkbox]').forEach(cb => cb.checked = false);
   attVeh.reset();
   openModal('modal-veh');
 }
@@ -156,7 +181,13 @@ function editar(v) {
     anio: v.anio, tipo: v.tipo, combustible: v.combustible,
     km_actual: v.km_actual, color: v.color, vin: v.vin,
     estado: v.estado, operador_id: v.operador_id,
-    venc_seguro: v.venc_seguro, sucursal_id: v.sucursal_id || '', notas: v.notas
+    venc_seguro: v.venc_seguro, sucursal_id: v.sucursal_id || '', notas: v.notas,
+    detalles_checklist: v.detalles_checklist || ''
+  });
+  // Fill checkboxes
+  ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok'].forEach(f => {
+    const cb = document.querySelector(`#modal-veh [name="${f}"]`);
+    if (cb) cb.checked = !!parseInt(v[f]);
   });
   attVeh.setEntityId(v.id);
   attVeh.load();
@@ -165,6 +196,12 @@ function editar(v) {
 
 async function guardar() {
   const data = getForm('modal-veh');
+  // Handle checkboxes
+  const checkFields = ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok'];
+  checkFields.forEach(f => {
+    const cb = document.querySelector(`#modal-veh [name="${f}"]`);
+    data[f] = cb && cb.checked ? 1 : 0;
+  });
   if (!data.placa || !data.marca || !data.modelo) { toast('Placa, Marca y Modelo son obligatorios', 'error'); return; }
   try {
     const method = data.id ? 'PUT' : 'POST';

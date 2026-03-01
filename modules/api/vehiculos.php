@@ -111,15 +111,18 @@ try {
             }
             $d = json_decode(file_get_contents('php://input'), true);
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
-            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id,tiene_gata,tiene_herramientas,tiene_llanta_repuesto,tiene_bac_flota,revision_ok,detalles_checklist)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
                 $d['venc_seguro'] ?: null, $d['notas'] ?: null,
-                $d['sucursal_id'] ?: null
+                $d['sucursal_id'] ?: null,
+                (int)($d['tiene_gata'] ?? 0), (int)($d['tiene_herramientas'] ?? 0),
+                (int)($d['tiene_llanta_repuesto'] ?? 0), (int)($d['tiene_bac_flota'] ?? 0),
+                (int)($d['revision_ok'] ?? 0), $d['detalles_checklist'] ?: null
             ]);
             $newId = (int)$db->lastInsertId();
             if ($kmNuevo > 0) {
@@ -142,14 +145,18 @@ try {
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['id'], $kmNuevo, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=?,tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,detalles_checklist=? WHERE id=?");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
                 $d['venc_seguro'] ?: null, $d['notas'] ?: null,
-                $d['sucursal_id'] ?: null, $d['id']
+                $d['sucursal_id'] ?: null,
+                (int)($d['tiene_gata'] ?? 0), (int)($d['tiene_herramientas'] ?? 0),
+                (int)($d['tiene_llanta_repuesto'] ?? 0), (int)($d['tiene_bac_flota'] ?? 0),
+                (int)($d['revision_ok'] ?? 0), $d['detalles_checklist'] ?: null,
+                $d['id']
             ]);
             if ($kmNuevo > 0) {
                 odometro_registrar($db, (int)$d['id'], $kmNuevo, 'manual', (int)($_SESSION['user_id'] ?? 0));
