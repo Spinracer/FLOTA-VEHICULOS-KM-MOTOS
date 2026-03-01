@@ -298,12 +298,12 @@
 
 ## Definición global de terminado
 
-- [ ] Cada módulo tiene API + validación + políticas
-- [ ] Cambios críticos auditados
-- [ ] Adjuntos donde aplica
-- [ ] Reglas de bloqueo aplicadas
-- [ ] Reportes exportables y trazables
-- [ ] PDFs con folio, fecha y firmas
+- [x] Cada módulo tiene API + validación + políticas (16 endpoints REST, permisos granulares por rol/módulo)
+- [x] Cambios críticos auditados (audit_log en todas las operaciones CRUD, overrides, exports)
+- [x] Adjuntos donde aplica (vehículos, mantenimientos, combustible, operadores, asignaciones)
+- [x] Reglas de bloqueo aplicadas (asignación única, mantenimiento activo, máquina de estados OT, odómetro)
+- [x] Reportes exportables y trazables (7 reportes JSON + 4 exports en CSV/XLSX/PDF, audit_log por export)
+- [x] PDFs con folio, fecha y firmas (asignación, combustible individual/lote, QR, guardar como adjunto)
 
 ---
 
