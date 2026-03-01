@@ -1,9 +1,16 @@
 # FlotaControl — Documentación de API
 
-Base URL: `/api/`
+Base URL: `/api/` (legacy) o `/api/v1/` (versionada)
+
+**Documentación interactiva (Swagger UI)**: `/api/v1/docs`  
+**Especificación OpenAPI 3.0**: `/api/v1/openapi.json`  
+**Health check**: `/api/v1/health`
 
 Todos los endpoints requieren autenticación por sesión.  
 Las respuestas son JSON. Los errores retornan `{ "error": "mensaje" }`.
+
+> **Nota**: Los endpoints `/api/v1/{recurso}` enrutan a los mismos módulos que `/api/{recurso}.php`.  
+> En servidores sin URL rewriting, usar: `/api/v1/index.php?_resource={recurso}`
 
 ---
 

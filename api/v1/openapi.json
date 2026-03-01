@@ -1,0 +1,723 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FlotaControl API",
+    "description": "API REST para el Sistema de Gestión de Flota Vehicular. Incluye CRUD de vehículos, operadores, asignaciones, combustible, mantenimientos, incidentes, componentes, reportes y exportaciones.\n\n**Autenticación**: Sesión PHP (cookie). Login vía `/api/v1/usuarios` con credenciales.\n\n**Formato de errores**: `{ \"error\": \"mensaje\" }`",
+    "version": "1.0.0",
+    "contact": {
+      "name": "FlotaControl Dev Team"
+    },
+    "license": {
+      "name": "Privada"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "API v1 (versionada)"
+    },
+    {
+      "url": "/api",
+      "description": "API legacy (sin versionar)"
+    }
+  ],
+  "tags": [
+    { "name": "Vehículos", "description": "CRUD de vehículos + Perfil 360" },
+    { "name": "Asignaciones", "description": "Asignación/retorno de vehículos a operadores" },
+    { "name": "Combustible", "description": "Registro de cargas de combustible + anomalías" },
+    { "name": "Mantenimientos", "description": "Órdenes de trabajo + partidas" },
+    { "name": "Operadores", "description": "CRUD de conductores/operadores + historial" },
+    { "name": "Incidentes", "description": "Registro y seguimiento de incidentes" },
+    { "name": "Componentes", "description": "Catálogo e inventario por vehículo" },
+    { "name": "Reportes", "description": "Reportes JSON y exportaciones CSV/XLSX/PDF" },
+    { "name": "Preventivos", "description": "Intervalos de mantenimiento preventivo" },
+    { "name": "Catálogos", "description": "Catálogos dinámicos y configuración" },
+    { "name": "Usuarios", "description": "Gestión de usuarios (solo admin)" },
+    { "name": "Permisos", "description": "Matriz de permisos granulares por rol" },
+    { "name": "Adjuntos", "description": "Subida/descarga de archivos por entidad" },
+    { "name": "Auditoría", "description": "Bitácora de cambios del sistema" },
+    { "name": "Proveedores", "description": "CRUD de talleres y proveedores" },
+    { "name": "Recordatorios", "description": "Alertas y recordatorios programados" },
+    { "name": "Sistema", "description": "Health check e información de la API" }
+  ],
+  "paths": {
+    "/vehiculos": {
+      "get": {
+        "tags": ["Vehículos"],
+        "summary": "Listar vehículos",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["profile"] },
+            "description": "Si es `profile`, devuelve perfil 360 del vehículo (requiere `id`)"
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "ID del vehículo (para perfil 360)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista paginada o perfil 360",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/PaginatedList" },
+                    { "$ref": "#/components/schemas/VehiculoProfile" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Vehículos"],
+        "summary": "Crear vehículo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VehiculoInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Vehículo creado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SuccessWithId" } } } },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": { "description": "Placa duplicada" }
+        }
+      },
+      "put": {
+        "tags": ["Vehículos"],
+        "summary": "Editar vehículo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  { "properties": { "id": { "type": "integer" } }, "required": ["id"] },
+                  { "$ref": "#/components/schemas/VehiculoInput" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Vehículo actualizado" },
+          "400": { "$ref": "#/components/responses/ValidationError" }
+        }
+      },
+      "delete": {
+        "tags": ["Vehículos"],
+        "summary": "Eliminar vehículo (soft-delete)",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Eliminado" },
+          "400": { "description": "Tiene asignación o mantenimiento activo" }
+        }
+      }
+    },
+    "/asignaciones": {
+      "get": {
+        "tags": ["Asignaciones"],
+        "summary": "Listar asignaciones",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "estado", "in": "query", "schema": { "type": "string", "enum": ["Activa", "Cerrada", "Cancelada"] } },
+          { "name": "action", "in": "query", "schema": { "type": "string", "enum": ["snapshots"] }, "description": "Obtener snapshots de componentes" },
+          { "name": "asignacion_id", "in": "query", "schema": { "type": "integer" }, "description": "ID para snapshots" },
+          { "name": "momento", "in": "query", "schema": { "type": "string", "enum": ["entrega", "retorno"] } }
+        ],
+        "responses": {
+          "200": { "description": "Lista paginada o snapshots" }
+        }
+      },
+      "post": {
+        "tags": ["Asignaciones"],
+        "summary": "Crear asignación",
+        "description": "Reglas de bloqueo: no se permite si el vehículo tiene asignación activa, mantenimiento activo o estado no 'Activo' (a menos que se incluya override_reason).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AsignacionInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Asignación creada" },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": { "description": "Bloqueo por regla de negocio" }
+        }
+      },
+      "put": {
+        "tags": ["Asignaciones"],
+        "summary": "Cerrar asignación",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AsignacionClose" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Asignación cerrada" }
+        }
+      }
+    },
+    "/combustible": {
+      "get": {
+        "tags": ["Combustible"],
+        "summary": "Listar cargas de combustible",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "action", "in": "query", "schema": { "type": "string", "enum": ["anomalias"] }, "description": "Detectar anomalías de consumo" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista con stats o alertas de anomalías",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": { "type": "integer" },
+                    "stats": { "type": "object", "properties": { "litros": { "type": "number" }, "gasto": { "type": "number" } } },
+                    "rows": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Combustible"],
+        "summary": "Registrar carga de combustible",
+        "description": "Bloquea si el vehículo está en mantenimiento activo (excepto con override_reason).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CombustibleInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Carga registrada" },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": { "description": "Bloqueo por mantenimiento activo" }
+        }
+      }
+    },
+    "/mantenimientos": {
+      "get": {
+        "tags": ["Mantenimientos"],
+        "summary": "Listar OTs o partidas",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "estado", "in": "query", "schema": { "type": "string", "enum": ["Pendiente", "En proceso", "Completado", "Cancelado"] } },
+          { "name": "action", "in": "query", "schema": { "type": "string", "enum": ["items"] } },
+          { "name": "mantenimiento_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Lista de OTs o partidas" }
+        }
+      },
+      "post": {
+        "tags": ["Mantenimientos"],
+        "summary": "Crear OT o partida",
+        "description": "Si `action=items`, crea una partida dentro de la OT.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/MantenimientoInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OT o partida creada" }
+        }
+      },
+      "put": {
+        "tags": ["Mantenimientos"],
+        "summary": "Editar OT o cambiar estado",
+        "description": "Transiciones: Pendiente → En proceso/Cancelado, En proceso → Completado/Cancelado. Al completar se requiere exit_km y resumen.",
+        "responses": {
+          "200": { "description": "OT actualizada" }
+        }
+      },
+      "delete": {
+        "tags": ["Mantenimientos"],
+        "summary": "Eliminar partida",
+        "parameters": [
+          { "name": "action", "in": "query", "required": true, "schema": { "type": "string", "enum": ["items"] } },
+          { "name": "mantenimiento_id", "in": "query", "required": true, "schema": { "type": "integer" } },
+          { "name": "item_id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Partida eliminada" }
+        }
+      }
+    },
+    "/operadores": {
+      "get": {
+        "tags": ["Operadores"],
+        "summary": "Listar operadores o historial",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "action", "in": "query", "schema": { "type": "string", "enum": ["history"] } },
+          { "name": "id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Lista o historial" } }
+      },
+      "post": { "tags": ["Operadores"], "summary": "Crear operador", "responses": { "200": { "description": "Operador creado" } } },
+      "put": { "tags": ["Operadores"], "summary": "Editar operador", "responses": { "200": { "description": "Operador actualizado" } } },
+      "delete": { "tags": ["Operadores"], "summary": "Eliminar operador (soft-delete)", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/incidentes": {
+      "get": {
+        "tags": ["Incidentes"],
+        "summary": "Listar incidentes",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "estado", "in": "query", "schema": { "type": "string", "enum": ["Abierto", "En investigación", "Cerrado"] } }
+        ],
+        "responses": { "200": { "description": "Lista paginada" } }
+      },
+      "post": { "tags": ["Incidentes"], "summary": "Crear incidente", "responses": { "200": { "description": "Incidente creado" } } },
+      "put": { "tags": ["Incidentes"], "summary": "Editar incidente", "responses": { "200": { "description": "Incidente actualizado" } } },
+      "delete": { "tags": ["Incidentes"], "summary": "Eliminar incidente (soft-delete)", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/componentes": {
+      "get": {
+        "tags": ["Componentes"],
+        "summary": "Catálogo maestro o inventario por vehículo",
+        "parameters": [
+          { "name": "section", "in": "query", "required": true, "schema": { "type": "string", "enum": ["catalog", "vehicle"] } },
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "tipo", "in": "query", "schema": { "type": "string", "enum": ["tool", "safety", "document", "card", "accessory"] } },
+          { "name": "estado", "in": "query", "schema": { "type": "string", "enum": ["Bueno", "Regular", "Malo", "Faltante"] } }
+        ],
+        "responses": { "200": { "description": "Catálogo o inventario" } }
+      },
+      "post": {
+        "tags": ["Componentes"],
+        "summary": "Crear componente o asignar a vehículo",
+        "responses": { "200": { "description": "Creado/asignado" }, "409": { "description": "Duplicado en vehículo" } }
+      },
+      "put": { "tags": ["Componentes"], "summary": "Editar componente", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Componentes"], "summary": "Eliminar componente", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/reportes": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Obtener reporte JSON o exportar CSV/XLSX/PDF",
+        "description": "Use `report` para datos JSON o `export` para descarga de archivo.",
+        "parameters": [
+          { "name": "report", "in": "query", "schema": { "type": "string", "enum": ["combustible", "mantenimiento", "vehiculos", "top_costosos", "talleres", "overrides", "operador_360"] }, "description": "Tipo de reporte JSON" },
+          { "name": "export", "in": "query", "schema": { "type": "string", "enum": ["combustible", "mantenimiento", "asignaciones", "incidentes"] }, "description": "Tipo de exportación" },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["csv", "xlsx", "pdf"], "default": "csv" }, "description": "Formato de exportación" },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "operador_id", "in": "query", "schema": { "type": "integer" }, "description": "Para reporte operador_360" },
+          { "name": "group_by", "in": "query", "schema": { "type": "string", "enum": ["vehiculo", "mes", "semana", "proveedor", "tipo_carga", "metodo_pago", "tipo", "estado"] }, "description": "Agrupar resultados" },
+          { "name": "order_by", "in": "query", "schema": { "type": "string", "enum": ["gasto", "cargas", "litros", "servicios"] } },
+          { "name": "order_dir", "in": "query", "schema": { "type": "string", "enum": ["ASC", "DESC"], "default": "DESC" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON del reporte o archivo descargable",
+            "content": {
+              "application/json": { "schema": { "type": "object" } },
+              "text/csv": { "schema": { "type": "string", "format": "binary" } },
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { "schema": { "type": "string", "format": "binary" } },
+              "text/html": { "schema": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "/preventivos": {
+      "get": {
+        "tags": ["Preventivos"],
+        "summary": "Intervalos o verificación de vencimientos",
+        "parameters": [
+          { "name": "action", "in": "query", "required": true, "schema": { "type": "string", "enum": ["intervals", "check"] } },
+          { "name": "vehiculo_id", "in": "query", "schema": { "type": "integer", "default": 0 }, "description": "0 = todos" }
+        ],
+        "responses": { "200": { "description": "Intervalos o alertas de vencimiento" } }
+      },
+      "post": {
+        "tags": ["Preventivos"],
+        "summary": "Crear intervalo o OT desde alerta",
+        "description": "Use `action=create_ot` con `interval_id` para crear OT automática.",
+        "responses": { "200": { "description": "Intervalo creado o OT generada" } }
+      },
+      "put": { "tags": ["Preventivos"], "summary": "Editar intervalo", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Preventivos"], "summary": "Eliminar intervalo", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/catalogos": {
+      "get": {
+        "tags": ["Catálogos"],
+        "summary": "Listar catálogos, ítems o configuración",
+        "parameters": [
+          { "name": "type", "in": "query", "required": true, "schema": { "type": "string", "enum": ["catalogs", "items", "settings"] } },
+          { "name": "catalog", "in": "query", "schema": { "type": "string" }, "description": "Nombre del catálogo (para type=items)" }
+        ],
+        "responses": { "200": { "description": "Datos del catálogo" } }
+      },
+      "post": { "tags": ["Catálogos"], "summary": "Crear ítem o setting", "responses": { "200": { "description": "Creado" } } },
+      "put": { "tags": ["Catálogos"], "summary": "Editar ítem o setting", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Catálogos"], "summary": "Eliminar ítem", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/usuarios": {
+      "get": { "tags": ["Usuarios"], "summary": "Listar usuarios (solo admin)", "responses": { "200": { "description": "Lista" } } },
+      "post": { "tags": ["Usuarios"], "summary": "Crear usuario", "responses": { "200": { "description": "Creado" } } },
+      "put": { "tags": ["Usuarios"], "summary": "Editar usuario", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Usuarios"], "summary": "Eliminar usuario", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/permisos": {
+      "get": {
+        "tags": ["Permisos"],
+        "summary": "Obtener matriz de permisos",
+        "responses": {
+          "200": {
+            "description": "Matriz completa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "matrix": { "type": "object", "description": "{ rol: { modulo: [permisos] } }" },
+                    "modulos": { "type": "array", "items": { "type": "string" } },
+                    "permisos": { "type": "array", "items": { "type": "string" } },
+                    "roles": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Permisos"],
+        "summary": "Actualizar permisos de un rol/módulo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["rol", "modulo", "permisos"],
+                "properties": {
+                  "rol": { "type": "string" },
+                  "modulo": { "type": "string" },
+                  "permisos": { "type": "array", "items": { "type": "string", "enum": ["view", "create", "edit", "delete", "export", "print"] } }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Permisos actualizados" } }
+      }
+    },
+    "/attachments": {
+      "get": {
+        "tags": ["Adjuntos"],
+        "summary": "Listar o descargar adjuntos",
+        "parameters": [
+          { "name": "entidad", "in": "query", "schema": { "type": "string", "enum": ["vehiculos", "mantenimientos", "combustible", "operadores", "incidentes", "asignaciones"] } },
+          { "name": "entidad_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "action", "in": "query", "schema": { "type": "string", "enum": ["download"] } },
+          { "name": "id", "in": "query", "schema": { "type": "integer" }, "description": "ID del adjunto (para download)" }
+        ],
+        "responses": {
+          "200": { "description": "Lista de adjuntos o archivo binario" }
+        }
+      },
+      "post": {
+        "tags": ["Adjuntos"],
+        "summary": "Subir archivo(s)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["entidad", "entidad_id", "archivo"],
+                "properties": {
+                  "entidad": { "type": "string" },
+                  "entidad_id": { "type": "integer" },
+                  "archivo": { "type": "string", "format": "binary", "description": "Máx 10MB. Tipos: jpg, png, gif, webp, pdf, doc, docx, xls, xlsx" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Archivo(s) subido(s)" } }
+      },
+      "delete": {
+        "tags": ["Adjuntos"],
+        "summary": "Eliminar adjunto",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Eliminado" } }
+      }
+    },
+    "/auditoria": {
+      "get": {
+        "tags": ["Auditoría"],
+        "summary": "Consultar bitácora de auditoría",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PerPage" },
+          { "name": "entidad", "in": "query", "schema": { "type": "string" } },
+          { "name": "accion", "in": "query", "schema": { "type": "string" } },
+          { "name": "user_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "desde", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "hasta", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bitácora paginada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": { "type": "integer" },
+                    "rows": { "type": "array", "items": { "type": "object" } },
+                    "entidades": { "type": "array", "items": { "type": "string" } },
+                    "acciones": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proveedores": {
+      "get": { "tags": ["Proveedores"], "summary": "Listar proveedores/talleres", "responses": { "200": { "description": "Lista" } } },
+      "post": { "tags": ["Proveedores"], "summary": "Crear proveedor", "responses": { "200": { "description": "Creado" } } },
+      "put": { "tags": ["Proveedores"], "summary": "Editar proveedor", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Proveedores"], "summary": "Eliminar proveedor", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/recordatorios": {
+      "get": {
+        "tags": ["Recordatorios"],
+        "summary": "Listar recordatorios",
+        "parameters": [
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "name": "estado", "in": "query", "schema": { "type": "string", "enum": ["Pendiente", "Completado", "Vencido"] } }
+        ],
+        "responses": { "200": { "description": "Lista" } }
+      },
+      "post": { "tags": ["Recordatorios"], "summary": "Crear recordatorio", "responses": { "200": { "description": "Creado" } } },
+      "put": { "tags": ["Recordatorios"], "summary": "Editar recordatorio", "responses": { "200": { "description": "Actualizado" } } },
+      "delete": { "tags": ["Recordatorios"], "summary": "Eliminar recordatorio", "responses": { "200": { "description": "Eliminado" } } }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Estado del sistema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" },
+                    "version": { "type": "string", "example": "1.0" },
+                    "app": { "type": "string", "example": "FlotaControl" },
+                    "timestamp": { "type": "string", "format": "date-time" },
+                    "endpoints": { "type": "integer", "example": 16 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "SearchQuery": {
+        "name": "q",
+        "in": "query",
+        "description": "Búsqueda por texto (placa, nombre, etc.)",
+        "schema": { "type": "string" }
+      },
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "description": "Número de página",
+        "schema": { "type": "integer", "default": 1, "minimum": 1 }
+      },
+      "PerPage": {
+        "name": "per",
+        "in": "query",
+        "description": "Resultados por página",
+        "schema": { "type": "integer", "default": 25, "minimum": 1, "maximum": 100 }
+      }
+    },
+    "schemas": {
+      "PaginatedList": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "rows": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "SuccessWithId": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "id": { "type": "integer" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "VehiculoInput": {
+        "type": "object",
+        "required": ["placa", "marca", "modelo", "tipo", "combustible", "km_actual", "estado"],
+        "properties": {
+          "placa": { "type": "string", "example": "ABC-123" },
+          "marca": { "type": "string", "example": "Toyota" },
+          "modelo": { "type": "string", "example": "Hilux" },
+          "anio": { "type": "integer", "example": 2024 },
+          "color": { "type": "string", "example": "Blanco" },
+          "vin": { "type": "string" },
+          "num_motor": { "type": "string" },
+          "tipo": { "type": "string", "example": "Camioneta" },
+          "combustible": { "type": "string", "enum": ["Gasolina", "Diésel", "Gas LP", "Eléctrico", "Híbrido"] },
+          "capacidad_tanque": { "type": "number" },
+          "km_actual": { "type": "integer", "example": 45000 },
+          "estado": { "type": "string", "enum": ["Activo", "En mantenimiento", "Fuera de servicio"] }
+        }
+      },
+      "VehiculoProfile": {
+        "type": "object",
+        "properties": {
+          "vehiculo": { "type": "object" },
+          "asignacion_activa": { "type": "object", "nullable": true },
+          "mantenimiento_activo": { "type": "object", "nullable": true },
+          "ultimo_odometro": { "type": "object", "nullable": true },
+          "totales": { "type": "object" },
+          "historial_mantenimientos": { "type": "array", "items": { "type": "object" } },
+          "historial_combustible": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "AsignacionInput": {
+        "type": "object",
+        "required": ["vehiculo_id", "operador_id", "start_at", "start_km"],
+        "properties": {
+          "vehiculo_id": { "type": "integer" },
+          "operador_id": { "type": "integer" },
+          "start_at": { "type": "string", "format": "date-time" },
+          "start_km": { "type": "integer" },
+          "start_notes": { "type": "string" },
+          "override_reason": { "type": "string", "description": "Motivo para saltar reglas de bloqueo" }
+        }
+      },
+      "AsignacionClose": {
+        "type": "object",
+        "required": ["id", "action", "end_at", "end_km"],
+        "properties": {
+          "id": { "type": "integer" },
+          "action": { "type": "string", "enum": ["close"] },
+          "end_at": { "type": "string", "format": "date-time" },
+          "end_km": { "type": "integer" },
+          "end_notes": { "type": "string" }
+        }
+      },
+      "CombustibleInput": {
+        "type": "object",
+        "required": ["fecha", "vehiculo_id", "litros", "costo_litro", "km"],
+        "properties": {
+          "fecha": { "type": "string", "format": "date" },
+          "vehiculo_id": { "type": "integer" },
+          "operador_id": { "type": "integer" },
+          "litros": { "type": "number" },
+          "costo_litro": { "type": "number" },
+          "km": { "type": "integer" },
+          "tipo_carga": { "type": "string", "enum": ["Lleno", "Parcial"] },
+          "proveedor_id": { "type": "integer" },
+          "metodo_pago": { "type": "string" },
+          "numero_recibo": { "type": "string" },
+          "notas": { "type": "string" },
+          "override_reason": { "type": "string" }
+        }
+      },
+      "MantenimientoInput": {
+        "type": "object",
+        "required": ["fecha", "vehiculo_id", "tipo", "descripcion"],
+        "properties": {
+          "fecha": { "type": "string", "format": "date" },
+          "vehiculo_id": { "type": "integer" },
+          "tipo": { "type": "string" },
+          "descripcion": { "type": "string" },
+          "costo": { "type": "number", "default": 0 },
+          "km": { "type": "integer" },
+          "proximo_km": { "type": "integer" },
+          "proveedor_id": { "type": "integer" },
+          "estado": { "type": "string", "enum": ["Pendiente", "En proceso", "Completado", "Cancelado"], "default": "Pendiente" }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Error de validación",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        }
+      }
+    }
+  }
+}

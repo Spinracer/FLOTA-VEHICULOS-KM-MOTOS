@@ -264,9 +264,9 @@
 ## 12) Diseño de API REST + documentación
 
 - [x] Endpoints REST base por módulo (`/api/*.php`)
-- [ ] Versionado `/api/v1/*`
-- [ ] FormRequests/Resources (Laravel)
-- [ ] Documentación automática (Scribe/Swagger)
+- [x] Versionado `/api/v1/*` (router con fallback a query param)
+- [ ] FormRequests/Resources (Laravel — pendiente migración)
+- [x] Documentación automática (OpenAPI 3.0 + Swagger UI)
 
 **Aceptación**
 - Funcionalidad disponible vía API documentada.

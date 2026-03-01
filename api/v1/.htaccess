@@ -1,0 +1,11 @@
+RewriteEngine On
+RewriteBase /api/v1/
+
+# Servir archivos estáticos directamente
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Enrutar todo lo demás al index.php
+RewriteRule ^([a-z_]+)/?$ index.php?_resource=$1 [QSA,L]
+RewriteRule ^openapi\.json$ index.php?_resource=openapi_json [L]
+RewriteRule ^docs/?$ index.php?_resource=docs [L]

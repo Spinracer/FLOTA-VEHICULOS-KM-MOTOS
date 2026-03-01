@@ -1,5 +1,20 @@
 # FlotaControl — Changelog
 
+## [2.8.0] — 2026-03-01
+
+### Nuevas Funcionalidades
+- **API v1 Versionada**: Nuevo router en `/api/v1/` que enruta a los 16 módulos API existentes. Soporta path routing (`/api/v1/vehiculos`) y query param fallback (`/api/v1/index.php?_resource=vehiculos`). Headers `X-API-Version: 1.0`.
+- **OpenAPI 3.0 Spec**: Especificación completa en `/api/v1/openapi.json` con 17 paths, schemas, parámetros reutilizables y documentación de todos los endpoints.
+- **Swagger UI**: Documentación interactiva en `/api/v1/docs` con tema dark personalizado, Swagger UI 5 desde CDN.
+- **Health Check**: Endpoint `/api/v1/health` con status, versión, timestamp y conteo de endpoints.
+- **API Index**: `/api/v1/` devuelve lista de endpoints disponibles con links a docs y health.
+
+### Mejoras
+- **`.htaccess` para Apache**: Rewrite rules para URLs limpias en `/api/v1/`.
+- **docs/API.md**: Actualizada con formatos XLSX/PDF en exportaciones.
+
+---
+
 ## [2.7.0] — 2026-03-01
 
 ### Nuevas Funcionalidades
