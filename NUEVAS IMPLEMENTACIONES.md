@@ -200,7 +200,7 @@
 ### 9.5 Historial y exportación
 - [x] Listado histórico con filtros básicos (vehículo/texto)
 - [x] Filtros avanzados (rango costo, taller, tipo, estado)
-- [x] Exportar CSV (implementado; XLSX/PDF pendiente)
+- [x] Exportar CSV / XLSX / PDF (todos los formatos implementados)
 
 **Aceptación**
 - OT como fuente única, exportable y auditable.
@@ -240,7 +240,7 @@
 
 ### 11.1 Motor reusable
 - [x] `ReportQueryBuilder` con filtros (includes/export.php + modules/api/reportes.php)
-- [x] `ReportExportService` con CSV (XLSX/PDF pendiente)
+- [x] `ReportExportService` con CSV, XLSX y PDF (export_dispatch)
 - [ ] Colas para exportes grandes
 - [x] Trazabilidad de exportes (audit_log en cada export)
 

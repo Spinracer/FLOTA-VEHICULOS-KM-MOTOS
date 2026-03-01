@@ -27,7 +27,11 @@ ob_start();
     <option value="">Seleccione operador</option>
     <?php foreach($operadores as $op): ?><option value="<?=$op['id']?>"><?=htmlspecialchars($op['nombre'])?> (<?=$op['estado']?>)</option><?php endforeach; ?>
   </select>
-  <button class="btn btn-primary" onclick="exportCSV()">📥 Exportar CSV</button>
+  <div class="export-group" style="display:inline-flex;gap:4px;margin-left:auto;">
+    <button class="btn btn-primary" onclick="exportReport('csv')" title="Exportar CSV">📥 CSV</button>
+    <button class="btn btn-primary" onclick="exportReport('xlsx')" title="Exportar Excel" style="background:#217346;border-color:#217346;">📊 XLSX</button>
+    <button class="btn btn-primary" onclick="exportReport('pdf')" title="Exportar PDF" style="background:#d32f2f;border-color:#d32f2f;">📄 PDF</button>
+  </div>
 </div>
 <div class="toolbar" id="group-toolbar" style="margin-top:4px;display:none;">
   <label style="font-size:12px;color:#8892a4;margin-right:6px;">Agrupar por:</label>
@@ -243,12 +247,20 @@ async function loadReport() {
   }
 }
 
-function exportCSV() {
+function exportReport(format) {
+  format = format || 'csv';
   const type = document.getElementById('rtype').value;
   const exportType = (type === 'vehiculos' || type === 'top_costosos' || type === 'talleres') ? 'combustible' : type;
-  const qs = buildQS({export: exportType, format: 'csv'});
-  window.location.href = `/api/reportes.php?${qs}`;
+  const qs = buildQS({export: exportType, format: format});
+  if (format === 'pdf') {
+    window.open(`/api/reportes.php?${qs}`, '_blank');
+  } else {
+    window.location.href = `/api/reportes.php?${qs}`;
+  }
 }
+
+// Mantener compatibilidad con llamadas anteriores
+function exportCSV() { exportReport('csv'); }
 
 document.addEventListener('DOMContentLoaded', loadReport);
 </script>

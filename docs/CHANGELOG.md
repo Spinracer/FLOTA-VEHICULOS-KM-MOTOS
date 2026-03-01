@@ -1,5 +1,19 @@
 # FlotaControl — Changelog
 
+## [2.7.0] — 2026-03-01
+
+### Nuevas Funcionalidades
+- **Exportación XLSX**: Nuevo formato de exportación a Excel (tabla HTML con MIME nativo de Excel). Compatible con Excel, LibreOffice Calc y Google Sheets. Incluye encabezados estilizados, metadatos de generación y nombre de hoja personalizado.
+- **Exportación PDF**: Vista HTML imprimible con estilos profesionales (orientación landscape, logo, metadatos, resumen). Barra de acciones con botón "Imprimir/Guardar PDF" y auto-print opcional. Oculta controles al imprimir.
+- **Motor de exportación unificado**: Nueva función `export_dispatch()` en `includes/export.php` que despacha a CSV, XLSX o PDF según parámetro `format`. Los 4 tipos de reporte (combustible, mantenimiento, asignaciones, incidentes) soportan los 3 formatos.
+- **Botones de exportación en UI**: Tres botones diferenciados (CSV verde, XLSX verde-Excel, PDF rojo) en la toolbar de reportes. PDF se abre en nueva pestaña para impresión nativa del navegador.
+
+### Mejoras
+- **API reportes.php**: Parámetro `format` ahora acepta `csv`, `xlsx` o `pdf`. Audit log registra el formato utilizado.
+- **includes/export.php**: Refactorizado de 56 a ~210 líneas con 4 funciones exportadoras.
+
+---
+
 ## [2.6.0] — 2026-03-01
 
 ### Nuevas Funcionalidades

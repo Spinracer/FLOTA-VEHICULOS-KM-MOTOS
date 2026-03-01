@@ -7,8 +7,10 @@
  *   GET ?report=vehiculos        → JSON utilización
  *   GET ?report=top_costosos     → JSON top vehículos por gasto
  *   GET ?report=talleres         → JSON desempeño por taller
- *   GET ?export=combustible&format=csv  → Descarga CSV
- *   GET ?export=mantenimiento&format=csv → Descarga CSV
+ *   GET ?export=combustible&format=csv|xlsx|pdf  → Descarga
+ *   GET ?export=mantenimiento&format=csv|xlsx|pdf → Descarga
+ *   GET ?export=asignaciones&format=csv|xlsx|pdf  → Descarga
+ *   GET ?export=incidentes&format=csv|xlsx|pdf    → Descarga
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
@@ -52,10 +54,10 @@ try {
                 while ($r = $stmt->fetch()) {
                     $rows[] = array_values($r);
                 }
-                audit_log('reportes', 'export_csv', null, [], ['tipo' => 'combustible', 'filtros' => compact('from','to','vid')]);
-                export_csv('reporte_combustible_' . date('Ymd_His') . '.csv',
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'combustible', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
+                export_dispatch($format, 'reporte_combustible',
                     ['Fecha','Placa','Marca','Conductor','Litros','Costo/L','Total','KM','Tipo Carga','Proveedor','Método Pago','Recibo','Notas'],
-                    $rows
+                    $rows, 'Reporte de Combustible'
                 );
                 break;
 
@@ -76,10 +78,10 @@ try {
                 while ($r = $stmt->fetch()) {
                     $rows[] = array_values($r);
                 }
-                audit_log('reportes', 'export_csv', null, [], ['tipo' => 'mantenimiento', 'filtros' => compact('from','to','vid','provId')]);
-                export_csv('reporte_mantenimiento_' . date('Ymd_His') . '.csv',
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'mantenimiento', 'formato' => $format, 'filtros' => compact('from','to','vid','provId')]);
+                export_dispatch($format, 'reporte_mantenimiento',
                     ['Fecha','Placa','Marca','Tipo','Descripción','Costo','KM','Próx. KM','Proveedor','Estado'],
-                    $rows
+                    $rows, 'Reporte de Mantenimiento'
                 );
                 break;
 
@@ -99,10 +101,10 @@ try {
                 while ($r = $stmt->fetch()) {
                     $rows[] = array_values($r);
                 }
-                audit_log('reportes', 'export_csv', null, [], ['tipo' => 'asignaciones', 'filtros' => compact('from','to','vid')]);
-                export_csv('reporte_asignaciones_' . date('Ymd_His') . '.csv',
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'asignaciones', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
+                export_dispatch($format, 'reporte_asignaciones',
                     ['Inicio','Fin','Placa','Marca','Operador','KM Inicio','KM Fin','Estado','Override'],
-                    $rows
+                    $rows, 'Reporte de Asignaciones'
                 );
                 break;
 
@@ -121,10 +123,10 @@ try {
                 while ($r = $stmt->fetch()) {
                     $rows[] = array_values($r);
                 }
-                audit_log('reportes', 'export_csv', null, [], ['tipo' => 'incidentes', 'filtros' => compact('from','to','vid')]);
-                export_csv('reporte_incidentes_' . date('Ymd_His') . '.csv',
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'incidentes', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
+                export_dispatch($format, 'reporte_incidentes',
                     ['Fecha','Placa','Marca','Tipo','Descripción','Severidad','Estado','Costo Est.'],
-                    $rows
+                    $rows, 'Reporte de Incidentes'
                 );
                 break;
 

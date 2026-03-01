@@ -156,11 +156,14 @@ GET /api/reportes.php?report=combustible&from=2026-01-01&to=2026-12-31&vehiculo_
 ```
 Reportes disponibles: `combustible`, `mantenimiento`, `vehiculos`, `top_costosos`, `talleres`
 
-### GET - Exportar CSV
+### GET - Exportar (CSV / XLSX / PDF)
 ```
 GET /api/reportes.php?export=combustible&format=csv&from=2026-01-01&to=2026-12-31
+GET /api/reportes.php?export=mantenimiento&format=xlsx&vehiculo_id=1
+GET /api/reportes.php?export=incidentes&format=pdf
 ```
 Exportaciones disponibles: `combustible`, `mantenimiento`, `asignaciones`, `incidentes`
+Formatos soportados: `csv` (descarga directa), `xlsx` (Excel), `pdf` (vista imprimible en nueva pestaña)
 
 ---
 
