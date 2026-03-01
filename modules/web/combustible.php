@@ -78,6 +78,7 @@ ob_start();
       <div class="form-group"><label>No. de recibo</label><input name="numero_recibo" placeholder="REC-2026-0001"></div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar bloqueo por mantenimiento u odómetro."></textarea></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
+      <div class="form-group full" id="att-comb-wrap"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-comb')">Cancelar</button>
@@ -101,6 +102,7 @@ ob_start();
 
 <script>
 const pager = new Paginator('pager-comb', load, 25);
+const attComb = new AttachmentWidget('att-comb-wrap', 'combustible');
 function calcTotal() {
   const l = parseFloat(document.querySelector('#modal-comb [name=litros]')?.value)||0;
   const c = parseFloat(document.querySelector('#modal-comb [name=costo_litro]')?.value)||0;
@@ -137,6 +139,7 @@ async function load() {
       <td>${r.numero_recibo||'—'}</td>
       <?php if(can('edit')): ?>
       <td><div class="action-btns">
+        <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=combustible&id=${r.id}','_blank')" title="Imprimir PDF">🖨️</button>
         <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
         <?php if(can('delete')): ?>
         <button class="btn btn-danger btn-sm" onclick="eliminar(${r.id})">🗑️</button>
@@ -148,17 +151,24 @@ async function load() {
 function abrirNuevo() {
   document.getElementById('modal-comb-title').textContent = '⛽ Registrar Carga';
   resetForm('modal-comb');
+  attComb.reset();
   openModal('modal-comb');
 }
 function editar(r) {
   document.getElementById('modal-comb-title').textContent = '✏️ Editar Carga';
   fillForm('modal-comb', { id:r.id, fecha:r.fecha, vehiculo_id:r.vehiculo_id, operador_id:r.operador_id, litros:r.litros, costo_litro:r.costo_litro, total:r.total, km:r.km, tipo_carga:r.tipo_carga, proveedor_id:r.proveedor_id, metodo_pago:r.metodo_pago, numero_recibo:r.numero_recibo, notas:r.notas });
+  attComb.setEntityId(r.id);
+  attComb.load();
   openModal('modal-comb');
 }
 async function guardar() {
   const d = getForm('modal-comb');
   if (!d.vehiculo_id || !d.operador_id || !d.litros) { toast('Vehículo, conductor y litros son obligatorios','error'); return; }
-  await api('/api/combustible.php', d.id?'PUT':'POST', d);
+  const res = await api('/api/combustible.php', d.id?'PUT':'POST', d);
+  const savedId = d.id || res.id;
+  if (attComb.hasPending() && savedId) {
+    await attComb.uploadPending(savedId);
+  }
   toast(d.id?'Carga actualizada':'Carga registrada');
   closeModal('modal-comb'); load();
 }

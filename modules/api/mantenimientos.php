@@ -344,6 +344,26 @@ try {
                     echo json_encode(['error' => 'El resumen de trabajo es obligatorio para completar la OT.']);
                     break;
                 }
+
+                // ═══ Adjuntos obligatorios sobre umbral de costo ═══
+                $umbralAdjuntos = 0;
+                try {
+                    $stUmb = $db->prepare("SELECT value_num FROM system_settings WHERE key_name='maintenance.umbral_adjuntos' LIMIT 1");
+                    $stUmb->execute();
+                    $umbralAdjuntos = (float)($stUmb->fetchColumn() ?: 0);
+                } catch (Exception $e) {}
+                if ($umbralAdjuntos > 0) {
+                    $costoOT = (float)($d['costo'] ?? $prev['costo'] ?? 0);
+                    if ($costoOT >= $umbralAdjuntos) {
+                        require_once __DIR__ . '/../../includes/attachments.php';
+                        $adjuntos = attachment_list('mantenimientos', $id);
+                        if (count($adjuntos) === 0) {
+                            http_response_code(422);
+                            echo json_encode(['error' => "OTs con costo ≥ \${$umbralAdjuntos} requieren al menos un adjunto (diagnóstico, cotización o factura)."]);
+                            break;
+                        }
+                    }
+                }
             }
 
             if ($rol === 'taller') {

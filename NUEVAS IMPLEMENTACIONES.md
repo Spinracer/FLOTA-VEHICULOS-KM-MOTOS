@@ -130,7 +130,7 @@
 
 - [x] CRUD de conductores/operadores (datos básicos)
 - [x] Estado activo/inactivo/suspendido en operador
-- [ ] Documentos de licencia con adjuntos
+- [x] Documentos de licencia con adjuntos
 - [x] Historial de asignaciones/combustible/incidentes por conductor
 - [x] Regla: conductor inactivo no puede asignarse
 
@@ -154,7 +154,7 @@
 - [x] Override admin con justificación y auditoría
 
 ### 7.3 PDF opcional
-- [ ] PDF entrega/retorno con checklist y firmas
+- [x] PDF entrega/retorno con checklist y firmas
 
 **Aceptación**
 - No hay reasignación indebida sin override trazable.
@@ -178,7 +178,7 @@
 ### 9.1 Orden de trabajo (OT)
 - [x] Crear OT formal con máquina de estados completa (Pendiente→En proceso→Completado/Cancelado)
 - [x] Registro de mantenimientos con estado básico (`Completado`, `En proceso`, `Pendiente`, `Cancelado`)
-- [ ] Adjuntos (diagnóstico, cotización, factura, fotos)
+- [x] Adjuntos (diagnóstico, cotización, factura, fotos)
 
 ### 9.2 Ítems de mantenimiento
 - [x] Tabla de partidas (cantidad, unidad, precio, subtotal) → `mantenimiento_items`
@@ -193,7 +193,7 @@
 ### 9.4 Reglas de cierre
 - [x] `exit_km` obligatorio y validado
 - [x] Resumen de trabajo obligatorio
-- [ ] Adjuntos obligatorios sobre umbral
+- [x] Adjuntos obligatorios sobre umbral
 - [x] Odómetro automático
 - [x] Actualización de estado operativo según asignación
 
@@ -213,7 +213,7 @@
 - [x] Registro de combustible (vehículo, litros, costo, total, km, proveedor, tipo, notas)
 - [x] Driver/responsable explícito
 - [x] Método de pago, número de recibo
-- [ ] Adjuntos (foto de recibo y odómetro)
+- [x] Adjuntos (foto de recibo y odómetro)
 
 ### 10.2 Reglas de bloqueo
 - [x] Bloquear carga si vehículo está en mantenimiento activo
@@ -226,8 +226,8 @@
 - [x] Alertas por anomalías (cargas muy cercanas, exceso de capacidad, odómetro sospechoso)
 
 ### 10.4 PDF autorización con firmas
-- [ ] PDF por registro y por lote
-- [ ] Líneas de firma (conductor, flota, contabilidad)
+- [x] PDF por registro y por lote
+- [x] Líneas de firma (conductor, flota, contabilidad)
 - [ ] QR opcional
 - [ ] Guardar PDF generado como adjunto
 

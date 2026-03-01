@@ -61,6 +61,7 @@ ob_start();
       <div class="form-group" id="grpExitKm" style="display:none"><label>KM Salida *</label><input name="exit_km" type="number" step="0.1" placeholder="KM al salir del taller"></div>
       <div class="form-group full" id="grpResumen" style="display:none"><label>Resumen de trabajo *</label><textarea name="resumen" placeholder="Describa los trabajos realizados..."></textarea></div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Detalles del servicio..."></textarea></div>
+      <div class="form-group full" id="att-mant-wrap"></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
@@ -78,6 +79,7 @@ ob_start();
       <table><thead><tr><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P.Unit.</th><th>Subtotal</th><th>Notas</th><?php if(can('edit')): ?><th>Acc.</th><?php endif; ?></tr></thead>
       <tbody id="tbodyItems"></tbody></table>
     </div>
+    <div id="att-items-wrap" style="margin-top:12px"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modalItems')">Cerrar</button></div>
   </div>
 </div>
@@ -106,6 +108,7 @@ ob_start();
 let currentMantId = null;
 const pager=new Paginator('pgr',load,25);
 const EB={'Completado':'badge-green','En proceso':'badge-orange','Pendiente':'badge-blue','Cancelado':'badge-red'};
+const attMant = new AttachmentWidget('att-mant-wrap', 'mantenimientos');
 
 async function load(){
   const q=document.getElementById('s').value,vid=document.getElementById('fv').value,est=document.getElementById('fest').value;
@@ -144,6 +147,7 @@ function abrirNuevo(){
   document.getElementById('mtitle').textContent='🔧 Nueva Orden de Trabajo';
   document.getElementById('inputCostoOT').removeAttribute('readonly');
   resetForm('modal');openModal('modal');
+  attMant.reset();
   toggleCierreFields();
 }
 function editar(r){
@@ -151,6 +155,8 @@ function editar(r){
   document.getElementById('inputCostoOT').setAttribute('readonly','');
   fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,exit_km:r.exit_km||'',proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,resumen:r.resumen||'',descripcion:r.descripcion});
   openModal('modal');
+  attMant.setEntityId(r.id);
+  attMant.load();
   toggleCierreFields();
 }
 
@@ -164,7 +170,11 @@ document.getElementById('selEstadoOT').addEventListener('change', toggleCierreFi
 async function guardar(){
   const d=getForm('modal');
   if(!d.vehiculo_id){toast('Selecciona un vehículo','error');return;}
-  await api('/api/mantenimientos.php',d.id?'PUT':'POST',d);
+  const res = await api('/api/mantenimientos.php',d.id?'PUT':'POST',d);
+  const savedId = d.id || res.id;
+  if (attMant.hasPending() && savedId) {
+    await attMant.uploadPending(savedId);
+  }
   toast(d.id?'OT actualizada':'OT registrada');
   closeModal('modal');load();
 }
@@ -176,6 +186,9 @@ async function verItems(mantId) {
   document.getElementById('itemsOTId').textContent = mantId;
   openModal('modalItems');
   await loadItems();
+  // Load attachments for this OT
+  const attItems = new AttachmentWidget('att-items-wrap', 'mantenimientos', mantId);
+  attItems.load();
 }
 
 async function loadItems() {

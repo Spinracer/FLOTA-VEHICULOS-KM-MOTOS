@@ -556,6 +556,7 @@ $seedCatalogs = [
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.anomaly_threshold',15,'Porcentaje mínimo bajo promedio para marcar anomalía')", 'Semilla configuración global'],
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('fuel.max_litros_evento',200,'Máximo de litros permitidos por carga (0=sin límite)')", 'Semilla max litros'],
   ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('maintenance.umbral_aprobacion',5000,'Costo de OT que requiere aprobación especial (0=sin umbral)')", 'Semilla umbral aprobación'],
+  ["INSERT IGNORE INTO system_settings (key_name,value_num,description) VALUES ('maintenance.umbral_adjuntos',3000,'Costo de OT sobre el cual se requieren adjuntos para completar (0=sin umbral)')", 'Semilla umbral adjuntos OT'],
   ["INSERT IGNORE INTO components (nombre,tipo,descripcion) VALUES
     ('Gato hidráulico','tool','Gato para cambio de llanta'),
     ('Llave de ruedas','tool','Cruz para tuercas de rueda'),

@@ -1,5 +1,24 @@
 # FlotaControl — Changelog
 
+## [2.5.0] — 2026-02-27
+
+### Nuevas Funcionalidades
+- **Widget de Adjuntos Reutilizable (JS)**: Clase `AttachmentWidget` en app.js que se embebe en cualquier modal. Soporta multi-archivo, preview de pendientes, upload al guardar, descarga inline, eliminación soft-delete. Contratos: `.load()`, `.reset()`, `.uploadPending(id)`, `.hasPending()`.
+- **Adjuntos integrados en Vehículos**: Widget en modal de edición y en Perfil 360. Adjuntar fotos, seguro, permisos y documentos de cada vehículo.
+- **Adjuntos integrados en Mantenimientos**: Widget en modal OT y en vista de partidas. Adjuntar diagnóstico, cotización, factura y fotos por OT.
+- **Adjuntos integrados en Combustible**: Widget en modal de carga. Adjuntar foto de recibo y odómetro.
+- **Adjuntos integrados en Operadores**: Widget en modal. Adjuntar documentos de licencia, identificación, certificados.
+- **Adjuntos obligatorios sobre umbral**: Setting `maintenance.umbral_adjuntos` (default $3000). Al completar una OT con costo ≥ umbral, se exige al menos un adjunto. Regla validada en API con mensaje descriptivo.
+- **PDF Entrega/Retorno de Vehículo**: Vista HTML imprimible con datos de vehículo, operador, asignación, checklist de componentes (snapshot) y líneas de firma (operador, flota, administración). Botón 🖨️ en tabla de asignaciones.
+- **PDF Autorización Combustible**: Vista HTML imprimible individual con datos de carga, vehículo, conductor, firmas(conductor, flota, contabilidad). Botón 🖨️ por registro. Soporte para impresión por lote (`?type=combustible_lote&ids=1,2,3`).
+- **Módulo de Impresión**: Nuevo `/print.php` con CSS dedicado para impresión, header con folio y fecha, footer corporativo.
+
+### Mejoras
+- **Setting nuevo**: `maintenance.umbral_adjuntos` en install.php (seed $3000).
+- **CSS de impresión**: Diseño profesional blanco/negro con @page letter, tablas, firmas y formato de folio.
+
+---
+
 ## [2.4.0] — 2026-02-27
 
 ### Nuevas Funcionalidades

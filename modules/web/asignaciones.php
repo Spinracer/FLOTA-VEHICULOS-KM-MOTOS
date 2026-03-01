@@ -98,6 +98,7 @@ async function load(){
       <?php if(can('edit')): ?>
       <td>
         <div class="action-btns">
+          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=asignacion&id=${r.id}','_blank')" title="Imprimir PDF">🖨️</button>
           ${r.estado==='Activa' ? `<button class="btn btn-primary btn-sm" onclick='openClose(${JSON.stringify(r)})'>Cerrar</button>` : ''}
           <?php if(can('delete')): ?>
           <button class="btn btn-danger btn-sm" onclick="delItem(${r.id})">🗑️</button>

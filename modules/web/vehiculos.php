@@ -71,6 +71,7 @@ ob_start();
         </select></div>
       <div class="form-group"><label>Venc. Seguro</label><input name="venc_seguro" type="date"></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
+      <div class="form-group full" id="att-veh-wrap"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-veh')">Cancelar</button>
@@ -94,6 +95,7 @@ ob_start();
 
 <script>
 let pager = new Paginator('pager-veh', loadVehiculos, 20);
+const attVeh = new AttachmentWidget('att-veh-wrap', 'vehiculos');
 
 async function loadVehiculos() {
   const q = document.getElementById('search-veh').value;
@@ -132,6 +134,7 @@ async function loadVehiculos() {
 function abrirNuevo() {
   document.getElementById('modal-veh-title').textContent = '🚗 Nuevo Vehículo';
   resetForm('modal-veh');
+  attVeh.reset();
   openModal('modal-veh');
 }
 
@@ -144,6 +147,8 @@ function editar(v) {
     estado: v.estado, operador_id: v.operador_id,
     venc_seguro: v.venc_seguro, notas: v.notas
   });
+  attVeh.setEntityId(v.id);
+  attVeh.load();
   openModal('modal-veh');
 }
 
@@ -152,7 +157,12 @@ async function guardar() {
   if (!data.placa || !data.marca || !data.modelo) { toast('Placa, Marca y Modelo son obligatorios', 'error'); return; }
   try {
     const method = data.id ? 'PUT' : 'POST';
-    await api('/api/vehiculos.php', method, data);
+    const res = await api('/api/vehiculos.php', method, data);
+    const savedId = data.id || res.id;
+    // Upload pending attachments
+    if (attVeh.hasPending() && savedId) {
+      await attVeh.uploadPending(savedId);
+    }
     toast(data.id ? 'Vehículo actualizado' : 'Vehículo registrado');
     closeModal('modal-veh');
     loadVehiculos();
@@ -215,8 +225,15 @@ async function verPerfil(id) {
       html += '</tbody></table>';
     }
 
+    // Adjuntos in profile
+    html += `<div class="section-title" style="margin:12px 0 6px">📎 Adjuntos</div><div id="att-profile-wrap"></div>`;
+
     document.getElementById('profile-title').textContent = `📋 Perfil: ${v.placa} — ${v.marca} ${v.modelo}`;
     cnt.innerHTML = html;
+
+    // Initialize attachment widget for profile view
+    const attProfile = new AttachmentWidget('att-profile-wrap', 'vehiculos', id);
+    attProfile.load();
   } catch(e) {
     cnt.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-title">Error al cargar perfil</div></div>';
   }

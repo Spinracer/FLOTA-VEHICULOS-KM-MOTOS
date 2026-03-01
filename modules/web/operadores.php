@@ -24,6 +24,7 @@ ob_start();
       <div class="form-group"><label>Email</label><input name="email" type="email" placeholder="op@empresa.com"></div>
       <div class="form-group"><label>Estado</label><select name="estado"><option>Activo</option><option>Inactivo</option><option>Suspendido</option></select></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
+      <div class="form-group full" id="att-op-wrap"></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
@@ -31,6 +32,7 @@ ob_start();
 <script>
 const pager=new Paginator('pgr',load,25);
 const EB={'Activo':'badge-green','Inactivo':'badge-gray','Suspendido':'badge-red'};
+const attOp = new AttachmentWidget('att-op-wrap', 'operadores');
 async function load(){
   const q=document.getElementById('s').value;
   const data=await api(`/api/operadores.php?q=${encodeURIComponent(q)}&page=${pager.page}&per=${pager.perPage}`);
@@ -57,9 +59,9 @@ async function load(){
     </tr>`;
   }).join('');
 }
-function abrirNuevo(){document.getElementById('mtitle').textContent='👤 Nuevo Operador';resetForm('modal');openModal('modal');}
-function editar(r){document.getElementById('mtitle').textContent='✏️ Editar Operador';fillForm('modal',{id:r.id,nombre:r.nombre,licencia:r.licencia,categoria_lic:r.categoria_lic,venc_licencia:r.venc_licencia,telefono:r.telefono,email:r.email,estado:r.estado,notas:r.notas});openModal('modal');}
-async function guardar(){const d=getForm('modal');if(!d.nombre){toast('El nombre es obligatorio','error');return;}await api('/api/operadores.php',d.id?'PUT':'POST',d);toast(d.id?'Actualizado':'Operador registrado');closeModal('modal');load();}
+function abrirNuevo(){document.getElementById('mtitle').textContent='👤 Nuevo Operador';resetForm('modal');attOp.reset();openModal('modal');}
+function editar(r){document.getElementById('mtitle').textContent='✏️ Editar Operador';fillForm('modal',{id:r.id,nombre:r.nombre,licencia:r.licencia,categoria_lic:r.categoria_lic,venc_licencia:r.venc_licencia,telefono:r.telefono,email:r.email,estado:r.estado,notas:r.notas});attOp.setEntityId(r.id);attOp.load();openModal('modal');}
+async function guardar(){const d=getForm('modal');if(!d.nombre){toast('El nombre es obligatorio','error');return;}const res=await api('/api/operadores.php',d.id?'PUT':'POST',d);const savedId=d.id||res.id;if(attOp.hasPending()&&savedId){await attOp.uploadPending(savedId);}toast(d.id?'Actualizado':'Operador registrado');closeModal('modal');load();}
 async function del(id){confirmDelete('¿Eliminar este operador?',async()=>{await api(`/api/operadores.php?id=${id}`,'DELETE');toast('Eliminado','warning');load();});}
 
 async function verHistorial(id){

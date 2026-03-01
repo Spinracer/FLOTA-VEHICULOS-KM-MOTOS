@@ -98,6 +98,126 @@ function renderBarChart(containerId, data, { unit = '', color = '#e8ff47', empty
     </div>`).join('');
 }
 
+// ── ATTACHMENTS WIDGET ─────────────────────────
+/**
+ * Widget reutilizable de adjuntos.
+ * Uso: new AttachmentWidget(containerId, entidad, entidadId)
+ *  - .load()           → carga adjuntos existentes
+ *  - .setEntityId(id)  → cambia entidad_id (al crear un registro nuevo)
+ *  - .reset()          → limpia la lista
+ */
+class AttachmentWidget {
+  constructor(containerId, entidad, entidadId = 0) {
+    this.container = document.getElementById(containerId);
+    this.entidad = entidad;
+    this.entidadId = entidadId;
+    this.attachments = [];
+    this.pendingFiles = []; // files to upload on save
+    if (this.container) this.render();
+  }
+
+  setEntityId(id) { this.entidadId = id; }
+
+  reset() {
+    this.entidadId = 0;
+    this.attachments = [];
+    this.pendingFiles = [];
+    if (this.container) this.render();
+  }
+
+  async load() {
+    if (!this.entidadId) { this.render(); return; }
+    try {
+      const res = await fetch(`/api/attachments.php?entidad=${this.entidad}&entidad_id=${this.entidadId}`);
+      if (res.ok) {
+        const d = await res.json();
+        this.attachments = d.attachments || [];
+      }
+    } catch(e) {}
+    this.render();
+  }
+
+  render() {
+    if (!this.container) return;
+    const isImg = (m) => m && m.startsWith('image/');
+    const fmtSize = (b) => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : (b/1024).toFixed(0)+' KB';
+
+    let html = `<div class="att-widget">
+      <div class="att-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:600;color:var(--accent2)">📎 Adjuntos (${this.attachments.length})</span>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0">
+          + Archivo <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="window._attWidget_${this.container.id}.onFiles(this.files)">
+        </label>
+      </div>`;
+
+    if (this.pendingFiles.length) {
+      html += `<div style="margin-bottom:6px;font-size:11px;color:var(--accent)">⏳ Pendientes de subir: ${this.pendingFiles.length} archivo(s)</div>`;
+      html += this.pendingFiles.map((f,i) => `<div class="att-item pending" style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:rgba(232,255,71,.08);border-radius:6px;margin-bottom:4px">
+        <span style="font-size:12px">${isImg(f.type)?'🖼️':'📄'}</span>
+        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+        <span style="font-size:11px;color:var(--text2)">${fmtSize(f.size)}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px" onclick="window._attWidget_${this.container.id}.removePending(${i})">✕</button>
+      </div>`).join('');
+    }
+
+    if (this.attachments.length) {
+      html += this.attachments.map(a => `<div class="att-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;margin-bottom:4px;background:rgba(255,255,255,.04)">
+        <span style="font-size:12px">${isImg(a.mime_type)?'🖼️':'📄'}</span>
+        <a href="/api/attachments.php?action=download&id=${a.id}" target="_blank" style="flex:1;font-size:12px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.original_name}">${a.original_name}</a>
+        <span style="font-size:11px;color:var(--text2)">${fmtSize(a.size_bytes)}</span>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
+      </div>`).join('');
+    } else if (!this.pendingFiles.length) {
+      html += `<div style="font-size:12px;color:var(--text2);padding:8px;text-align:center">Sin adjuntos</div>`;
+    }
+
+    html += '</div>';
+    this.container.innerHTML = html;
+    window[`_attWidget_${this.container.id}`] = this;
+  }
+
+  onFiles(fileList) {
+    for (const f of fileList) this.pendingFiles.push(f);
+    this.render();
+  }
+
+  removePending(idx) {
+    this.pendingFiles.splice(idx, 1);
+    this.render();
+  }
+
+  async deleteAtt(id) {
+    if (!confirm('¿Eliminar este adjunto?')) return;
+    try {
+      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE'});
+      this.attachments = this.attachments.filter(a => a.id !== id);
+      this.render();
+      toast('Adjunto eliminado', 'warning');
+    } catch(e) { toast('Error al eliminar adjunto', 'error'); }
+  }
+
+  /** Upload all pending files. Call after saving the parent entity. */
+  async uploadPending(entidadId) {
+    if (entidadId) this.entidadId = entidadId;
+    if (!this.pendingFiles.length || !this.entidadId) return;
+    const fd = new FormData();
+    fd.append('entidad', this.entidad);
+    fd.append('entidad_id', this.entidadId);
+    for (const f of this.pendingFiles) fd.append('archivo[]', f);
+    try {
+      const res = await fetch('/api/attachments.php', {method:'POST', body: fd});
+      if (!res.ok) throw new Error('Error al subir');
+      const d = await res.json();
+      this.pendingFiles = [];
+      toast(`${d.uploaded.length} adjunto(s) subido(s)`);
+      await this.load(); // refresh from server
+    } catch(e) { toast('Error al subir adjuntos', 'error'); }
+  }
+
+  hasPending() { return this.pendingFiles.length > 0; }
+  count() { return this.attachments.length + this.pendingFiles.length; }
+}
+
 // ── CALC COMBUSTIBLE TOTAL ─────────────────────
 function calcCombTotal() {
   const l = parseFloat(document.querySelector('[name="litros"]')?.value) || 0;
