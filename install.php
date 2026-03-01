@@ -40,6 +40,7 @@ define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'flotacontrol');
+define('DB_SOCKET', getenv('DB_SOCKET') ?: '');
 
 $log = [];
 $ok  = true;
@@ -55,7 +56,10 @@ function step(string $msg, bool $success, string $detail = '') {
 
 // 1. Conexión sin BD
 try {
-    $pdo = new PDO("mysql:host=".DB_HOST.";charset=utf8mb4", DB_USER, DB_PASS, [
+    $installDsn = DB_SOCKET
+        ? "mysql:unix_socket=" . DB_SOCKET . ";charset=utf8mb4"
+        : "mysql:host=" . DB_HOST . ";charset=utf8mb4";
+    $pdo = new PDO($installDsn, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);
     step("Conexión al servidor MySQL", true);

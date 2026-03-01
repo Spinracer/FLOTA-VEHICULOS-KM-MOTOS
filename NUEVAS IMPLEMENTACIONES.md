@@ -228,8 +228,8 @@
 ### 10.4 PDF autorización con firmas
 - [x] PDF por registro y por lote
 - [x] Líneas de firma (conductor, flota, contabilidad)
-- [ ] QR opcional
-- [ ] Guardar PDF generado como adjunto
+- [x] QR opcional
+- [x] Guardar PDF generado como adjunto
 
 **Aceptación**
 - Control de combustible estricto, medible e imprimible.

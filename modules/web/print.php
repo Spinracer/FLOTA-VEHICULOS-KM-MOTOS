@@ -183,6 +183,25 @@ default:
 }
 
 $generadoPor = htmlspecialchars(current_user()['nombre'] ?? 'Sistema');
+
+// ═══════════════════════════════════════════════════════
+// QR Code generation (inline SVG, no external dependency)
+// ═══════════════════════════════════════════════════════
+$qrUrl = '';
+if ($folio) {
+    // Build verification URL with folio and type
+    $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+             . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $qrData = $baseUrl . '/print.php?type=' . urlencode($type) . '&id=' . $id;
+    // Use Google Charts QR API for simplicity (works offline when printed)
+    $qrUrl = 'https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=' . urlencode($qrData) . '&choe=UTF-8';
+}
+
+// ═══════════════════════════════════════════════════════
+// Save PDF as attachment option (?save=1)
+// ═══════════════════════════════════════════════════════
+$saveAsAttachment = (int)($_GET['save'] ?? 0);
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -242,6 +261,11 @@ $generadoPor = htmlspecialchars(current_user()['nombre'] ?? 'Sistema');
   .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #1a1a1a; color: #fff; padding: 8px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100; font-size: 13px; }
   .print-bar button { background: #e8ff47; color: #000; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 700; font-size: 13px; }
   .print-bar button:hover { background: #d4eb3c; }
+
+  /* QR Code */
+  .qr-wrap { margin-top: 16px; text-align: center; }
+  .qr-wrap img { width: 100px; height: 100px; }
+  .qr-wrap .qr-label { font-size: 9px; color: #888; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -249,6 +273,7 @@ $generadoPor = htmlspecialchars(current_user()['nombre'] ?? 'Sistema');
   <span><?= htmlspecialchars($title) ?> — <?= $folio ?></span>
   <div>
     <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    <button onclick="saveAsAttachment()" style="background:#4ecdc4;color:#000;margin-left:8px" title="Guardar una copia como adjunto del registro">💾 Guardar como adjunto</button>
     <button onclick="window.close()" style="background:#555;color:#fff;margin-left:8px">✕ Cerrar</button>
   </div>
 </div>
@@ -267,10 +292,58 @@ $generadoPor = htmlspecialchars(current_user()['nombre'] ?? 'Sistema');
 
   <?= $content ?>
 
+  <?php if ($qrUrl): ?>
+  <div class="qr-wrap">
+    <img src="<?= htmlspecialchars($qrUrl) ?>" alt="QR Verificación" />
+    <div class="qr-label">Escanea para verificar documento — <?= $folio ?></div>
+  </div>
+  <?php endif; ?>
+
   <div class="footer">
     <span>Documento generado por FlotaCtrl — Sistema de Gestión de Flota</span>
     <span><?= $folio ?> — <?= $fecha ?></span>
   </div>
 </div>
+
+<script>
+async function saveAsAttachment() {
+  const type = '<?= addslashes($type) ?>';
+  const id = <?= $id ?>;
+  const folio = '<?= addslashes($folio) ?>';
+
+  // Determine entity for attachment
+  let entidad = '';
+  let entidadId = id;
+  if (type === 'asignacion') { entidad = 'asignaciones'; }
+  else if (type === 'combustible') { entidad = 'combustible'; }
+  else if (type === 'combustible_lote') {
+    alert('Para lotes, guarda cada registro individual.');
+    return;
+  }
+  if (!entidad) { alert('Tipo no soportado para guardar adjunto.'); return; }
+
+  // Capture page HTML as a Blob (HTML snapshot)
+  const pageEl = document.querySelector('.page');
+  const styles = document.querySelector('style').outerHTML;
+  const htmlContent = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' + folio + '</title>' + styles + '</head><body style="background:#fff;padding:20px">' + pageEl.outerHTML + '</body></html>';
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const fileName = folio + '.html';
+
+  const fd = new FormData();
+  fd.append('entidad', entidad);
+  fd.append('entidad_id', entidadId);
+  fd.append('archivo[]', blob, fileName);
+
+  try {
+    const res = await fetch('/api/attachments.php', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('Error al guardar');
+    const d = await res.json();
+    alert('✅ Documento guardado como adjunto: ' + fileName);
+  } catch(e) {
+    alert('❌ Error al guardar adjunto: ' + e.message);
+  }
+}
+</script>
+
 </body>
 </html>

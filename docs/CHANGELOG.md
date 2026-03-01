@@ -1,5 +1,18 @@
 # FlotaControl — Changelog
 
+## [2.6.0] — 2026-03-01
+
+### Nuevas Funcionalidades
+- **QR en documentos imprimibles**: Todos los PDFs (asignación, combustible, lote) ahora incluyen un código QR de verificación generado automáticamente con enlace al documento original.
+- **Guardar PDF como adjunto**: Botón "💾 Guardar como adjunto" en la barra de impresión que captura el documento HTML y lo almacena como adjunto del registro correspondiente (asignación o carga de combustible).
+- **Soporte DB Socket**: Conexión MySQL via socket Unix (`DB_SOCKET` en .env) para mayor compatibilidad en entornos de desarrollo.
+
+### Mejoras
+- **install.php**: Soporte para conexión via socket Unix.
+- **includes/db.php**: Detección automática de socket vs TCP según configuración.
+
+---
+
 ## [2.5.0] — 2026-02-27
 
 ### Nuevas Funcionalidades

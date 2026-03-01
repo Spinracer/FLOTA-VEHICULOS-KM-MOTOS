@@ -32,6 +32,7 @@ define('DB_NAME',    getenv('DB_NAME')    ?: 'flotacontrol');
 define('DB_USER',    getenv('DB_USER')    ?: 'root');
 define('DB_PASS',    getenv('DB_PASS')    ?: '');
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
+define('DB_SOCKET', getenv('DB_SOCKET') ?: '');
 
 define('APP_NAME',  getenv('APP_NAME')  ?: 'FlotaControl');
 define('APP_DEBUG', getenv('APP_DEBUG') === 'true');
@@ -42,8 +43,13 @@ define('APP_DEBUG', getenv('APP_DEBUG') === 'true');
 function getDB(): PDO {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn  = "mysql:host=" . DB_HOST . ";port=" . DB_PORT
-              . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+        $socket = defined('DB_SOCKET') && DB_SOCKET ? DB_SOCKET : '';
+        if ($socket) {
+            $dsn = "mysql:unix_socket=" . $socket . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+        } else {
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT
+                 . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+        }
         $opts = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
