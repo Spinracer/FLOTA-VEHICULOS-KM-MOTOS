@@ -288,10 +288,10 @@
 
 ## 14) Mejoras opcionales para escala
 
-- [ ] Colas con Redis + Horizon
-- [ ] Notificaciones (email/WhatsApp)
-- [ ] Multi-sucursal
-- [ ] Módulo de incidentes avanzados con seguros
+- [ ] Colas con Redis + Horizon *(requiere infraestructura Redis — no aplicable en stack PHP puro)*
+- [x] Notificaciones (email/WhatsApp) — Sistema de notificaciones en BD con polling en tiempo real, campana en topbar, panel de notificaciones, API CRUD (`/api/notificaciones.php`), helper `includes/notifications.php` con funciones `notify_user()`, `notify_roles()`, `notify_all()`, `count_unread()`, `mark_read()`, `mark_all_read()`, `send_notification_email()`. Notificaciones automáticas al crear incidentes Alta/Crítica y al completar/cancelar OTs.
+- [x] Multi-sucursal — Tabla `sucursales` con nombre, dirección, ciudad, teléfono, responsable, activo. Columna `sucursal_id` en vehiculos, operadores, usuarios. API CRUD `/api/sucursales.php`, vista web `/sucursales.php` con CRUD completo. Filtro por sucursal en vehículos (API + UI). Seed "Matriz" en install.php. Menú de navegación actualizado.
+- [x] Módulo de incidentes avanzados con seguros — 8 nuevos campos: `aseguradora`, `poliza_numero`, `tiene_reclamo`, `estado_reclamo` (N/A/En proceso/Aprobado/Rechazado/Pagado), `monto_reclamo`, `fecha_reclamo`, `referencia_reclamo`, `notas_seguro`. UI con sección plegable de seguros, filtro por reclamo, modal de detalle con info del seguro del vehículo, stats cards (total, abiertos, con reclamo, costos, reclamos). Búsqueda por aseguradora/póliza.
 - [x] Reporte de overrides
 
 ---

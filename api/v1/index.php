@@ -33,7 +33,7 @@ if (!$resource && isset($_GET['_resource'])) {
 
 // Header de versión API
 header('X-API-Version: 1.0');
-header('X-Powered-By: FlotaControl/2.8');
+header('X-Powered-By: FlotaControl/2.9');
 
 // Mapa de recursos válidos
 $routes = [
@@ -53,6 +53,8 @@ $routes = [
     'permisos'       => '/../../modules/api/permisos.php',
     'auditoria'      => '/../../modules/api/auditoria.php',
     'attachments'    => '/../../modules/api/attachments.php',
+    'notificaciones' => '/../../modules/api/notificaciones.php',
+    'sucursales'     => '/../../modules/api/sucursales.php',
 ];
 
 // ── Rutas especiales ──

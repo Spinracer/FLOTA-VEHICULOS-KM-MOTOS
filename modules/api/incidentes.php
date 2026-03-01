@@ -9,20 +9,29 @@ $db = getDB();
 try {
     switch ($method) {
         case 'GET':
+            // Detail single by id
+            if (!empty($_GET['detail'])) {
+                $row = $db->prepare("SELECT i.*,v.placa,v.marca,v.modelo,v.venc_seguro AS vehiculo_venc_seguro FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id WHERE i.id=? AND i.deleted_at IS NULL LIMIT 1");
+                $row->execute([(int)$_GET['detail']]);
+                echo json_encode($row->fetch() ?: []);
+                break;
+            }
             $q='%'.trim($_GET['q']??'').'%'; $vid=(int)($_GET['vehiculo_id']??0);
             $estado = trim($_GET['estado'] ?? '');
+            $tieneReclamo = $_GET['tiene_reclamo'] ?? '';
             $page=max(1,(int)($_GET['page']??1)); $per=min(100,max(5,(int)($_GET['per']??25))); $off=($page-1)*$per;
-            $where="WHERE i.deleted_at IS NULL AND (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ?)";
-            $params=[$q,$q,$q];
+            $where="WHERE i.deleted_at IS NULL AND (v.placa LIKE ? OR i.tipo LIKE ? OR i.descripcion LIKE ? OR i.aseguradora LIKE ? OR i.poliza_numero LIKE ?)";
+            $params=[$q,$q,$q,$q,$q];
             if ($vid){$where.=" AND i.vehiculo_id=?"; $params[] = $vid;}
             if ($estado !== ''){$where.=" AND i.estado=?"; $params[] = $estado;}
+            if ($tieneReclamo !== ''){$where.=" AND i.tiene_reclamo=?"; $params[] = (int)$tieneReclamo;}
             $total=$db->prepare("SELECT COUNT(*) FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id $where");
             $total->execute($params);
             $totalCount = (int)$total->fetchColumn();
             $listParams = $params;
             $listParams[] = $per;
             $listParams[] = $off;
-            $stmt=$db->prepare("SELECT i.*,v.placa,v.marca FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id $where ORDER BY i.fecha DESC,i.id DESC LIMIT ? OFFSET ?");
+            $stmt=$db->prepare("SELECT i.*,v.placa,v.marca,v.venc_seguro AS vehiculo_venc_seguro FROM incidentes i LEFT JOIN vehiculos v ON v.id=i.vehiculo_id $where ORDER BY i.fecha DESC,i.id DESC LIMIT ? OFFSET ?");
             $stmt->execute($listParams);
             echo json_encode(['total'=>$totalCount,'rows'=>$stmt->fetchAll()]);
             break;
@@ -33,11 +42,29 @@ try {
                 break;
             }
             $d=json_decode(file_get_contents('php://input'),true);
-            $db->prepare("INSERT INTO incidentes (fecha,vehiculo_id,tipo,descripcion,severidad,estado,costo_est) VALUES (?,?,?,?,?,?,?)")
-               ->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion'],$d['severidad'],$d['estado'],(float)$d['costo_est']]);
-                $newId = (int)$db->lastInsertId();
-                audit_log('incidentes', 'create', $newId, [], $d);
-                echo json_encode(['id'=>$newId,'ok'=>true]);
+            $db->prepare("INSERT INTO incidentes (fecha,vehiculo_id,tipo,descripcion,severidad,estado,costo_est,aseguradora,poliza_numero,tiene_reclamo,estado_reclamo,monto_reclamo,fecha_reclamo,referencia_reclamo,notas_seguro) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+               ->execute([
+                   $d['fecha'], $d['vehiculo_id'], $d['tipo'], $d['descripcion'],
+                   $d['severidad'], $d['estado'], (float)($d['costo_est'] ?? 0),
+                   $d['aseguradora'] ?? null, $d['poliza_numero'] ?? null,
+                   (int)($d['tiene_reclamo'] ?? 0),
+                   $d['estado_reclamo'] ?? 'N/A', (float)($d['monto_reclamo'] ?? 0),
+                   $d['fecha_reclamo'] ?: null, $d['referencia_reclamo'] ?? null,
+                   $d['notas_seguro'] ?? null
+               ]);
+            $newId = (int)$db->lastInsertId();
+            audit_log('incidentes', 'create', $newId, [], $d);
+            // Notificación si severidad alta/crítica
+            if (in_array($d['severidad'] ?? '', ['Alta','Crítica'])) {
+                try {
+                    require_once __DIR__ . '/../../includes/notifications.php';
+                    $veh = $db->prepare("SELECT placa FROM vehiculos WHERE id=? LIMIT 1");
+                    $veh->execute([(int)$d['vehiculo_id']]);
+                    $placa = $veh->fetchColumn() ?: '?';
+                    notify_roles($db, ['coordinador_it','admin','soporte'], 'alerta', "Incidente {$d['severidad']}", "Se reportó incidente de severidad {$d['severidad']} en vehículo {$placa}: {$d['tipo']}", 'incidentes', $newId);
+                } catch (Throwable $e) { /* no bloquear */ }
+            }
+            echo json_encode(['id'=>$newId,'ok'=>true]);
             break;
         case 'PUT':
             if (!can('edit')) {
@@ -46,12 +73,21 @@ try {
                 break;
             }
             $d=json_decode(file_get_contents('php://input'),true);
-                $prevStmt = $db->prepare("SELECT * FROM incidentes WHERE id=? LIMIT 1");
-                $prevStmt->execute([(int)$d['id']]);
-                $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("UPDATE incidentes SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,severidad=?,estado=?,costo_est=? WHERE id=?")
-               ->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion'],$d['severidad'],$d['estado'],(float)$d['costo_est'],$d['id']]);
-                audit_log('incidentes', 'update', (int)$d['id'], $prev, $d);
+            $prevStmt = $db->prepare("SELECT * FROM incidentes WHERE id=? LIMIT 1");
+            $prevStmt->execute([(int)$d['id']]);
+            $prev = $prevStmt->fetch() ?: [];
+            $db->prepare("UPDATE incidentes SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,severidad=?,estado=?,costo_est=?,aseguradora=?,poliza_numero=?,tiene_reclamo=?,estado_reclamo=?,monto_reclamo=?,fecha_reclamo=?,referencia_reclamo=?,notas_seguro=? WHERE id=?")
+               ->execute([
+                   $d['fecha'], $d['vehiculo_id'], $d['tipo'], $d['descripcion'],
+                   $d['severidad'], $d['estado'], (float)($d['costo_est'] ?? 0),
+                   $d['aseguradora'] ?? null, $d['poliza_numero'] ?? null,
+                   (int)($d['tiene_reclamo'] ?? 0),
+                   $d['estado_reclamo'] ?? 'N/A', (float)($d['monto_reclamo'] ?? 0),
+                   $d['fecha_reclamo'] ?: null, $d['referencia_reclamo'] ?? null,
+                   $d['notas_seguro'] ?? null,
+                   $d['id']
+               ]);
+            audit_log('incidentes', 'update', (int)$d['id'], $prev, $d);
             echo json_encode(['ok'=>true]);
             break;
         case 'DELETE':

@@ -1,5 +1,22 @@
 # FlotaControl — Changelog
 
+## [2.9.0] — 2026-03-01
+
+### Nuevas Funcionalidades — Módulo 14: Mejoras para Escala
+
+- **Incidentes Avanzados con Seguros**: 8 nuevos campos en incidentes (`aseguradora`, `poliza_numero`, `tiene_reclamo`, `estado_reclamo`, `monto_reclamo`, `fecha_reclamo`, `referencia_reclamo`, `notas_seguro`). UI con sección plegable de seguros, filtro por reclamo, modal de detalle con info del seguro del vehículo. Stats cards en listado (total, abiertos, con reclamo, costos, reclamos). Búsqueda por aseguradora/póliza. API `/api/incidentes.php?detail=X` para vista individual.
+
+- **Sistema de Notificaciones**: Tabla `notificaciones` con tipos (info/alerta/exito/warning), destino por usuario o global. API `/api/notificaciones.php` (GET no leídas, PUT marcar leída/todas). Campana con badge en topbar, panel desplegable con notificaciones en tiempo real (polling 30s). Helper `includes/notifications.php` con funciones `notify_user()`, `notify_roles()`, `notify_all()`, `send_notification_email()`. Notificaciones automáticas: incidentes Alta/Crítica → coordinador_it/admin/soporte; OT completada/cancelada → coordinador_it/admin.
+
+- **Multi-sucursal**: Tabla `sucursales` (nombre, dirección, ciudad, teléfono, responsable, activo). Columna `sucursal_id` añadida a vehiculos, operadores, usuarios. API CRUD `/api/sucursales.php` con protección contra borrado de sucursales con registros. Vista web `/sucursales.php` con CRUD completo, conteo de vehículos/operadores por sucursal. Filtro por sucursal en vehículos (API + UI). Selector de sucursal en formulario de vehículos. Seed "Matriz" automática. Entrada en menú de navegación.
+
+### Mejoras
+- **Menú de navegación**: Añadidas entradas Sucursales (Administración) y campana de notificaciones (topbar).
+- **API v1 Router**: Añadidas rutas `notificaciones` y `sucursales`. Versión actualizada a 2.9.
+- **install.php**: Migraciones automáticas para columnas de seguros en incidentes, tabla sucursales, tabla notificaciones, columna sucursal_id en vehiculos/operadores/usuarios.
+
+---
+
 ## [2.8.0] — 2026-03-01
 
 ### Nuevas Funcionalidades

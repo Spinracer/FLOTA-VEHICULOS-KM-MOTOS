@@ -202,15 +202,23 @@ $tables = [
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
 "incidentes" => "CREATE TABLE IF NOT EXISTS incidentes (
-  id           INT AUTO_INCREMENT PRIMARY KEY,
-  fecha        DATE         NOT NULL,
-  vehiculo_id  INT          NOT NULL,
-  tipo         VARCHAR(60)  NOT NULL DEFAULT 'Falla mecánica',
-  descripcion  TEXT         NOT NULL,
-  severidad    ENUM('Baja','Media','Alta','Crítica') NOT NULL DEFAULT 'Media',
-  estado       ENUM('Abierto','En proceso','Cerrado') NOT NULL DEFAULT 'Abierto',
-  costo_est    DECIMAL(10,2) NOT NULL DEFAULT 0,
-  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  fecha             DATE         NOT NULL,
+  vehiculo_id       INT          NOT NULL,
+  tipo              VARCHAR(60)  NOT NULL DEFAULT 'Falla mecánica',
+  descripcion       TEXT         NOT NULL,
+  severidad         ENUM('Baja','Media','Alta','Crítica') NOT NULL DEFAULT 'Media',
+  estado            ENUM('Abierto','En proceso','Cerrado') NOT NULL DEFAULT 'Abierto',
+  costo_est         DECIMAL(10,2) NOT NULL DEFAULT 0,
+  aseguradora       VARCHAR(150) NULL,
+  poliza_numero     VARCHAR(80)  NULL,
+  tiene_reclamo     TINYINT(1)   NOT NULL DEFAULT 0,
+  estado_reclamo    ENUM('N/A','En proceso','Aprobado','Rechazado','Pagado') NOT NULL DEFAULT 'N/A',
+  monto_reclamo     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  fecha_reclamo     DATE         NULL,
+  referencia_reclamo VARCHAR(100) NULL,
+  notas_seguro      TEXT         NULL,
+  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
@@ -692,6 +700,95 @@ foreach ($compositeIndexes as [$tbl, $idx, $cols]) {
   } catch (Throwable $e) {
     step("Índice: {$tbl}.{$idx}", false, $e->getMessage());
   }
+}
+
+// 3.4 Módulo 14: Incidentes avanzados con seguros (migración)
+$incSeguroCols = [
+  ['aseguradora', "VARCHAR(150) NULL AFTER costo_est"],
+  ['poliza_numero', "VARCHAR(80) NULL AFTER aseguradora"],
+  ['tiene_reclamo', "TINYINT(1) NOT NULL DEFAULT 0 AFTER poliza_numero"],
+  ['estado_reclamo', "ENUM('N/A','En proceso','Aprobado','Rechazado','Pagado') NOT NULL DEFAULT 'N/A' AFTER tiene_reclamo"],
+  ['monto_reclamo', "DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER estado_reclamo"],
+  ['fecha_reclamo', "DATE NULL AFTER monto_reclamo"],
+  ['referencia_reclamo', "VARCHAR(100) NULL AFTER fecha_reclamo"],
+  ['notas_seguro', "TEXT NULL AFTER referencia_reclamo"],
+];
+foreach ($incSeguroCols as [$col, $def]) {
+  try {
+    if (!$existsColumn('incidentes', $col)) {
+      $pdo->exec("ALTER TABLE incidentes ADD COLUMN {$col} {$def}");
+      step("Incidentes seguros: {$col}", true);
+    } else {
+      step("Incidentes seguros: {$col}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Incidentes seguros: {$col}", false, $e->getMessage());
+  }
+}
+
+// 3.5 Módulo 14: Tabla sucursales + columna sucursal_id
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS sucursales (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    nombre     VARCHAR(150) NOT NULL,
+    direccion  VARCHAR(255) NULL,
+    ciudad     VARCHAR(100) NULL,
+    telefono   VARCHAR(30)  NULL,
+    responsable VARCHAR(150) NULL,
+    activo     TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: sucursales', true);
+} catch (Throwable $e) {
+  step('Tabla: sucursales', false, $e->getMessage());
+}
+
+$sucursalTables = ['vehiculos', 'operadores', 'usuarios'];
+foreach ($sucursalTables as $tbl) {
+  try {
+    if (!$existsColumn($tbl, 'sucursal_id')) {
+      $pdo->exec("ALTER TABLE `{$tbl}` ADD COLUMN sucursal_id INT NULL");
+      step("Multi-sucursal: {$tbl}.sucursal_id", true);
+    } else {
+      step("Multi-sucursal: {$tbl}.sucursal_id", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Multi-sucursal: {$tbl}.sucursal_id", false, $e->getMessage());
+  }
+}
+
+// Seed sucursal por defecto
+try {
+  $chk = $pdo->query("SELECT COUNT(*) FROM sucursales")->fetchColumn();
+  if ((int)$chk === 0) {
+    $pdo->exec("INSERT INTO sucursales (nombre, ciudad) VALUES ('Matriz','Ciudad Principal')");
+    step('Semilla: sucursal Matriz', true);
+  } else {
+    step('Semilla: sucursal Matriz', true, 'Ya existen sucursales');
+  }
+} catch (Throwable $e) {
+  step('Semilla: sucursal Matriz', false, $e->getMessage());
+}
+
+// 3.6 Módulo 14: Tabla notificaciones
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS notificaciones (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id  INT          NULL,
+    tipo        VARCHAR(60)  NOT NULL DEFAULT 'info',
+    titulo      VARCHAR(200) NOT NULL,
+    mensaje     TEXT         NOT NULL,
+    entidad     VARCHAR(60)  NULL,
+    entidad_id  INT          NULL,
+    leida       TINYINT(1)   NOT NULL DEFAULT 0,
+    enviada_email TINYINT(1) NOT NULL DEFAULT 0,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_notif_usuario (usuario_id, leida),
+    INDEX idx_notif_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: notificaciones', true);
+} catch (Throwable $e) {
+  step('Tabla: notificaciones', false, $e->getMessage());
 }
 
 // 4. Usuarios iniciales del sistema

@@ -433,6 +433,19 @@ try {
                         }
                     }
                     audit_log('mantenimientos', 'estado_change', (int)$d['id'], ['estado' => $estadoAnterior], ['estado' => $estadoNuevo]);
+
+                    // Notificación al cambiar estado
+                    try {
+                        require_once __DIR__ . '/../../includes/notifications.php';
+                        $vPlaca = $db->prepare("SELECT placa FROM vehiculos WHERE id=? LIMIT 1");
+                        $vPlaca->execute([(int)$d['vehiculo_id']]);
+                        $placaOT = $vPlaca->fetchColumn() ?: '?';
+                        if ($estadoNuevo === 'Completado') {
+                            notify_roles($db, ['coordinador_it','admin','soporte'], 'exito', "OT #{$d['id']} Completada", "Mantenimiento {$d['tipo']} del vehículo {$placaOT} ha sido completado.", 'mantenimientos', (int)$d['id']);
+                        } elseif ($estadoNuevo === 'Cancelado') {
+                            notify_roles($db, ['coordinador_it','admin'], 'warning', "OT #{$d['id']} Cancelada", "Mantenimiento {$d['tipo']} del vehículo {$placaOT} fue cancelado.", 'mantenimientos', (int)$d['id']);
+                        }
+                    } catch (Throwable $ne) { /* no bloquear */ }
                 }
 
                 $db->commit();

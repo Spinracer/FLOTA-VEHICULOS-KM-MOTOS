@@ -69,6 +69,9 @@ function render_layout(string $page_title, string $active_page, string $content)
     <a href="/proveedores.php" class="nav-item <?= $active_page==='proveedores'?'active':'' ?>">
       <span class="nav-icon">🏪</span><span>Proveedores</span>
     </a>
+    <a href="/sucursales.php" class="nav-item <?= $active_page==='sucursales'?'active':'' ?>">
+      <span class="nav-icon">🏢</span><span>Sucursales</span>
+    </a>
     <?php endif; ?>
 
     <?php if ($is_admin): ?>
@@ -104,6 +107,17 @@ function render_layout(string $page_title, string $active_page, string $content)
   <header class="topbar">
     <div class="topbar-title"><?= htmlspecialchars($page_title) ?></div>
     <div class="topbar-actions" id="topbar-actions">
+      <div id="notif-bell" style="position:relative;cursor:pointer;margin-right:12px" onclick="toggleNotifPanel()">
+        <span style="font-size:20px">🔔</span>
+        <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#ff4757;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;text-align:center;line-height:18px;font-weight:700"></span>
+      </div>
+      <div id="notif-panel" style="display:none;position:absolute;right:12px;top:52px;width:360px;max-height:420px;background:var(--card-bg,#111318);border:1px solid var(--border,#222730);border-radius:12px;z-index:999;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border,#222730);display:flex;justify-content:space-between;align-items:center">
+          <strong style="font-size:14px">Notificaciones</strong>
+          <button class="btn btn-ghost btn-sm" onclick="markAllRead()" style="font-size:11px">Marcar todas leídas</button>
+        </div>
+        <div id="notif-list" style="padding:8px"></div>
+      </div>
       <?php if ($rol === 'monitoreo'): ?>
         <span class="badge badge-cyan" style="padding:6px 12px;font-size:11px">👁 Modo solo lectura</span>
       <?php endif; ?>
@@ -139,6 +153,60 @@ function userCanModule(mod, perm) {
   return MODULE_PERMS[mod] && MODULE_PERMS[mod].includes(perm);
 }
 if (USER_ROLE !== 'coordinador_it') loadModulePerms();
+
+// Notificaciones en tiempo real
+let notifOpen = false;
+async function pollNotifs() {
+  try {
+    const r = await fetch('/api/notificaciones.php?count=1');
+    if (r.ok) {
+      const d = await r.json();
+      const badge = document.getElementById('notif-badge');
+      if (d.unread > 0) { badge.textContent = d.unread > 9 ? '9+' : d.unread; badge.style.display = ''; }
+      else { badge.style.display = 'none'; }
+    }
+  } catch(e) {}
+}
+function toggleNotifPanel() {
+  notifOpen = !notifOpen;
+  document.getElementById('notif-panel').style.display = notifOpen ? '' : 'none';
+  if (notifOpen) loadNotifs();
+}
+async function loadNotifs() {
+  try {
+    const r = await fetch('/api/notificaciones.php?all=1&limit=20');
+    if (!r.ok) return;
+    const d = await r.json();
+    const list = document.getElementById('notif-list');
+    if (!d.rows || !d.rows.length) { list.innerHTML = '<div style="text-align:center;padding:24px;color:#8892a4;font-size:13px">Sin notificaciones</div>'; return; }
+    const icons = {alerta:'🚨',info:'ℹ️',exito:'✅',warning:'⚠️'};
+    list.innerHTML = d.rows.map(n => `
+      <div style="padding:10px 12px;border-radius:8px;margin-bottom:4px;background:${Number(n.leida)?'transparent':'rgba(232,255,71,0.05)'};cursor:pointer;font-size:13px" onclick="readNotif(${n.id},this)">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <span>${icons[n.tipo]||'📌'} <strong>${n.titulo}</strong></span>
+          <small style="color:#555;white-space:nowrap;margin-left:8px">${n.created_at?.slice(5,16)||''}</small>
+        </div>
+        <div style="color:#8892a4;margin-top:4px">${n.mensaje}</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+async function readNotif(id, el) {
+  await fetch(`/api/notificaciones.php?id=${id}`, {method:'PUT'});
+  el.style.background = 'transparent';
+  pollNotifs();
+}
+async function markAllRead() {
+  await fetch('/api/notificaciones.php?all=1', {method:'PUT'});
+  pollNotifs(); loadNotifs();
+}
+// Close panel on outside click
+document.addEventListener('click', e => {
+  if (notifOpen && !e.target.closest('#notif-bell') && !e.target.closest('#notif-panel')) {
+    notifOpen = false; document.getElementById('notif-panel').style.display = 'none';
+  }
+});
+pollNotifs();
+setInterval(pollNotifs, 30000);
 </script>
 </body>
 </html>

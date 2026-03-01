@@ -80,19 +80,25 @@ try {
             $page = max(1, (int)($_GET['page'] ?? 1));
             $per  = min(100, max(5, (int)($_GET['per'] ?? 20)));
             $off  = ($page - 1) * $per;
+            $sucId = (int)($_GET['sucursal_id'] ?? 0);
 
-            $total = $db->prepare("SELECT COUNT(*) FROM vehiculos v
-                LEFT JOIN operadores o ON o.id = v.operador_id
-                WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)");
-            $total->execute([$q,$q,$q,$q]);
+            $where = "WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)";
+            $params = [$q,$q,$q,$q];
+            if ($sucId) { $where .= " AND v.sucursal_id = ?"; $params[] = $sucId; }
 
+            $total = $db->prepare("SELECT COUNT(*) FROM vehiculos v LEFT JOIN operadores o ON o.id = v.operador_id $where");
+            $total->execute($params);
+
+            $listParams = $params;
+            $listParams[] = $per;
+            $listParams[] = $off;
             $stmt = $db->prepare("SELECT v.*, o.nombre AS operador_nombre
                 FROM vehiculos v
                 LEFT JOIN operadores o ON o.id = v.operador_id
-                WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)
+                $where
                 ORDER BY v.placa ASC
                 LIMIT ? OFFSET ?");
-            $stmt->execute([$q,$q,$q,$q,$per,$off]);
+            $stmt->execute($listParams);
 
             echo json_encode(['total' => (int)$total->fetchColumn(), 'rows' => $stmt->fetchAll()]);
             break;
@@ -105,14 +111,15 @@ try {
             }
             $d = json_decode(file_get_contents('php://input'), true);
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
-            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
-                $d['venc_seguro'] ?: null, $d['notas'] ?: null
+                $d['venc_seguro'] ?: null, $d['notas'] ?: null,
+                $d['sucursal_id'] ?: null
             ]);
             $newId = (int)$db->lastInsertId();
             if ($kmNuevo > 0) {
@@ -135,13 +142,14 @@ try {
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['id'], $kmNuevo, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=? WHERE id=?");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
-                $d['venc_seguro'] ?: null, $d['notas'] ?: null, $d['id']
+                $d['venc_seguro'] ?: null, $d['notas'] ?: null,
+                $d['sucursal_id'] ?: null, $d['id']
             ]);
             if ($kmNuevo > 0) {
                 odometro_registrar($db, (int)$d['id'], $kmNuevo, 'manual', (int)($_SESSION['user_id'] ?? 0));

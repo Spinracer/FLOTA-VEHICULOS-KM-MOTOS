@@ -6,6 +6,7 @@ require_login();
 $db = getDB();
 $operadores = $db->query("SELECT id, nombre FROM operadores WHERE estado='Activo' ORDER BY nombre")->fetchAll();
 $estadosVehiculo = catalogo_items('estados_vehiculo');
+$sucursales = $db->query("SELECT id, nombre FROM sucursales WHERE activo=1 ORDER BY nombre")->fetchAll();
 
 ob_start();
 ?>
@@ -14,6 +15,10 @@ ob_start();
     <span class="search-icon">🔍</span>
     <input type="text" id="search-veh" placeholder="Buscar por placa, marca, modelo..." oninput="loadVehiculos()">
   </div>
+  <select id="fsuc" onchange="loadVehiculos()" style="max-width:180px">
+    <option value="">Todas las sucursales</option>
+    <?php foreach($sucursales as $s): ?><option value="<?=$s['id']?>"><?=htmlspecialchars($s['nombre'])?></option><?php endforeach; ?>
+  </select>
   <?php if(can('create')): ?>
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Vehículo</button>
   <?php endif; ?>
@@ -70,6 +75,11 @@ ob_start();
           <?php endforeach; ?>
         </select></div>
       <div class="form-group"><label>Venc. Seguro</label><input name="venc_seguro" type="date"></div>
+      <div class="form-group"><label>Sucursal</label>
+        <select name="sucursal_id">
+          <option value="">— Sin asignar —</option>
+          <?php foreach($sucursales as $s): ?><option value="<?=$s['id']?>"><?=htmlspecialchars($s['nombre'])?></option><?php endforeach; ?>
+        </select></div>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Observaciones..."></textarea></div>
       <div class="form-group full" id="att-veh-wrap"></div>
     </div>
@@ -99,8 +109,9 @@ const attVeh = new AttachmentWidget('att-veh-wrap', 'vehiculos');
 
 async function loadVehiculos() {
   const q = document.getElementById('search-veh').value;
+  const sucId = document.getElementById('fsuc').value;
   try {
-    const data = await api(`/api/vehiculos.php?q=${encodeURIComponent(q)}&page=${pager.page}&per=${pager.perPage}`);
+    const data = await api(`/api/vehiculos.php?q=${encodeURIComponent(q)}&sucursal_id=${sucId}&page=${pager.page}&per=${pager.perPage}`);
     pager.setTotal(data.total);
     const tbody = document.getElementById('tbody-veh');
     if (!data.rows.length) {
@@ -145,7 +156,7 @@ function editar(v) {
     anio: v.anio, tipo: v.tipo, combustible: v.combustible,
     km_actual: v.km_actual, color: v.color, vin: v.vin,
     estado: v.estado, operador_id: v.operador_id,
-    venc_seguro: v.venc_seguro, notas: v.notas
+    venc_seguro: v.venc_seguro, sucursal_id: v.sucursal_id || '', notas: v.notas
   });
   attVeh.setEntityId(v.id);
   attVeh.load();
