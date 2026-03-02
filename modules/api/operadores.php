@@ -6,7 +6,134 @@ require_login();
 header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
+$user = current_user();
 try {
+    $action = $_GET['action'] ?? '';
+
+    // ──── Capacitaciones CRUD ────
+    if ($action === 'capacitaciones') {
+        $opId = (int)($_GET['operador_id'] ?? ($_POST['operador_id'] ?? 0));
+        if ($method === 'GET') {
+            $opId = (int)($_GET['operador_id'] ?? 0);
+            if ($opId <= 0) { http_response_code(400); echo json_encode(['error'=>'operador_id requerido']); exit; }
+            $stmt = $db->prepare("SELECT * FROM operador_capacitaciones WHERE operador_id=? ORDER BY fecha DESC");
+            $stmt->execute([$opId]);
+            echo json_encode(['rows'=>$stmt->fetchAll()]);
+        } elseif ($method === 'POST') {
+            if (!can('create')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            if (empty($d['operador_id']) || empty($d['titulo']) || empty($d['fecha'])) {
+                http_response_code(422); echo json_encode(['error'=>'operador_id, titulo y fecha son obligatorios']); exit;
+            }
+            $db->prepare("INSERT INTO operador_capacitaciones (operador_id,titulo,descripcion,tipo,horas,fecha,certificado_url,vencimiento) VALUES (?,?,?,?,?,?,?,?)")
+               ->execute([(int)$d['operador_id'],$d['titulo'],$d['descripcion']??null,$d['tipo']??'Interna',(float)($d['horas']??0),$d['fecha'],$d['certificado_url']??null,$d['vencimiento']??null]);
+            $newId = (int)$db->lastInsertId();
+            audit_log('operador_capacitaciones','create',$newId,[],$d);
+            echo json_encode(['id'=>$newId,'ok'=>true]);
+        } elseif ($method === 'DELETE') {
+            if (!can('delete')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $id = (int)($_GET['id'] ?? 0);
+            $db->prepare("DELETE FROM operador_capacitaciones WHERE id=?")->execute([$id]);
+            audit_log('operador_capacitaciones','delete',$id,[],[]);
+            echo json_encode(['ok'=>true]);
+        }
+        exit;
+    }
+
+    // ──── Infracciones CRUD ────
+    if ($action === 'infracciones') {
+        if ($method === 'GET') {
+            $opId = (int)($_GET['operador_id'] ?? 0);
+            if ($opId <= 0) { http_response_code(400); echo json_encode(['error'=>'operador_id requerido']); exit; }
+            $stmt = $db->prepare("SELECT * FROM operador_infracciones WHERE operador_id=? ORDER BY fecha DESC");
+            $stmt->execute([$opId]);
+            echo json_encode(['rows'=>$stmt->fetchAll()]);
+        } elseif ($method === 'POST') {
+            if (!can('create')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            if (empty($d['operador_id']) || empty($d['fecha'])) {
+                http_response_code(422); echo json_encode(['error'=>'operador_id y fecha son obligatorios']); exit;
+            }
+            $db->prepare("INSERT INTO operador_infracciones (operador_id,fecha,tipo,descripcion,monto,estado,referencia) VALUES (?,?,?,?,?,?,?)")
+               ->execute([(int)$d['operador_id'],$d['fecha'],$d['tipo']??'Multa',$d['descripcion']??null,(float)($d['monto']??0),$d['estado']??'Pendiente',$d['referencia']??null]);
+            $newId = (int)$db->lastInsertId();
+            audit_log('operador_infracciones','create',$newId,[],$d);
+            echo json_encode(['id'=>$newId,'ok'=>true]);
+        } elseif ($method === 'PUT') {
+            if (!can('edit')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            $db->prepare("UPDATE operador_infracciones SET estado=? WHERE id=?")->execute([$d['estado'],(int)$d['id']]);
+            audit_log('operador_infracciones','update',(int)$d['id'],[],['estado'=>$d['estado']]);
+            echo json_encode(['ok'=>true]);
+        } elseif ($method === 'DELETE') {
+            if (!can('delete')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $id = (int)($_GET['id'] ?? 0);
+            $db->prepare("DELETE FROM operador_infracciones WHERE id=?")->execute([$id]);
+            audit_log('operador_infracciones','delete',$id,[],[]);
+            echo json_encode(['ok'=>true]);
+        }
+        exit;
+    }
+
+    // ──── KPIs de desempeño ────
+    if ($action === 'kpis') {
+        $opId = (int)($_GET['id'] ?? 0);
+        if ($opId <= 0) { http_response_code(400); echo json_encode(['error'=>'id requerido']); exit; }
+
+        // Total asignaciones y km recorridos
+        $asgStmt = $db->prepare("SELECT COUNT(*) as total,
+            COALESCE(SUM(CASE WHEN end_km IS NOT NULL AND start_km IS NOT NULL THEN end_km - start_km ELSE 0 END),0) as km_total,
+            MIN(start_at) as primera_asig, MAX(COALESCE(end_at,NOW())) as ultima_asig
+            FROM asignaciones WHERE operador_id=?");
+        $asgStmt->execute([$opId]);
+        $asg = $asgStmt->fetch();
+
+        // Incidentes asociados
+        $incStmt = $db->prepare("SELECT COUNT(DISTINCT i.id) as total FROM incidentes i
+            JOIN asignaciones a ON a.vehiculo_id=i.vehiculo_id AND a.operador_id=?
+            AND i.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))");
+        $incStmt->execute([$opId]);
+        $incidentes = (int)$incStmt->fetchColumn();
+
+        // Infracciones
+        $infStmt = $db->prepare("SELECT COUNT(*) as total, COALESCE(SUM(monto),0) as monto_total FROM operador_infracciones WHERE operador_id=?");
+        $infStmt->execute([$opId]);
+        $infracciones = $infStmt->fetch();
+
+        // Capacitaciones
+        $capStmt = $db->prepare("SELECT COUNT(*) as total, COALESCE(SUM(horas),0) as horas_total FROM operador_capacitaciones WHERE operador_id=?");
+        $capStmt->execute([$opId]);
+        $capacitaciones = $capStmt->fetch();
+
+        // Eficiencia combustible promedio
+        $fuelStmt = $db->prepare("SELECT AVG(c.km/NULLIF(c.litros,0)) as avg_kml FROM combustible c
+            JOIN asignaciones a ON a.vehiculo_id=c.vehiculo_id AND a.operador_id=?
+            AND c.fecha BETWEEN DATE(a.start_at) AND DATE(COALESCE(a.end_at, NOW()))
+            WHERE c.litros > 0 AND c.km > 0");
+        $fuelStmt->execute([$opId]);
+        $avgKml = $fuelStmt->fetchColumn();
+
+        // Días activo
+        $diasActivo = 0;
+        if ($asg['primera_asig']) {
+            $diasActivo = (int)((strtotime($asg['ultima_asig']) - strtotime($asg['primera_asig'])) / 86400);
+        }
+
+        echo json_encode([
+            'total_asignaciones' => (int)$asg['total'],
+            'km_recorridos' => round((float)$asg['km_total'], 1),
+            'incidentes' => $incidentes,
+            'infracciones' => (int)$infracciones['total'],
+            'infracciones_monto' => round((float)$infracciones['monto_total'], 2),
+            'capacitaciones' => (int)$capacitaciones['total'],
+            'horas_capacitacion' => round((float)$capacitaciones['horas_total'], 1),
+            'eficiencia_kml' => $avgKml ? round((float)$avgKml, 2) : null,
+            'dias_activo' => $diasActivo,
+            'km_por_dia' => $diasActivo > 0 ? round((float)$asg['km_total'] / $diasActivo, 1) : 0,
+        ]);
+        exit;
+    }
+
     switch ($method) {
         case 'GET':
             if (($_GET['action'] ?? '') === 'history') {

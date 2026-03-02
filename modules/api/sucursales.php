@@ -12,6 +12,57 @@ $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
 
 try {
+    $action = $_GET['action'] ?? '';
+
+    // ──── Dashboard comparativo entre sucursales ────
+    if ($action === 'dashboard') {
+        // Vehículos por sucursal
+        $veh = $db->query("SELECT s.id, s.nombre, COUNT(v.id) AS vehiculos
+            FROM sucursales s LEFT JOIN vehiculos v ON v.sucursal_id=s.id
+            WHERE s.activo=1 GROUP BY s.id ORDER BY s.nombre")->fetchAll();
+
+        // Operadores por sucursal
+        $ops = $db->query("SELECT s.id, s.nombre, COUNT(o.id) AS operadores
+            FROM sucursales s LEFT JOIN operadores o ON o.sucursal_id=s.id AND o.deleted_at IS NULL
+            WHERE s.activo=1 GROUP BY s.id ORDER BY s.nombre")->fetchAll();
+
+        // Gasto mantenimiento por sucursal (últimos 12 meses)
+        $mant = $db->query("SELECT s.id, s.nombre,
+            COALESCE(SUM(m.costo_total),0) AS gasto_mantenimiento,
+            COUNT(m.id) AS ordenes
+            FROM sucursales s
+            LEFT JOIN vehiculos v ON v.sucursal_id=s.id
+            LEFT JOIN mantenimientos m ON m.vehiculo_id=v.id AND m.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            WHERE s.activo=1 GROUP BY s.id ORDER BY s.nombre")->fetchAll();
+
+        // Gasto combustible por sucursal (últimos 12 meses)
+        $fuel = $db->query("SELECT s.id, s.nombre,
+            COALESCE(SUM(c.total),0) AS gasto_combustible,
+            COALESCE(SUM(c.litros),0) AS litros
+            FROM sucursales s
+            LEFT JOIN vehiculos v ON v.sucursal_id=s.id
+            LEFT JOIN combustible c ON c.vehiculo_id=v.id AND c.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            WHERE s.activo=1 GROUP BY s.id ORDER BY s.nombre")->fetchAll();
+
+        // Incidentes por sucursal (últimos 12 meses)
+        $inc = $db->query("SELECT s.id, s.nombre,
+            COUNT(i.id) AS incidentes,
+            SUM(CASE WHEN i.estado='Abierto' THEN 1 ELSE 0 END) AS abiertos
+            FROM sucursales s
+            LEFT JOIN vehiculos v ON v.sucursal_id=s.id
+            LEFT JOIN incidentes i ON i.vehiculo_id=v.id AND i.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            WHERE s.activo=1 GROUP BY s.id ORDER BY s.nombre")->fetchAll();
+
+        echo json_encode([
+            'vehiculos' => $veh,
+            'operadores' => $ops,
+            'mantenimiento' => $mant,
+            'combustible' => $fuel,
+            'incidentes' => $inc,
+        ]);
+        exit;
+    }
+
     switch ($method) {
         case 'GET':
             $q = '%' . trim($_GET['q'] ?? '') . '%';

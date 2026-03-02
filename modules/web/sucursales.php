@@ -6,6 +6,7 @@ ob_start();
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="sq" placeholder="Buscar sucursal..." oninput="loadSuc()"></div>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNueva()">+ Nueva Sucursal</button><?php endif; ?>
+  <button class="btn btn-ghost" onclick="verDashboard()">📊 Dashboard Comparativo</button>
 </div>
 <div class="table-wrap">
   <table><thead><tr><th>Nombre</th><th>Ciudad</th><th>Dirección</th><th>Teléfono</th><th>Responsable</th><th>Estado</th><th>Vehículos</th><th>Operadores</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
@@ -67,6 +68,72 @@ function abrirNueva(){document.getElementById('msuc-title').textContent='🏢 Nu
 function editarSuc(r){document.getElementById('msuc-title').textContent='✏️ Editar Sucursal';fillForm('msuc',{id:r.id,nombre:r.nombre,ciudad:r.ciudad||'',direccion:r.direccion||'',telefono:r.telefono||'',responsable:r.responsable||'',activo:r.activo});openModal('msuc');}
 async function guardarSuc(){const d=getForm('msuc');if(!d.nombre){toast('Nombre es obligatorio','error');return;}await api('/api/sucursales.php',d.id?'PUT':'POST',d);toast(d.id?'Actualizada':'Sucursal creada');closeModal('msuc');loadSuc();}
 async function delSuc(id){confirmDelete('¿Eliminar esta sucursal?',async()=>{await api(`/api/sucursales.php?id=${id}`,'DELETE');toast('Eliminada','warning');loadSuc();});}
+
+/* ════════════════ DASHBOARD COMPARATIVO ════════════════ */
+let dashCharts = [];
+async function verDashboard() {
+  const d = await api('/api/sucursales.php?action=dashboard');
+  // destroy previous charts
+  dashCharts.forEach(c => c.destroy()); dashCharts = [];
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg open';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:1100px">
+      <div class="modal-title">📊 Dashboard Comparativo de Sucursales (últimos 12 meses)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-height:70vh;overflow:auto">
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:12px"><canvas id="chVeh"></canvas></div>
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:12px"><canvas id="chMant"></canvas></div>
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:12px"><canvas id="chFuel"></canvas></div>
+        <div style="background:rgba(0,0,0,.2);border-radius:8px;padding:12px"><canvas id="chInc"></canvas></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="dashCharts.forEach(c=>c.destroy());dashCharts=[];this.closest('.modal-bg').remove()">Cerrar</button></div>
+    </div>`;
+  wrap.addEventListener('click',(e)=>{if(e.target===wrap){dashCharts.forEach(c=>c.destroy());dashCharts=[];wrap.remove();}});
+  document.body.appendChild(wrap);
+
+  const colors = ['#e8ff47','#4f46e5','#22d3ee','#f97316','#ef4444','#22c55e','#a855f7','#ec4899'];
+  const chartOpts = (title) => ({ responsive:true, plugins:{legend:{display:false},title:{display:true,text:title,color:'#fff',font:{size:14}}} });
+
+  // Vehículos + Operadores
+  const labels1 = d.vehiculos.map(r=>r.nombre);
+  dashCharts.push(new Chart(wrap.querySelector('#chVeh'), {
+    type:'bar', data:{
+      labels: labels1,
+      datasets:[
+        {label:'Vehículos',data:d.vehiculos.map(r=>r.vehiculos),backgroundColor:'#e8ff47'},
+        {label:'Operadores',data:d.operadores.map(r=>r.operadores),backgroundColor:'#4f46e5'}
+      ]
+    }, options:{...chartOpts('Vehículos y Operadores'),plugins:{...chartOpts('').plugins,legend:{display:true,labels:{color:'#ccc'}}}}
+  }));
+
+  // Gasto Mantenimiento
+  dashCharts.push(new Chart(wrap.querySelector('#chMant'), {
+    type:'bar', data:{
+      labels: d.mantenimiento.map(r=>r.nombre),
+      datasets:[{label:'Gasto Mant. $',data:d.mantenimiento.map(r=>Number(r.gasto_mantenimiento)),backgroundColor:'#f97316'}]
+    }, options:chartOpts('Gasto Mantenimiento')
+  }));
+
+  // Gasto Combustible
+  dashCharts.push(new Chart(wrap.querySelector('#chFuel'), {
+    type:'bar', data:{
+      labels: d.combustible.map(r=>r.nombre),
+      datasets:[{label:'Gasto Comb. $',data:d.combustible.map(r=>Number(r.gasto_combustible)),backgroundColor:'#22d3ee'}]
+    }, options:chartOpts('Gasto Combustible')
+  }));
+
+  // Incidentes
+  dashCharts.push(new Chart(wrap.querySelector('#chInc'), {
+    type:'bar', data:{
+      labels: d.incidentes.map(r=>r.nombre),
+      datasets:[
+        {label:'Total',data:d.incidentes.map(r=>r.incidentes),backgroundColor:'#ef4444'},
+        {label:'Abiertos',data:d.incidentes.map(r=>r.abiertos),backgroundColor:'#f97316'}
+      ]
+    }, options:{...chartOpts('Incidentes'),plugins:{...chartOpts('').plugins,legend:{display:true,labels:{color:'#ccc'}}}}
+  }));
+}
 document.addEventListener('DOMContentLoaded', loadSuc);
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Sucursales', 'sucursales', $content); ?>

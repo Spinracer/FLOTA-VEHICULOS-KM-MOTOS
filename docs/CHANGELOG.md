@@ -1,5 +1,34 @@
 # FlotaControl — Changelog
 
+## [3.5.0] — 2026-03-02
+
+### Nuevas Funcionalidades — Objetivo 5: Operadores + Componentes + Proveedores + Sucursales
+
+- **Capacitaciones de operadores**: Registro completo con tipo (Interna/Externa/Online), horas, vencimiento. CRUD completo.
+- **Infracciones de operadores**: Multas, accidentes, violaciones. Monto, estado (Pendiente/Pagada/Contestada), referencia.
+- **KPIs de desempeño**: 10 métricas por operador (asignaciones, km, incidentes, infracciones, capacitaciones, eficiencia km/L, días activo).
+- **Inventario con movimientos**: Entradas, salidas, transferencias, ajustes. Stock consolidado auto-actualizado.
+- **Stock mínimo y alertas**: Columna stock_minimo en catálogo. Badge visual con alertas de nivel bajo.
+- **Alertas vencimiento componentes**: Detección automática de componentes por vencer (30/60 días). Badge en toolbar.
+- **Evaluaciones de proveedores**: 4 dimensiones (calidad, puntualidad, precio, servicio) escala 1-5. Promedio auto-calculado.
+- **Ranking de proveedores**: Tabla ordenada por promedio de evaluaciones.
+- **Contratos de proveedores**: Registro con tipo, monto, fechas, estado. CRUD completo.
+- **Dashboard comparativo de sucursales**: 4 gráficos Chart.js (vehículos/operadores, gasto mantenimiento, gasto combustible, incidentes).
+
+### Migraciones
+- **install.php §3.16**: 5 tablas (operador_capacitaciones, operador_infracciones, componente_movimientos, proveedor_evaluaciones, proveedor_contratos). 2 columnas (components.stock, components.stock_minimo).
+
+### API
+- `operadores.php`: +3 endpoints (capacitaciones, infracciones, kpis)
+- `componentes.php`: +2 secciones (movimientos, alertas_vencimiento)
+- `proveedores.php`: +4 endpoints (evaluaciones, contratos, ranking)
+- `sucursales.php`: +1 endpoint (dashboard)
+
+### Documentación
+- `docs/OBJ5_OPERADORES_COMPONENTES_PROVEEDORES_SUCURSALES.md`
+
+---
+
 ## [3.4.0] — 2026-03-02
 
 ### Nuevas Funcionalidades — Objetivo 4: Mejoras Combustible + Incidentes

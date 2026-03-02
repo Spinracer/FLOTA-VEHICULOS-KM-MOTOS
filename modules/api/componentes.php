@@ -20,8 +20,65 @@ header('Content-Type: application/json');
 $method  = $_SERVER['REQUEST_METHOD'];
 $section = trim($_GET['section'] ?? 'catalog');
 $db      = getDB();
+$user    = current_user();
 
 try {
+    // ───────────────────── MOVIMIENTOS DE INVENTARIO ─────────────────────
+    if ($section === 'movimientos') {
+        if ($method === 'GET') {
+            $compId = (int)($_GET['component_id'] ?? 0);
+            $where = "WHERE 1=1";
+            $params = [];
+            if ($compId > 0) { $where .= " AND m.component_id=?"; $params[] = $compId; }
+            $vehId = (int)($_GET['vehiculo_id'] ?? 0);
+            if ($vehId > 0) { $where .= " AND m.vehiculo_id=?"; $params[] = $vehId; }
+            $page = max(1,(int)($_GET['page']??1)); $per = min(100,max(5,(int)($_GET['per']??50))); $off = ($page-1)*$per;
+            $total = $db->prepare("SELECT COUNT(*) FROM componente_movimientos m $where");
+            $total->execute($params);
+            $stmt = $db->prepare("SELECT m.*, c.nombre AS comp_nombre, v.placa, u.nombre AS usuario_nombre
+                FROM componente_movimientos m
+                JOIN components c ON c.id=m.component_id
+                LEFT JOIN vehiculos v ON v.id=m.vehiculo_id
+                LEFT JOIN usuarios u ON u.id=m.usuario_id
+                $where ORDER BY m.created_at DESC LIMIT ? OFFSET ?");
+            $stmt->execute(array_merge($params, [$per, $off]));
+            echo json_encode(['total'=>(int)$total->fetchColumn(),'rows'=>$stmt->fetchAll()]);
+        } elseif ($method === 'POST') {
+            if (!can('create')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            if (empty($d['component_id']) || empty($d['tipo'])) {
+                http_response_code(422); echo json_encode(['error'=>'component_id y tipo son obligatorios']); exit;
+            }
+            $db->beginTransaction();
+            $db->prepare("INSERT INTO componente_movimientos (component_id,vehiculo_id,tipo,cantidad,referencia,notas,usuario_id) VALUES (?,?,?,?,?,?,?)")
+               ->execute([(int)$d['component_id'],$d['vehiculo_id']?:null,$d['tipo'],(int)($d['cantidad']??1),$d['referencia']??null,$d['notas']??null,$user['id']??null]);
+            $newId = (int)$db->lastInsertId();
+            // Actualizar stock consolidado
+            $delta = (int)($d['cantidad'] ?? 1);
+            if (in_array($d['tipo'], ['Salida'])) $delta = -$delta;
+            $db->prepare("UPDATE components SET stock = stock + ? WHERE id = ?")->execute([$delta, (int)$d['component_id']]);
+            $db->commit();
+            audit_log('componente_movimientos','create',$newId,[],$d);
+            echo json_encode(['id'=>$newId,'ok'=>true]);
+        }
+        exit;
+    }
+
+    // ───────────────────── ALERTAS DE VENCIMIENTO ─────────────────────
+    if ($section === 'alertas_vencimiento') {
+        $dias = (int)($_GET['dias'] ?? 30);
+        $stmt = $db->prepare("SELECT vc.*, c.nombre AS comp_nombre, c.tipo AS comp_tipo, v.placa, v.marca,
+            DATEDIFF(vc.fecha_vencimiento, CURDATE()) AS dias_restantes
+            FROM vehicle_components vc
+            JOIN components c ON c.id=vc.component_id
+            JOIN vehiculos v ON v.id=vc.vehiculo_id
+            WHERE vc.fecha_vencimiento IS NOT NULL AND vc.fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+            ORDER BY vc.fecha_vencimiento ASC");
+        $stmt->execute([$dias]);
+        echo json_encode(['rows'=>$stmt->fetchAll()]);
+        exit;
+    }
+
     // ───────────────────── CATÁLOGO MAESTRO ─────────────────────
     if ($section === 'catalog') {
         switch ($method) {
@@ -80,8 +137,8 @@ try {
                 $prev->execute([(int)$d['id']]);
                 $prevData = $prev->fetch() ?: [];
 
-                $db->prepare("UPDATE components SET nombre = ?, tipo = ?, descripcion = ? WHERE id = ?")
-                   ->execute([$d['nombre'], $d['tipo'] ?? 'tool', $d['descripcion'] ?? null, (int)$d['id']]);
+                $db->prepare("UPDATE components SET nombre = ?, tipo = ?, descripcion = ?, stock_minimo = ? WHERE id = ?")
+                   ->execute([$d['nombre'], $d['tipo'] ?? 'tool', $d['descripcion'] ?? null, (int)($d['stock_minimo'] ?? 0), (int)$d['id']]);
                 audit_log('components', 'update', (int)$d['id'], $prevData, $d);
                 echo json_encode(['ok' => true]);
                 break;

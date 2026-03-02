@@ -18,6 +18,8 @@ ob_start();
   <div style="display:flex;gap:8px;margin-left:auto">
     <button class="btn btn-ghost tab-btn active" id="tabCatalog" onclick="switchTab('catalog')">📦 Catálogo</button>
     <button class="btn btn-ghost tab-btn" id="tabVehicle" onclick="switchTab('vehicle')">🚗 Por Vehículo</button>
+    <button class="btn btn-ghost" onclick="verMovimientos()">📦 Movimientos</button>
+    <button class="btn btn-ghost" onclick="verAlertasVenc()">⏰ Vencimientos <span class="badge badge-red" id="badgeVenc" style="display:none">0</span></button>
   </div>
 </div>
 
@@ -28,7 +30,7 @@ ob_start();
     <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevoCatalogo()">+ Nuevo Componente</button><?php endif; ?>
   </div>
   <div class="table-wrap">
-    <table><thead><tr><th>Nombre</th><th>Tipo</th><th>Descripción</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
+    <table><thead><tr><th>Nombre</th><th>Tipo</th><th>Descripción</th><th>Stock</th><th>Mín.</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
     <tbody id="tbodyCatalog"></tbody></table>
     <div id="pgrCatalog"></div>
   </div>
@@ -80,6 +82,7 @@ ob_start();
         </select>
       </div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Descripción del componente..."></textarea></div>
+      <div class="form-group"><label>Stock mínimo</label><input name="stock_minimo" type="number" min="0" value="0"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modalCatalog')">Cancelar</button>
@@ -151,19 +154,24 @@ async function loadCatalog() {
   pagerCat.setTotal(data.total);
   const tbody = document.getElementById('tbodyCatalog');
   if (!data.rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Sin componentes</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">📦</div><div class="empty-title">Sin componentes</div></div></td></tr>';
     return;
   }
-  tbody.innerHTML = data.rows.map(r => `<tr>
+  tbody.innerHTML = data.rows.map(r => {
+    const stk = parseInt(r.stock||0), min = parseInt(r.stock_minimo||0);
+    const stkClass = stk <= 0 ? 'badge-red' : stk <= min ? 'badge-orange' : 'badge-green';
+    return `<tr>
     <td><strong>${r.nombre}</strong></td>
     <td><span class="badge ${TIPO_BADGE[r.tipo]||'badge-gray'}">${TIPO_LABELS[r.tipo]||r.tipo}</span></td>
     <td class="td-truncate">${r.descripcion||'—'}</td>
+    <td><span class="badge ${stkClass}">${stk}</span></td>
+    <td>${min}</td>
     <td><span class="badge ${r.activo==='1'?'badge-green':'badge-red'}">${r.activo==='1'?'Activo':'Inactivo'}</span></td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       <button class="btn btn-ghost btn-sm" onclick='editarCatalogo(${JSON.stringify(r)})'>✏️</button>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delCatalogo(${r.id})">🗑️</button><?php endif; ?>
     </div></td><?php endif; ?>
-  </tr>`).join('');
+  </tr>`}).join('');
 }
 
 function abrirNuevoCatalogo() {
@@ -174,7 +182,7 @@ function abrirNuevoCatalogo() {
 
 function editarCatalogo(r) {
   document.getElementById('mtitleCat').textContent = '✏️ Editar Componente';
-  fillForm('modalCatalog', {id: r.id, nombre: r.nombre, tipo: r.tipo, descripcion: r.descripcion});
+  fillForm('modalCatalog', {id: r.id, nombre: r.nombre, tipo: r.tipo, descripcion: r.descripcion, stock_minimo: r.stock_minimo||0});
   openModal('modalCatalog');
 }
 
@@ -311,6 +319,103 @@ document.addEventListener('DOMContentLoaded', () => {
   loadVehicleSelect();
   loadComponentSelect();
   loadCatalog();
+  checkVencimientos();
 });
+
+/* ════════════════ MOVIMIENTOS ════════════════ */
+async function verMovimientos() {
+  const data = await api('/api/componentes.php?section=movimientos&per=100');
+  const TB2 = {Entrada:'badge-green',Salida:'badge-red',Transferencia:'badge-blue',Ajuste:'badge-orange'};
+  const rows = data.rows.map(r => `<tr>
+    <td>${r.created_at}</td><td>${r.comp_nombre}</td>
+    <td><span class="badge ${TB2[r.tipo]||'badge-gray'}">${r.tipo}</span></td>
+    <td>${r.cantidad}</td><td>${r.placa||'—'}</td>
+    <td>${r.referencia||'—'}</td><td>${r.usuario_nombre||'—'}</td>
+    <td class="td-truncate">${r.notas||'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="8"><div class="empty"><div class="empty-title">Sin movimientos</div></div></td></tr>';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg open';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:1000px">
+      <div class="modal-title">📦 Movimientos de Inventario</div>
+      <div style="max-height:40vh;overflow:auto">
+        <table><thead><tr><th>Fecha</th><th>Componente</th><th>Tipo</th><th>Cant.</th><th>Vehículo</th><th>Referencia</th><th>Usuario</th><th>Notas</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+      <?php if(can('create')): ?>
+      <h4 style="margin:12px 0 6px;color:var(--accent)">Registrar Movimiento</h4>
+      <div class="form-grid" id="movForm">
+        <div class="form-group"><label>Componente *</label><select id="mov_comp">${'<option value="">—</option>'}</select></div>
+        <div class="form-group"><label>Tipo *</label><select id="mov_tipo"><option>Entrada</option><option>Salida</option><option>Transferencia</option><option>Ajuste</option></select></div>
+        <div class="form-group"><label>Cantidad</label><input type="number" id="mov_cant" min="1" value="1"></div>
+        <div class="form-group"><label>Vehículo</label><select id="mov_veh"><option value="">— Ninguno —</option></select></div>
+        <div class="form-group"><label>Referencia</label><input id="mov_ref" placeholder="OT, factura..."></div>
+        <div class="form-group"><label>Notas</label><input id="mov_notas" placeholder="Observaciones"></div>
+        <div class="form-group"><button class="btn btn-primary btn-sm" onclick="addMovimiento()">+ Registrar</button></div>
+      </div>
+      <?php endif; ?>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest('.modal-bg').remove()">Cerrar</button></div>
+    </div>`;
+  wrap.addEventListener('click',(e)=>{if(e.target===wrap)wrap.remove();});
+  document.body.appendChild(wrap);
+  // Fill selects
+  const compSel = wrap.querySelector('#mov_comp');
+  const vehSel = wrap.querySelector('#mov_veh');
+  if (compSel) {
+    const cdata = await api('/api/componentes.php?section=catalog&per=500');
+    cdata.rows.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre; compSel.appendChild(o); });
+  }
+  if (vehSel) {
+    const vdata = await api('/api/vehiculos.php?per=500');
+    vdata.rows.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.textContent = `${v.placa} — ${v.marca}`; vehSel.appendChild(o); });
+  }
+}
+async function addMovimiento() {
+  const d = { component_id: document.getElementById('mov_comp').value, tipo: document.getElementById('mov_tipo').value, cantidad: document.getElementById('mov_cant').value, vehiculo_id: document.getElementById('mov_veh').value || null, referencia: document.getElementById('mov_ref').value || null, notas: document.getElementById('mov_notas').value || null };
+  if (!d.component_id) { toast('Selecciona un componente','error'); return; }
+  await api('/api/componentes.php?section=movimientos', 'POST', d);
+  toast('Movimiento registrado');
+  document.querySelector('.modal-bg.open')?.remove();
+  loadCatalog();
+}
+
+/* ════════════════ ALERTAS VENCIMIENTO ════════════════ */
+async function checkVencimientos() {
+  try {
+    const data = await api('/api/componentes.php?section=alertas_vencimiento&dias=30');
+    const badge = document.getElementById('badgeVenc');
+    if (data.rows.length > 0) { badge.textContent = data.rows.length; badge.style.display = ''; }
+  } catch(e){}
+}
+async function verAlertasVenc() {
+  const data = await api('/api/componentes.php?section=alertas_vencimiento&dias=60');
+  const rows = data.rows.map(r => {
+    const d = parseInt(r.dias_restantes);
+    const cls = d < 0 ? 'badge-red' : d <= 15 ? 'badge-orange' : 'badge-yellow';
+    const lbl = d < 0 ? 'Vencido' : d + 'd';
+    return `<tr>
+      <td>${r.placa} ${r.marca}</td><td>${r.comp_nombre}</td>
+      <td><span class="badge ${TIPO_BADGE[r.comp_tipo]||'badge-gray'}">${TIPO_LABELS[r.comp_tipo]||r.comp_tipo}</span></td>
+      <td>${r.fecha_vencimiento}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td>${r.estado}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6"><div class="empty"><div class="empty-title">Sin vencimientos próximos</div></div></td></tr>';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg open';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:850px">
+      <div class="modal-title">⏰ Alertas de Vencimiento (próximos 60 días)</div>
+      <div style="max-height:60vh;overflow:auto">
+        <table><thead><tr><th>Vehículo</th><th>Componente</th><th>Tipo</th><th>Vencimiento</th><th>Días</th><th>Estado</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest('.modal-bg').remove()">Cerrar</button></div>
+    </div>`;
+  wrap.addEventListener('click',(e)=>{if(e.target===wrap)wrap.remove();});
+  document.body.appendChild(wrap);
+}
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Componentes / Inventario', 'componentes', $content); ?>

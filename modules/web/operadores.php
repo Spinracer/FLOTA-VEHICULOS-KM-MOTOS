@@ -29,6 +29,56 @@ ob_start();
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
 </div>
+
+<!-- ═══════════ MODAL CAPACITACIONES ═══════════ -->
+<div class="modal-bg" id="modalCap">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-title" id="capTitle">📜 Capacitaciones</div>
+    <div style="max-height:60vh;overflow:auto">
+      <table><thead><tr><th>Fecha</th><th>Título</th><th>Tipo</th><th>Horas</th><th>Vencimiento</th><th>Descripción</th><th></th></tr></thead>
+      <tbody id="capBody"></tbody></table>
+    </div>
+    <?php if(can('create')): ?>
+    <form id="capForm" onsubmit="event.preventDefault();addCap()" style="margin-top:12px">
+      <div class="form-grid">
+        <div class="form-group"><label>Título *</label><input name="cap_titulo" id="cap_titulo" placeholder="Curso de manejo defensivo" required></div>
+        <div class="form-group"><label>Tipo</label><select name="cap_tipo" id="cap_tipo"><option>Interna</option><option>Externa</option><option>Online</option></select></div>
+        <div class="form-group"><label>Fecha *</label><input type="date" name="cap_fecha" id="cap_fecha" required></div>
+        <div class="form-group"><label>Horas</label><input type="number" step="0.5" name="cap_horas" id="cap_horas" value="0"></div>
+        <div class="form-group"><label>Vencimiento</label><input type="date" name="cap_venc" id="cap_venc"></div>
+        <div class="form-group"><label>Descripción</label><input name="cap_desc" id="cap_desc" placeholder="Detalles..."></div>
+        <div class="form-group"><button type="submit" class="btn btn-primary btn-sm">+ Agregar</button></div>
+      </div>
+    </form>
+    <?php endif; ?>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modalCap')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL INFRACCIONES ═══════════ -->
+<div class="modal-bg" id="modalInf">
+  <div class="modal" style="max-width:900px">
+    <div class="modal-title" id="infTitle">⚠️ Infracciones</div>
+    <div style="max-height:60vh;overflow:auto">
+      <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Estado</th><th>Referencia</th><th></th></tr></thead>
+      <tbody id="infBody"></tbody></table>
+    </div>
+    <?php if(can('create')): ?>
+    <form id="infForm" onsubmit="event.preventDefault();addInf()" style="margin-top:12px">
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha *</label><input type="date" name="inf_fecha" id="inf_fecha" required></div>
+        <div class="form-group"><label>Tipo</label><select name="inf_tipo" id="inf_tipo"><option>Multa</option><option>Accidente</option><option>Violación</option><option>Otro</option></select></div>
+        <div class="form-group"><label>Monto $</label><input type="number" step="0.01" name="inf_monto" id="inf_monto" value="0"></div>
+        <div class="form-group"><label>Referencia</label><input name="inf_ref" id="inf_ref" placeholder="Folio / boleta"></div>
+        <div class="form-group full"><label>Descripción</label><input name="inf_desc" id="inf_desc" placeholder="Detalle de la infracción..."></div>
+        <div class="form-group"><button type="submit" class="btn btn-primary btn-sm">+ Agregar</button></div>
+      </div>
+    </form>
+    <?php endif; ?>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modalInf')">Cerrar</button></div>
+  </div>
+</div>
+
 <script>
 const pager=new Paginator('pgr',load,25);
 const EB={'Activo':'badge-green','Inactivo':'badge-gray','Suspendido':'badge-red'};
@@ -52,6 +102,9 @@ async function load(){
       <td><span class="badge ${lb}">${r.venc_licencia||lt}</span></td>
       <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
       <?php if(can('edit')): ?><td><div class="action-btns">
+        <button class="btn btn-ghost btn-sm" onclick="verKPIs(${r.id},'${r.nombre.replace(/'/g,"\\'")}')">📊</button>
+        <button class="btn btn-ghost btn-sm" onclick="verCapacitaciones(${r.id},'${r.nombre.replace(/'/g,"\\'")}')">📜</button>
+        <button class="btn btn-ghost btn-sm" onclick="verInfracciones(${r.id},'${r.nombre.replace(/'/g,"\\'")}')">⚠️</button>
         <button class="btn btn-ghost btn-sm" onclick="verHistorial(${r.id})">📚</button>
         <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
         <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="del(${r.id})">🗑️</button><?php endif; ?>
@@ -99,5 +152,101 @@ async function verHistorial(id){
   document.body.appendChild(wrap);
 }
 document.addEventListener('DOMContentLoaded',load);
+
+/* ════════════════ CAPACITACIONES ════════════════ */
+let capOpId = 0, capOpName = '';
+async function verCapacitaciones(id, nombre) {
+  capOpId = id; capOpName = nombre;
+  document.getElementById('capTitle').textContent = `📜 Capacitaciones — ${nombre}`;
+  await loadCapacitaciones();
+  openModal('modalCap');
+}
+async function loadCapacitaciones() {
+  const data = await api(`/api/operadores.php?action=capacitaciones&operador_id=${capOpId}`);
+  const tbody = document.getElementById('capBody');
+  if (!data.rows.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-title">Sin capacitaciones registradas</div></div></td></tr>'; return; }
+  tbody.innerHTML = data.rows.map(r => `<tr>
+    <td>${r.fecha}</td><td>${r.titulo}</td>
+    <td><span class="badge ${{'Interna':'badge-blue','Externa':'badge-green','Online':'badge-cyan'}[r.tipo]||'badge-gray'}">${r.tipo}</span></td>
+    <td>${Number(r.horas).toFixed(1)}h</td>
+    <td>${r.vencimiento||'—'}</td>
+    <td class="td-truncate">${r.descripcion||'—'}</td>
+    <td><?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delCap(${r.id})">🗑️</button><?php endif; ?></td>
+  </tr>`).join('');
+}
+async function addCap() {
+  const f = document.getElementById('capForm');
+  const d = { operador_id: capOpId, titulo: f.cap_titulo.value, tipo: f.cap_tipo.value, horas: f.cap_horas.value, fecha: f.cap_fecha.value, descripcion: f.cap_desc.value, vencimiento: f.cap_venc.value || null };
+  if (!d.titulo || !d.fecha) { toast('Título y fecha son obligatorios','error'); return; }
+  await api('/api/operadores.php?action=capacitaciones', 'POST', d);
+  toast('Capacitación registrada'); f.reset(); loadCapacitaciones();
+}
+async function delCap(id) { confirmDelete('¿Eliminar?',async()=>{ await api(`/api/operadores.php?action=capacitaciones&id=${id}`,'DELETE'); toast('Eliminada','warning'); loadCapacitaciones(); }); }
+
+/* ════════════════ INFRACCIONES ════════════════ */
+let infOpId = 0, infOpName = '';
+async function verInfracciones(id, nombre) {
+  infOpId = id; infOpName = nombre;
+  document.getElementById('infTitle').textContent = `⚠️ Infracciones — ${nombre}`;
+  await loadInfracciones();
+  openModal('modalInf');
+}
+async function loadInfracciones() {
+  const data = await api(`/api/operadores.php?action=infracciones&operador_id=${infOpId}`);
+  const tbody = document.getElementById('infBody');
+  if (!data.rows.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-title">Sin infracciones registradas</div></div></td></tr>'; return; }
+  const EB2={'Pendiente':'badge-orange','Pagada':'badge-green','Contestada':'badge-blue'};
+  tbody.innerHTML = data.rows.map(r => `<tr>
+    <td>${r.fecha}</td>
+    <td><span class="badge ${{Multa:'badge-orange',Accidente:'badge-red','Violación':'badge-red',Otro:'badge-gray'}[r.tipo]||'badge-gray'}">${r.tipo}</span></td>
+    <td class="td-truncate">${r.descripcion||'—'}</td>
+    <td>$${Number(r.monto).toFixed(2)}</td>
+    <td><span class="badge ${EB2[r.estado]||'badge-gray'}">${r.estado}</span></td>
+    <td>${r.referencia||'—'}</td>
+    <td><div class="action-btns">
+      <?php if(can('edit')): ?><select onchange="cambiarEstInf(${r.id},this.value)" style="font-size:11px;padding:2px 4px">
+        <option ${r.estado==='Pendiente'?'selected':''}>Pendiente</option>
+        <option ${r.estado==='Pagada'?'selected':''}>Pagada</option>
+        <option ${r.estado==='Contestada'?'selected':''}>Contestada</option>
+      </select><?php endif; ?>
+      <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delInf(${r.id})">🗑️</button><?php endif; ?>
+    </div></td>
+  </tr>`).join('');
+}
+async function addInf() {
+  const f = document.getElementById('infForm');
+  const d = { operador_id: infOpId, fecha: f.inf_fecha.value, tipo: f.inf_tipo.value, descripcion: f.inf_desc.value, monto: f.inf_monto.value || 0, referencia: f.inf_ref.value || null };
+  if (!d.fecha) { toast('La fecha es obligatoria','error'); return; }
+  await api('/api/operadores.php?action=infracciones', 'POST', d);
+  toast('Infracción registrada'); f.reset(); loadInfracciones();
+}
+async function cambiarEstInf(id, estado) { await api('/api/operadores.php?action=infracciones', 'PUT', {id, estado}); toast('Estado actualizado'); loadInfracciones(); }
+async function delInf(id) { confirmDelete('¿Eliminar?',async()=>{ await api(`/api/operadores.php?action=infracciones&id=${id}`,'DELETE'); toast('Eliminada','warning'); loadInfracciones(); }); }
+
+/* ════════════════ KPIs ════════════════ */
+async function verKPIs(id, nombre) {
+  const k = await api(`/api/operadores.php?action=kpis&id=${id}`);
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-bg open';
+  wrap.innerHTML = `
+    <div class="modal" style="max-width:680px">
+      <div class="modal-title">📊 KPIs de Desempeño — ${nombre}</div>
+      <div class="kpi-row" style="flex-wrap:wrap;gap:12px">
+        <div class="kpi-card"><div class="kpi-value">${k.total_asignaciones}</div><div class="kpi-label">Asignaciones</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.km_recorridos.toLocaleString()}</div><div class="kpi-label">km Recorridos</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.dias_activo}</div><div class="kpi-label">Días Activo</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.km_por_dia}</div><div class="kpi-label">km/día</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.eficiencia_kml!==null?k.eficiencia_kml:'—'}</div><div class="kpi-label">km/L Prom.</div></div>
+        <div class="kpi-card"><div class="kpi-value" style="color:${k.incidentes>3?'#ff4757':'inherit'}">${k.incidentes}</div><div class="kpi-label">Incidentes</div></div>
+        <div class="kpi-card"><div class="kpi-value" style="color:${k.infracciones>2?'#ff4757':'inherit'}">${k.infracciones}</div><div class="kpi-label">Infracciones</div></div>
+        <div class="kpi-card"><div class="kpi-value">$${k.infracciones_monto.toLocaleString()}</div><div class="kpi-label">Monto Infracciones</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.capacitaciones}</div><div class="kpi-label">Capacitaciones</div></div>
+        <div class="kpi-card"><div class="kpi-value">${k.horas_capacitacion}h</div><div class="kpi-label">Horas Formación</div></div>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="this.closest('.modal-bg').remove()">Cerrar</button></div>
+    </div>`;
+  wrap.addEventListener('click',(e)=>{if(e.target===wrap)wrap.remove();});
+  document.body.appendChild(wrap);
+}
 </script>
 <?php $content=ob_get_clean(); echo render_layout('Operadores','operadores',$content); ?>

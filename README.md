@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.4.0** — Última actualización: 2026-03-02
+> **v3.5.0** — Última actualización: 2026-03-02
 
 ---
 
@@ -29,6 +29,12 @@
 - **Adjuntos en incidentes**: AttachmentWidget integrado
 - **Dashboard de seguridad**: KPIs, gráficos y top vehículos
 - **Seguimiento de incidentes**: Log de estados y notas
+- **Capacitaciones e infracciones**: Historial completo por operador
+- **KPIs de operadores**: 10 métricas de desempeño individual
+- **Inventario con movimientos**: Stock consolidado con entradas/salidas
+- **Evaluación de proveedores**: Ranking 4 dimensiones con estrellas
+- **Contratos de proveedores**: Registro con estado y montos
+- **Dashboard comparativo sucursales**: 4 gráficos Chart.js
 
 ---
 

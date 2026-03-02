@@ -1107,6 +1107,131 @@ try {
   } else { step('Incidentes extra: prioridad', true, 'Ya existe'); }
 } catch (Throwable $e) { step('Incidentes extra: prioridad', false, $e->getMessage()); }
 
+// 3.16 Objetivo 5 — Operadores + Componentes + Proveedores + Sucursales
+// ═══════════════════════════════════════════════════════════════════════
+
+// -- Capacitaciones de operadores
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS operador_capacitaciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    operador_id INT NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT NULL,
+    tipo ENUM('Interna','Externa','Online') NOT NULL DEFAULT 'Interna',
+    horas DECIMAL(6,1) NOT NULL DEFAULT 0,
+    fecha DATE NOT NULL,
+    certificado_url VARCHAR(500) NULL,
+    vencimiento DATE NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_opcap_operador (operador_id),
+    INDEX idx_opcap_fecha (fecha),
+    FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: operador_capacitaciones', true);
+} catch (Throwable $e) { step('Tabla: operador_capacitaciones', false, $e->getMessage()); }
+
+// -- Infracciones de operadores
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS operador_infracciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    operador_id INT NOT NULL,
+    fecha DATE NOT NULL,
+    tipo ENUM('Multa','Accidente','Violación','Otro') NOT NULL DEFAULT 'Multa',
+    descripcion TEXT NULL,
+    monto DECIMAL(12,2) NOT NULL DEFAULT 0,
+    estado ENUM('Pendiente','Pagada','Contestada') NOT NULL DEFAULT 'Pendiente',
+    referencia VARCHAR(100) NULL COMMENT 'Folio o número de boleta',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_opinf_operador (operador_id),
+    INDEX idx_opinf_fecha (fecha),
+    FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: operador_infracciones', true);
+} catch (Throwable $e) { step('Tabla: operador_infracciones', false, $e->getMessage()); }
+
+// -- Movimientos de componentes / inventario
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS componente_movimientos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    component_id INT NOT NULL,
+    vehiculo_id INT NULL COMMENT 'Vehículo involucrado',
+    tipo ENUM('Entrada','Salida','Transferencia','Ajuste') NOT NULL DEFAULT 'Entrada',
+    cantidad INT NOT NULL DEFAULT 1,
+    referencia VARCHAR(150) NULL COMMENT 'OT, factura, etc.',
+    notas TEXT NULL,
+    usuario_id INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cmov_component (component_id),
+    INDEX idx_cmov_vehiculo (vehiculo_id),
+    INDEX idx_cmov_fecha (created_at),
+    FOREIGN KEY (component_id) REFERENCES components(id) ON DELETE CASCADE,
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: componente_movimientos', true);
+} catch (Throwable $e) { step('Tabla: componente_movimientos', false, $e->getMessage()); }
+
+// -- Evaluaciones de proveedores
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS proveedor_evaluaciones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    proveedor_id INT NOT NULL,
+    periodo VARCHAR(20) NOT NULL COMMENT 'Ej: 2026-Q1',
+    calidad TINYINT NOT NULL DEFAULT 3 COMMENT '1-5',
+    puntualidad TINYINT NOT NULL DEFAULT 3,
+    precio TINYINT NOT NULL DEFAULT 3,
+    servicio TINYINT NOT NULL DEFAULT 3,
+    promedio DECIMAL(3,2) GENERATED ALWAYS AS ((calidad+puntualidad+precio+servicio)/4) STORED,
+    comentario TEXT NULL,
+    usuario_id INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_peval_proveedor (proveedor_id),
+    INDEX idx_peval_periodo (periodo),
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: proveedor_evaluaciones', true);
+} catch (Throwable $e) { step('Tabla: proveedor_evaluaciones', false, $e->getMessage()); }
+
+// -- Contratos de proveedores
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS proveedor_contratos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    proveedor_id INT NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    numero_contrato VARCHAR(80) NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NULL,
+    monto DECIMAL(14,2) NOT NULL DEFAULT 0,
+    tipo ENUM('Servicio','Suministro','Mantenimiento','Otro') NOT NULL DEFAULT 'Servicio',
+    estado ENUM('Vigente','Vencido','Cancelado') NOT NULL DEFAULT 'Vigente',
+    documento_url VARCHAR(500) NULL,
+    notas TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pcon_proveedor (proveedor_id),
+    INDEX idx_pcon_estado (estado),
+    INDEX idx_pcon_fin (fecha_fin),
+    FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: proveedor_contratos', true);
+} catch (Throwable $e) { step('Tabla: proveedor_contratos', false, $e->getMessage()); }
+
+// -- Columna stock en catálogo de componentes (para inventario con movimientos)
+try {
+  if (!$existsColumn('components', 'stock')) {
+    $pdo->exec("ALTER TABLE components ADD COLUMN stock INT NOT NULL DEFAULT 0 COMMENT 'Stock consolidado'");
+    step('Components: stock', true);
+  } else { step('Components: stock', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Components: stock', false, $e->getMessage()); }
+
+// -- Columna stock_minimo en catálogo para alertas
+try {
+  if (!$existsColumn('components', 'stock_minimo')) {
+    $pdo->exec("ALTER TABLE components ADD COLUMN stock_minimo INT NOT NULL DEFAULT 0 COMMENT 'Stock mínimo para alerta'");
+    step('Components: stock_minimo', true);
+  } else { step('Components: stock_minimo', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Components: stock_minimo', false, $e->getMessage()); }
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [
