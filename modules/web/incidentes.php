@@ -14,6 +14,7 @@ ob_start();
   <select id="fest" onchange="load()" style="max-width:140px"><option value="">Todos los estados</option><option>Abierto</option><option>En proceso</option><option>Cerrado</option></select>
   <select id="freclamo" onchange="load()" style="max-width:150px"><option value="">Todos</option><option value="1">Con reclamo</option><option value="0">Sin reclamo</option></select>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Reportar Incidente</button><?php endif; ?>
+  <button class="btn btn-ghost" onclick="verDashboard()">📊 Dashboard Seguridad</button>
 </div>
 
 <!-- Stats cards -->
@@ -36,6 +37,7 @@ ob_start();
       <div class="form-group"><label>Severidad</label><select name="severidad"><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></select></div>
       <div class="form-group"><label>Estado</label><select name="estado"><option>Abierto</option><option>En proceso</option><option>Cerrado</option></select></div>
       <div class="form-group"><label>Costo estimado ($)</label><input name="costo_est" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Prioridad</label><select name="prioridad"><option>Normal</option><option>Baja</option><option>Alta</option><option>Urgente</option></select></div>
       <div class="form-group full"><label>Descripción *</label><textarea name="descripcion" placeholder="Descripción del incidente..." style="min-height:80px"></textarea></div>
 
       <!-- Sección de Seguros -->
@@ -51,6 +53,8 @@ ob_start();
       <div class="form-group reclamo-field" style="display:none"><label>Ref. reclamo</label><input name="referencia_reclamo" placeholder="No. siniestro"></div>
       <div class="form-group full reclamo-field" style="display:none"><label>Notas seguro</label><textarea name="notas_seguro" placeholder="Observaciones del reclamo..." style="min-height:60px"></textarea></div>
     </div>
+    <div class="form-group full" id="att-inc-wrap"></div>
+    </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
 </div>
@@ -62,7 +66,39 @@ ob_start();
     <div id="detail-content" style="max-height:70vh;overflow-y:auto;font-size:14px;">
       <div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>
     </div>
+    <div id="seguimientos-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <h4 style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:8px">📝 Seguimientos</h4>
+      <div id="seguimientos-list" style="max-height:200px;overflow-y:auto;font-size:12px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input type="text" id="nuevo-seg-comentario" placeholder="Agregar nota de seguimiento..." style="flex:1;font-size:12px">
+        <button class="btn btn-primary btn-sm" onclick="addSeguimiento()">Agregar</button>
+      </div>
+    </div>
+    <div id="att-detail-wrap" style="margin-top:12px"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- MODAL DASHBOARD SEGURIDAD -->
+<div class="modal-bg" id="modal-dashboard">
+  <div class="modal" style="max-width:1000px">
+    <div class="modal-title">📊 Dashboard de Seguridad</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+      <label style="font-size:12px;color:#8892a4">Año: <select id="dash-year" onchange="loadDashboard()" style="max-width:100px"></select></label>
+    </div>
+    <div id="dash-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="background:var(--bg2);border-radius:10px;padding:14px"><h4 style="font-size:13px;margin-bottom:8px;color:var(--accent2)">Incidentes por mes</h4><canvas id="chart-inc-month" height="200"></canvas></div>
+      <div style="background:var(--bg2);border-radius:10px;padding:14px"><h4 style="font-size:13px;margin-bottom:8px;color:var(--accent2)">Por severidad</h4><canvas id="chart-inc-sev" height="200"></canvas></div>
+    </div>
+    <div style="background:var(--bg2);border-radius:10px;padding:14px">
+      <h4 style="font-size:13px;margin-bottom:8px;color:var(--accent2)">🚗 Vehículos con más incidentes</h4>
+      <div class="table-wrap" style="max-height:250px;overflow-y:auto">
+        <table><thead><tr><th>Vehículo</th><th>Incidentes</th><th>Costo est. total</th></tr></thead>
+        <tbody id="tbody-top-veh"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-dashboard')">Cerrar</button></div>
   </div>
 </div>
 
@@ -71,6 +107,9 @@ const pager=new Paginator('pgr',load,25);
 const SB={'Baja':'badge-green','Media':'badge-yellow','Alta':'badge-orange','Crítica':'badge-red'};
 const EB={'Abierto':'badge-red','En proceso':'badge-orange','Cerrado':'badge-green'};
 const RB={'N/A':'badge-gray','En proceso':'badge-orange','Aprobado':'badge-green','Rechazado':'badge-red','Pagado':'badge-green'};
+const PB={'Baja':'badge-gray','Normal':'badge-blue','Alta':'badge-orange','Urgente':'badge-red'};
+const attInc = new AttachmentWidget('att-inc-wrap', 'incidentes');
+let currentIncId = null;
 
 function toggleReclamo(v){
   document.querySelectorAll('.reclamo-field').forEach(el=>el.style.display=v==='1'?'':'none');
@@ -117,28 +156,37 @@ async function load(){
 
 function abrirNuevo(){
   document.getElementById('mtitle').textContent='⚠️ Reportar Incidente';
-  resetForm('modal');toggleReclamo('0');openModal('modal');
+  resetForm('modal');toggleReclamo('0');
+  attInc.reset();
+  openModal('modal');
 }
 function editar(r){
   document.getElementById('mtitle').textContent='✏️ Editar Incidente';
   fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,severidad:r.severidad,
-    estado:r.estado,costo_est:r.costo_est,descripcion:r.descripcion,
+    estado:r.estado,costo_est:r.costo_est,descripcion:r.descripcion,prioridad:r.prioridad||'Normal',
     aseguradora:r.aseguradora||'',poliza_numero:r.poliza_numero||'',
     tiene_reclamo:r.tiene_reclamo||'0',estado_reclamo:r.estado_reclamo||'N/A',
     monto_reclamo:r.monto_reclamo||'',fecha_reclamo:r.fecha_reclamo||'',
     referencia_reclamo:r.referencia_reclamo||'',notas_seguro:r.notas_seguro||''});
   toggleReclamo(String(r.tiene_reclamo||0));
+  attInc.setEntityId(r.id);
+  attInc.load();
   openModal('modal');
 }
 async function guardar(){
   const d=getForm('modal');
   if(!d.vehiculo_id||!d.descripcion){toast('Vehículo y descripción son obligatorios','error');return;}
-  await api('/api/incidentes.php',d.id?'PUT':'POST',d);
+  const res = await api('/api/incidentes.php',d.id?'PUT':'POST',d);
+  const savedId = d.id || res.id;
+  if (attInc.hasPending() && savedId) {
+    await attInc.uploadPending(savedId);
+  }
   toast(d.id?'Actualizado':'Incidente reportado');closeModal('modal');load();
 }
 async function del(id){confirmDelete('¿Eliminar este incidente?',async()=>{await api(`/api/incidentes.php?id=${id}`,'DELETE');toast('Eliminado','warning');load();});}
 
 async function verDetalle(id){
+  currentIncId = id;
   openModal('modal-detail');
   const r = await api(`/api/incidentes.php?detail=${id}`);
   if(!r || !r.id){document.getElementById('detail-content').innerHTML='<div class="empty"><div class="empty-icon">❌</div><div class="empty-title">No encontrado</div></div>';return;}
@@ -167,6 +215,118 @@ async function verDetalle(id){
       ${seguroHtml}
       ${r.vehiculo_venc_seguro?`<tr><td style="color:#8892a4">Venc. seguro vehículo</td><td>${r.vehiculo_venc_seguro}</td></tr>`:''}
     </table>`;
+
+  // Load seguimientos
+  loadSeguimientos(id);
+  // Load attachments
+  const attDetail = new AttachmentWidget('att-detail-wrap', 'incidentes', id);
+  attDetail.load();
+}
+
+async function loadSeguimientos(incId) {
+  const list = document.getElementById('seguimientos-list');
+  if (!list) return;
+  try {
+    const data = await api(`/api/incidentes.php?action=seguimientos&incidente_id=${incId}`);
+    const segs = data.seguimientos || [];
+    if (!segs.length) { list.innerHTML = '<p style="color:var(--text2);font-size:11px">Sin seguimientos aún.</p>'; return; }
+    list.innerHTML = segs.map(s => {
+      const icon = s.accion === 'estado_change' ? '🔄' : '💬';
+      const stateInfo = s.estado_anterior ? `<span class="badge badge-gray">${s.estado_anterior}</span> → <span class="badge badge-green">${s.estado_nuevo}</span>` : '';
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>${icon} ${s.usuario_nombre || 'Sistema'}</strong>
+          <span style="color:var(--text2);font-size:10px">${s.created_at}</span>
+        </div>
+        ${stateInfo}
+        ${s.comentario ? `<div style="margin-top:4px;color:var(--text1)">${s.comentario}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = '<p style="color:var(--text2);font-size:11px">Error al cargar seguimientos.</p>'; }
+}
+
+async function addSeguimiento() {
+  if (!currentIncId) return;
+  const input = document.getElementById('nuevo-seg-comentario');
+  const comentario = input.value.trim();
+  if (!comentario) { toast('Escribe un comentario','error'); return; }
+  try {
+    await api('/api/incidentes.php?action=seguimientos', 'POST', { incidente_id: currentIncId, comentario });
+    input.value = '';
+    toast('Seguimiento agregado');
+    loadSeguimientos(currentIncId);
+  } catch(e) { toast('Error al agregar seguimiento','error'); }
+}
+
+// ═══ Dashboard de Seguridad ═══
+let chartIncMonth = null, chartIncSev = null;
+function verDashboard() {
+  const sel = document.getElementById('dash-year');
+  if (sel.options.length === 0) {
+    const currentYear = new Date().getFullYear();
+    for (let y = currentYear; y >= currentYear - 3; y--) {
+      sel.innerHTML += `<option value="${y}">${y}</option>`;
+    }
+  }
+  openModal('modal-dashboard');
+  loadDashboard();
+}
+async function loadDashboard() {
+  const year = document.getElementById('dash-year').value || new Date().getFullYear();
+  try {
+    const d = await api(`/api/incidentes.php?action=dashboard&year=${year}`);
+    // KPIs
+    const totalInc = (d.by_status || []).reduce((s, r) => s + Number(r.total), 0);
+    const abiertos = (d.by_status || []).find(r => r.estado === 'Abierto');
+    const criticos = (d.by_severity || []).find(r => r.severidad === 'Crítica');
+    document.getElementById('dash-kpis').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${totalInc}</div><div class="stat-label">Total incidentes</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:#ff4757">${abiertos ? abiertos.total : 0}</div><div class="stat-label">Abiertos</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:#ff6348">${criticos ? criticos.total : 0}</div><div class="stat-label">Críticos</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:#2ed573">${d.avg_resolve_days ?? '—'}</div><div class="stat-label">Días prom. resolución</div></div>
+    `;
+
+    // Chart incidentes por mes
+    const months = Array.from({length:12}, (_,i) => ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][i]);
+    const monthData = new Array(12).fill(0);
+    const monthCost = new Array(12).fill(0);
+    (d.by_month || []).forEach(r => { monthData[r.mes - 1] = Number(r.total); monthCost[r.mes - 1] = Number(r.costo); });
+
+    const darkMode = document.documentElement.classList.contains('dark') || !document.documentElement.classList.contains('light');
+    const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const textColor = darkMode ? '#8892a4' : '#666';
+
+    if (chartIncMonth) chartIncMonth.destroy();
+    chartIncMonth = new Chart(document.getElementById('chart-inc-month'), {
+      type: 'bar', data: { labels: months, datasets: [
+        { label: 'Incidentes', data: monthData, backgroundColor: 'rgba(255,71,87,0.7)', borderRadius: 4 },
+        { label: 'Costo ($)', data: monthCost, type: 'line', borderColor: '#ffa502', pointRadius: 3, yAxisID: 'y1' }
+      ]}, options: { responsive: true, scales: {
+        y: { grid: { color: gridColor }, ticks: { color: textColor } },
+        y1: { position: 'right', grid: { display: false }, ticks: { color: '#ffa502', callback: v => '$' + v.toLocaleString() } },
+        x: { ticks: { color: textColor } }
+      }, plugins: { legend: { labels: { color: textColor } } } }
+    });
+
+    // Chart por severidad (doughnut)
+    const sevLabels = (d.by_severity || []).map(r => r.severidad);
+    const sevData = (d.by_severity || []).map(r => Number(r.total));
+    const sevColors = sevLabels.map(s => ({Crítica:'#ff4757',Alta:'#ff6348',Media:'#ffa502',Baja:'#2ed573'}[s] || '#8892a4'));
+    if (chartIncSev) chartIncSev.destroy();
+    chartIncSev = new Chart(document.getElementById('chart-inc-sev'), {
+      type: 'doughnut', data: { labels: sevLabels, datasets: [{ data: sevData, backgroundColor: sevColors }] },
+      options: { responsive: true, plugins: { legend: { labels: { color: textColor } } } }
+    });
+
+    // Top vehículos
+    const topTbody = document.getElementById('tbody-top-veh');
+    const topVeh = d.top_vehicles || [];
+    topTbody.innerHTML = topVeh.length ? topVeh.map(v => `<tr>
+      <td><strong style="color:var(--accent2)">${v.placa} ${v.marca||''}</strong></td>
+      <td>${v.total}</td>
+      <td>$${Number(v.costo_total).toFixed(2)}</td>
+    </tr>`).join('') : '<tr><td colspan="3">Sin datos</td></tr>';
+  } catch(e) { toast('Error al cargar dashboard','error'); }
 }
 
 document.addEventListener('DOMContentLoaded',load);

@@ -134,6 +134,98 @@ try {
         exit;
     }
 
+    // ─── Sub-endpoint: Gráfico comparativo por período ───
+    if ($action === 'chart_data') {
+        $vid  = (int)($_GET['vehiculo_id'] ?? 0);
+        $from = trim($_GET['from'] ?? '');
+        $to   = trim($_GET['to'] ?? '');
+        $group = trim($_GET['group'] ?? 'month'); // month, week, day
+        if (!$from) $from = date('Y-m-01', strtotime('-6 months'));
+        if (!$to) $to = date('Y-m-d');
+
+        $groupExpr = match($group) {
+            'day'  => "DATE(c.fecha)",
+            'week' => "DATE(c.fecha - INTERVAL WEEKDAY(c.fecha) DAY)",
+            default => "DATE_FORMAT(c.fecha, '%Y-%m-01')",
+        };
+
+        $where = "WHERE c.deleted_at IS NULL AND c.fecha >= ? AND c.fecha <= ?";
+        $params = [$from, $to];
+        if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
+
+        $stmt = $db->prepare("SELECT {$groupExpr} AS periodo,
+            COUNT(*) AS cargas,
+            COALESCE(SUM(c.litros),0) AS litros,
+            COALESCE(SUM(c.total),0) AS gasto,
+            COALESCE(AVG(c.costo_litro),0) AS avg_costo_litro
+            FROM combustible c $where
+            GROUP BY periodo ORDER BY periodo ASC");
+        $stmt->execute($params);
+        $series = $stmt->fetchAll();
+
+        // Comparar con período anterior (mismo rango de duración)
+        $days = (strtotime($to) - strtotime($from)) / 86400;
+        $prevFrom = date('Y-m-d', strtotime($from . " -{$days} days"));
+        $prevTo   = date('Y-m-d', strtotime($from . ' -1 day'));
+        $prevParams = [$prevFrom, $prevTo];
+        if ($vid) $prevParams[] = $vid;
+        $prevStmt = $db->prepare("SELECT COALESCE(SUM(c.litros),0) AS litros, COALESCE(SUM(c.total),0) AS gasto, COUNT(*) AS cargas
+            FROM combustible c $where");
+        $prevWhere = str_replace($from, $prevFrom, str_replace($to, $prevTo, $where));
+        $prevStmt2 = $db->prepare("SELECT COALESCE(SUM(c.litros),0) AS litros, COALESCE(SUM(c.total),0) AS gasto, COUNT(*) AS cargas
+            FROM combustible c WHERE c.deleted_at IS NULL AND c.fecha >= ? AND c.fecha <= ?" . ($vid ? " AND c.vehiculo_id = ?" : ""));
+        $prevStmt2->execute($prevParams);
+        $prevTotals = $prevStmt2->fetch();
+
+        echo json_encode(['series' => $series, 'prev_period' => $prevTotals]);
+        exit;
+    }
+
+    // ─── Sub-endpoint: Eficiencia por vehículo ───
+    if ($action === 'eficiencia') {
+        $from = trim($_GET['from'] ?? '');
+        $to   = trim($_GET['to'] ?? '');
+        $where = "WHERE c.deleted_at IS NULL AND c.km > 0 AND c.litros > 0";
+        $params = [];
+        if ($from) { $where .= " AND c.fecha >= ?"; $params[] = $from; }
+        if ($to)   { $where .= " AND c.fecha <= ?"; $params[] = $to; }
+
+        $stmt = $db->prepare("SELECT c.vehiculo_id, v.placa, v.marca, v.modelo,
+            COUNT(*) AS cargas,
+            SUM(c.litros) AS total_litros,
+            SUM(c.total) AS total_gasto,
+            MIN(c.km) AS km_min,
+            MAX(c.km) AS km_max,
+            v.km_actual
+            FROM combustible c
+            JOIN vehiculos v ON v.id = c.vehiculo_id
+            $where
+            GROUP BY c.vehiculo_id, v.placa, v.marca, v.modelo, v.km_actual
+            HAVING cargas >= 2
+            ORDER BY total_litros DESC");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
+
+        foreach ($rows as &$r) {
+            $kmRecorridos = (float)$r['km_max'] - (float)$r['km_min'];
+            $r['km_recorridos'] = round($kmRecorridos, 1);
+            $r['rendimiento_kml'] = ($r['total_litros'] > 0 && $kmRecorridos > 0)
+                ? round($kmRecorridos / (float)$r['total_litros'], 2) : null;
+            $r['costo_por_km'] = ($kmRecorridos > 0)
+                ? round((float)$r['total_gasto'] / $kmRecorridos, 2) : null;
+        }
+        unset($r);
+
+        // Ranking
+        usort($rows, fn($a, $b) => ($b['rendimiento_kml'] ?? 0) <=> ($a['rendimiento_kml'] ?? 0));
+        $rank = 1;
+        foreach ($rows as &$r) { $r['rank'] = $rank++; }
+        unset($r);
+
+        echo json_encode(['vehiculos' => $rows]);
+        exit;
+    }
+
     switch ($method) {
         case 'GET':
             $q    = '%'.trim($_GET['q']??'').'%';

@@ -1066,6 +1066,47 @@ try {
   step('Asignación extra: plantilla_id', false, $e->getMessage());
 }
 
+// 3.15 Seguimiento de incidentes (Objetivo 4)
+// ═══════════════════════════════════════════════════
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS incidente_seguimientos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    incidente_id INT NOT NULL,
+    usuario_id INT NULL,
+    accion VARCHAR(60) NOT NULL COMMENT 'estado_change, nota, adjunto',
+    estado_anterior VARCHAR(30) NULL,
+    estado_nuevo VARCHAR(30) NULL,
+    comentario TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (incidente_id) REFERENCES incidentes(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: incidente_seguimientos', true);
+} catch (Throwable $e) {
+  step('Tabla: incidente_seguimientos', false, $e->getMessage());
+}
+
+try {
+  if (!$existsColumn('incidentes', 'resolved_at')) {
+    $pdo->exec("ALTER TABLE incidentes ADD COLUMN resolved_at DATETIME NULL COMMENT 'Fecha de resolución'");
+    step('Incidentes extra: resolved_at', true);
+  } else { step('Incidentes extra: resolved_at', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Incidentes extra: resolved_at', false, $e->getMessage()); }
+
+try {
+  if (!$existsColumn('incidentes', 'resolved_by')) {
+    $pdo->exec("ALTER TABLE incidentes ADD COLUMN resolved_by INT NULL COMMENT 'Usuario que cerró'");
+    step('Incidentes extra: resolved_by', true);
+  } else { step('Incidentes extra: resolved_by', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Incidentes extra: resolved_by', false, $e->getMessage()); }
+
+try {
+  if (!$existsColumn('incidentes', 'prioridad')) {
+    $pdo->exec("ALTER TABLE incidentes ADD COLUMN prioridad ENUM('Baja','Normal','Alta','Urgente') NOT NULL DEFAULT 'Normal' COMMENT 'Prioridad de atención'");
+    step('Incidentes extra: prioridad', true);
+  } else { step('Incidentes extra: prioridad', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Incidentes extra: prioridad', false, $e->getMessage()); }
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [

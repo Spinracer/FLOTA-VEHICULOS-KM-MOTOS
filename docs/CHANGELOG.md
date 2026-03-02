@@ -1,5 +1,29 @@
 # FlotaControl — Changelog
 
+## [3.4.0] — 2026-03-02
+
+### Nuevas Funcionalidades — Objetivo 4: Mejoras Combustible + Incidentes
+
+- **Gráfico comparativo de combustible**: Bar charts de gasto y litros por período (mes/semana/día) con línea de precio promedio. Comparativa porcentual vs período anterior.
+- **Indicador de eficiencia por vehículo**: Ranking con km/L y $/km. Modal dedicado con filtros de fecha. Mínimo 2 cargas para cálculo.
+- **Adjuntos en incidentes**: AttachmentWidget integrado en crear/editar y detalle. Soporte multi-archivo.
+- **Flujo de seguimiento por estados**: Máquina de estados formal (Abierto→En proceso→Cerrado + reabrir). Log automático de cambios. Notas manuales de seguimiento. Tabla `incidente_seguimientos`.
+- **Dashboard de seguridad**: KPIs (total, abiertos, críticos, días prom. resolución), gráfico mensual, doughnut por severidad, top 10 vehículos. Filtro por año.
+- **Campo prioridad en incidentes**: Baja, Normal, Alta, Urgente.
+- **Tracking de resolución**: `resolved_at` y `resolved_by` automáticos al cerrar.
+
+### Migraciones
+- **install.php §3.15**: Tabla `incidente_seguimientos`. Columnas `resolved_at`, `resolved_by`, `prioridad` en incidentes.
+
+### API
+- `combustible.php`: +2 endpoints (chart_data, eficiencia)
+- `incidentes.php`: +2 endpoints (seguimientos, dashboard), máquina de estados, prioridad
+
+### Documentación
+- `docs/OBJ4_COMBUSTIBLE_INCIDENTES.md` — Documentación completa del objetivo.
+
+---
+
 ## [3.3.0] — 2026-03-02
 
 ### Nuevas Funcionalidades — Objetivo 3: Mejoras Asignaciones + Mantenimientos

@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.3.0** — Última actualización: 2026-03-02
+> **v3.4.0** — Última actualización: 2026-03-02
 
 ---
 
@@ -24,6 +24,11 @@
 - **Checklist dinámico**: Plantillas configurables de checklist con N items
 - **Aprobaciones multinivel**: Aprobación automática para OTs de alto costo
 - **Componentes en partidas**: Vinculación directa de componentes en OTs
+- **Gráficos de combustible**: Comparativa por período con Chart.js
+- **Eficiencia por vehículo**: Ranking km/L y $/km con filtros
+- **Adjuntos en incidentes**: AttachmentWidget integrado
+- **Dashboard de seguridad**: KPIs, gráficos y top vehículos
+- **Seguimiento de incidentes**: Log de estados y notas
 
 ---
 

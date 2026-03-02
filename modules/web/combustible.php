@@ -25,6 +25,25 @@ ob_start();
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Registrar Carga</button>
   <?php endif; ?>
   <button class="btn btn-ghost" onclick="verAnomalias()" title="Detectar anomalías">⚠️ Anomalías</button>
+  <button class="btn btn-ghost" onclick="toggleCharts()" id="btnCharts">📊 Gráficos</button>
+  <button class="btn btn-ghost" onclick="verEficiencia()">🏆 Eficiencia</button>
+</div>
+
+<!-- Gráficos comparativos -->
+<div id="charts-section" style="display:none;margin-bottom:18px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="background:var(--bg2);border-radius:12px;padding:16px">
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent2)">💰 Gasto por período</h4>
+      <canvas id="chart-gasto" height="220"></canvas>
+    </div>
+    <div style="background:var(--bg2);border-radius:12px;padding:16px">
+      <h4 style="font-size:14px;margin-bottom:8px;color:var(--accent2)">⛽ Litros por período</h4>
+      <canvas id="chart-litros" height="220"></canvas>
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:12px">
+    <div id="prev-compare" style="font-size:12px;color:var(--text2);background:var(--bg2);border-radius:8px;padding:10px;flex:1"></div>
+  </div>
 </div>
 
 <div class="table-wrap">
@@ -97,6 +116,23 @@ ob_start();
       <tbody id="tbody-anomalias"></tbody></table>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-anomalias')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- MODAL EFICIENCIA -->
+<div class="modal-bg" id="modal-eficiencia">
+  <div class="modal" style="max-width:950px">
+    <div class="modal-title">🏆 Eficiencia por Vehículo</div>
+    <div id="eficiencia-filters" style="display:flex;gap:8px;margin-bottom:12px;font-size:12px">
+      <label style="color:#8892a4;display:flex;align-items:center;gap:4px">Desde <input type="date" id="ef-from" style="max-width:140px"></label>
+      <label style="color:#8892a4;display:flex;align-items:center;gap:4px">Hasta <input type="date" id="ef-to" style="max-width:140px"></label>
+      <button class="btn btn-ghost btn-sm" onclick="loadEficiencia()">Filtrar</button>
+    </div>
+    <div class="table-wrap" style="max-height:450px;overflow-y:auto">
+      <table><thead><tr><th>#</th><th>Vehículo</th><th>Cargas</th><th>Litros</th><th>Gasto</th><th>KM recorridos</th><th>km/L</th><th>$/km</th></tr></thead>
+      <tbody id="tbody-eficiencia"></tbody></table>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-eficiencia')">Cerrar</button></div>
   </div>
 </div>
 
@@ -179,6 +215,116 @@ async function eliminar(id) {
   });
 }
 document.addEventListener('DOMContentLoaded', load);
+
+// ═══ Gráficos comparativos ═══
+let chartsVisible = false;
+let chartGasto = null, chartLitros = null;
+function toggleCharts() {
+  chartsVisible = !chartsVisible;
+  document.getElementById('charts-section').style.display = chartsVisible ? '' : 'none';
+  document.getElementById('btnCharts').textContent = chartsVisible ? '📊 Ocultar' : '📊 Gráficos';
+  if (chartsVisible) loadCharts();
+}
+async function loadCharts() {
+  const vid = document.getElementById('filter-veh').value;
+  const from = document.getElementById('from-date').value || '';
+  const to = document.getElementById('to-date').value || '';
+  try {
+    const data = await api(`/api/combustible.php?action=chart_data&vehiculo_id=${vid}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    const labels = (data.series || []).map(s => s.periodo);
+    const gastos = (data.series || []).map(s => Number(s.gasto));
+    const litros = (data.series || []).map(s => Number(s.litros));
+    const costos = (data.series || []).map(s => Number(s.avg_costo_litro));
+
+    if (chartGasto) chartGasto.destroy();
+    if (chartLitros) chartLitros.destroy();
+
+    const darkMode = document.documentElement.classList.contains('dark') || !document.documentElement.classList.contains('light');
+    const gridColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const textColor = darkMode ? '#8892a4' : '#666';
+
+    chartGasto = new Chart(document.getElementById('chart-gasto'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Gasto ($)', data: gastos, backgroundColor: 'rgba(232,255,71,0.7)', borderRadius: 4 },
+          { label: '$/L promedio', data: costos, type: 'line', borderColor: '#ff6b6b', pointRadius: 3, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, interaction: { mode: 'index' },
+        scales: {
+          y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '$' + v.toLocaleString() } },
+          y1: { position: 'right', grid: { display: false }, ticks: { color: '#ff6b6b', callback: v => '$' + v.toFixed(2) } },
+          x: { ticks: { color: textColor } }
+        },
+        plugins: { legend: { labels: { color: textColor } } }
+      }
+    });
+
+    chartLitros = new Chart(document.getElementById('chart-litros'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label: 'Litros', data: litros, backgroundColor: 'rgba(46,213,115,0.7)', borderRadius: 4 }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => v.toLocaleString() + ' L' } },
+          x: { ticks: { color: textColor } }
+        },
+        plugins: { legend: { labels: { color: textColor } } }
+      }
+    });
+
+    // Comparativa con período anterior
+    const prev = data.prev_period || {};
+    const curGasto = gastos.reduce((a, b) => a + b, 0);
+    const curLitros = litros.reduce((a, b) => a + b, 0);
+    const diffGasto = prev.gasto > 0 ? (((curGasto - prev.gasto) / prev.gasto) * 100).toFixed(1) : '—';
+    const diffLitros = prev.litros > 0 ? (((curLitros - prev.litros) / prev.litros) * 100).toFixed(1) : '—';
+    document.getElementById('prev-compare').innerHTML = `
+      <strong>vs período anterior:</strong>
+      Gasto: $${curGasto.toFixed(0)} ${typeof diffGasto === 'string' && diffGasto !== '—' ? (diffGasto > 0 ? `<span style="color:#ff4757">↑${diffGasto}%</span>` : `<span style="color:#2ed573">↓${Math.abs(diffGasto)}%</span>`) : '—'}
+      &nbsp;|&nbsp; Litros: ${curLitros.toFixed(0)} ${typeof diffLitros === 'string' && diffLitros !== '—' ? (diffLitros > 0 ? `<span style="color:#ff4757">↑${diffLitros}%</span>` : `<span style="color:#2ed573">↓${Math.abs(diffLitros)}%</span>`) : '—'}
+      &nbsp;|&nbsp; Cargas período anterior: ${prev.cargas || 0}
+    `;
+  } catch(e) { console.error('Chart error', e); }
+}
+
+// ═══ Eficiencia por vehículo ═══
+function verEficiencia() {
+  openModal('modal-eficiencia');
+  loadEficiencia();
+}
+async function loadEficiencia() {
+  const from = document.getElementById('ef-from').value;
+  const to = document.getElementById('ef-to').value;
+  try {
+    const data = await api(`/api/combustible.php?action=eficiencia&from=${from}&to=${to}`);
+    const tbody = document.getElementById('tbody-eficiencia');
+    const rows = data.vehiculos || [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="empty-icon">📊</div><div class="empty-title">Sin datos suficientes (mín 2 cargas)</div></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const kmlColor = r.rendimiento_kml >= 10 ? '#2ed573' : (r.rendimiento_kml >= 6 ? '#ffa502' : '#ff4757');
+      return `<tr>
+        <td><span class="badge badge-yellow">#${r.rank}</span></td>
+        <td><strong style="color:var(--accent2)">${r.placa} ${r.marca||''}</strong></td>
+        <td>${r.cargas}</td>
+        <td>${Number(r.total_litros).toFixed(1)} L</td>
+        <td>$${Number(r.total_gasto).toFixed(2)}</td>
+        <td>${Number(r.km_recorridos).toLocaleString()} km</td>
+        <td><strong style="color:${kmlColor}">${r.rendimiento_kml ? r.rendimiento_kml + ' km/L' : '—'}</strong></td>
+        <td>${r.costo_por_km ? '$' + r.costo_por_km + '/km' : '—'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) { toast('Error al cargar eficiencia','error'); }
+}
 
 async function verAnomalias() {
   const vid = document.getElementById('filter-veh').value;
