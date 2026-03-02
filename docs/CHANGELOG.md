@@ -1,5 +1,45 @@
 # FlotaControl — Changelog
 
+## [3.2.0] — 2026-03-02
+
+### Nuevas Funcionalidades — Objetivo 2: Mejoras del Módulo Vehículos
+
+- **Clasificación por etiquetas**: Sistema de etiquetas libres para vehículos. Tabla `vehiculo_etiquetas` con restricción UNIQUE. API CRUD (GET/POST/DELETE). UI con pills de colores en tabla, filtro por etiqueta en toolbar, y gestión en modal de edición.
+- **Costo por kilómetro**: Cálculo automático `(gasto_mantenimiento + gasto_combustible) / km_actual`. Nuevo KPI destacado con borde accent en el Perfil 360. Incluye `gasto_total` agregado.
+- **Historial visual de kilometraje**: Gráfica Chart.js (line chart con fill) en el Perfil 360. Últimos 30 registros de `odometer_logs`. Colores dark-mode friendly con eje Y formateado.
+- **Estructura de telemetría**: Tabla `telemetria_logs` (BIGINT PK, tipo/valor/unidad, GPS lat/lon, fuente). Últimos 20 registros en perfil. Placeholder UI para futura integración GPS/OBD.
+- **Campos financieros**: 3 nuevas columnas en vehículos (`costo_adquisicion`, `aseguradora`, `poliza_numero`). Formulario actualizado y visualización en Perfil 360.
+- **KPIs ampliados en Perfil 360**: Grid de 5 KPIs (asignaciones, mantenimientos, litros, gasto total, costo/km). Datos adicionales del vehículo (adquisición, aseguradora, póliza).
+
+### Migraciones
+- **install.php §3.9**: Tabla `vehiculo_etiquetas` con índice UNIQUE y por etiqueta.
+- **install.php §3.10**: Tabla `telemetria_logs` con índices compuestos.
+- **install.php §3.11**: Columnas `costo_adquisicion`, `aseguradora`, `poliza_numero` en vehiculos.
+
+### Documentación
+- `docs/OBJ2_VEHICULOS.md` — Documentación completa del objetivo.
+
+---
+
+## [3.1.0] — 2026-03-02
+
+### Nuevas Funcionalidades — Objetivo 1: Tailwind CSS + Tema Dark/Light
+
+- **Tailwind CSS integrado**: Framework CSS principal via Play CDN con configuración personalizada de colores, fuentes y breakpoints del sistema.
+- **Tema oscuro/claro**: Toggle en topbar (🌙/☀️) con persistencia en `localStorage`. Tema oscuro por defecto. Variables CSS duales para ambos temas con paleta profesional diferenciada (dark: neón amarillo/cyan, light: indigo/teal).
+- **Layout responsivo mejorado**: Sidebar oculto con hamburguesa en mobile (< 1024px), click-outside para cerrar, padding adaptativo en topbar y contenido.
+- **Soporte 4K**: Media query `@media(min-width:2560px)` con grids expandidos, contenido centrado con max-width 2200px.
+- **Login modernizado**: Página de login migrada completamente a Tailwind con clases utilitarias, soporte de tema y focus rings.
+- **Dashboard con Tailwind grids**: KPI grid responsivo (2→3→6 columnas), secciones con `lg:grid-cols-2`.
+- **Firma digital modernizada**: Página standalone `firma.php` migrada a Tailwind con diseño consistente.
+- **Capa de compatibilidad CSS**: `style.css` reescrito como bridge entre clases custom existentes (16 módulos) y Tailwind, sin breaking changes.
+
+### Documentación
+- `docs/OBJ1_TAILWIND_CSS.md` — Documentación completa del objetivo.
+- `docs/PLAN_MEJORAS.md` — Plan de trabajo con 9 objetivos e inventario completo.
+
+---
+
 ## [3.0.0] — 2026-03-01
 
 ### Corrección de Errores

@@ -67,59 +67,55 @@ $yaFirmado = !empty($asig['firma_data']);
 $folio = 'ASG-' . str_pad($asig['id'], 6, '0', STR_PAD_LEFT);
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Firma Digital — <?= $folio ?></title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Segoe UI',Arial,sans-serif; background:#0f1117; color:#e0e0e0; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:20px; }
-  .card { background:#1a1e27; border:1px solid #222730; border-radius:12px; padding:24px; max-width:500px; width:100%; margin-top:20px; }
-  h1 { font-size:20px; color:#e8ff47; margin-bottom:4px; }
-  h2 { font-size:15px; color:#8892a4; font-weight:400; margin-bottom:16px; }
-  .info { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; font-size:13px; }
-  .info div { background:#13151b; padding:8px 12px; border-radius:6px; }
-  .info label { color:#8892a4; font-size:11px; display:block; margin-bottom:2px; }
-  .info span { color:#fff; font-weight:500; }
-  canvas { display:block; width:100%; border:2px dashed #333; border-radius:8px; background:#13151b; cursor:crosshair; touch-action:none; margin:12px 0; }
-  .actions { display:flex; gap:12px; margin-top:12px; }
-  .btn { padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:.2s; }
-  .btn-primary { background:#e8ff47; color:#000; }
-  .btn-primary:hover { background:#d4eb3c; }
-  .btn-ghost { background:transparent; color:#8892a4; border:1px solid #333; }
-  .btn-ghost:hover { background:#222; }
-  .success { background:#1a2e1a; border:1px solid #2ed573; color:#2ed573; padding:16px; border-radius:8px; text-align:center; font-size:14px; margin-top:12px; }
-  .error { background:#2e1a1a; border:1px solid #ff4757; color:#ff4757; padding:16px; border-radius:8px; text-align:center; font-size:14px; margin-top:12px; }
-  .logo { font-size:24px; font-weight:800; color:#e8ff47; letter-spacing:-0.5px; }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        dark: '#0a0c10', surface: '#111318', surface2: '#181c24',
+        border: '#222730', accent: '#e8ff47', accent2: '#47ffe8',
+        danger: '#ff4757', success: '#2ed573', muted: '#8892a4',
+      },
+      fontFamily: { heading: ['Syne','sans-serif'], body: ['DM Sans','sans-serif'] }
+    }
+  }
+}
+</script>
 </head>
-<body>
-<div class="logo">FlotaCtrl</div>
-<div class="card">
-  <h1>✍️ Firma Digital</h1>
-  <h2><?= $folio ?> — <?= $asig['estado'] === 'Cerrada' ? 'Devolución' : 'Entrega' ?></h2>
+<body class="font-body bg-dark text-slate-200 min-h-screen flex flex-col items-center p-5">
+<div class="font-heading font-extrabold text-2xl text-accent tracking-tight">FlotaCtrl</div>
+<div class="bg-surface border border-border rounded-xl p-6 max-w-lg w-full mt-5">
+  <h1 class="text-xl font-bold text-accent mb-1">✍️ Firma Digital</h1>
+  <h2 class="text-sm text-muted font-normal mb-4"><?= $folio ?> — <?= $asig['estado'] === 'Cerrada' ? 'Devolución' : 'Entrega' ?></h2>
   
-  <div class="info">
-    <div><label>Vehículo</label><span><?= htmlspecialchars($asig['placa'] . ' ' . $asig['marca'] . ' ' . $asig['modelo']) ?></span></div>
-    <div><label>Operador</label><span><?= htmlspecialchars($asig['operador_nombre']) ?></span></div>
-    <div><label>Inicio</label><span><?= $asig['start_at'] ?></span></div>
-    <div><label>KM</label><span><?= number_format((float)($asig['start_km'] ?? 0), 0) ?> km</span></div>
+  <div class="grid grid-cols-2 gap-2 mb-4 text-[13px]">
+    <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">Vehículo</label><span class="text-white font-medium"><?= htmlspecialchars($asig['placa'] . ' ' . $asig['marca'] . ' ' . $asig['modelo']) ?></span></div>
+    <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">Operador</label><span class="text-white font-medium"><?= htmlspecialchars($asig['operador_nombre']) ?></span></div>
+    <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">Inicio</label><span class="text-white font-medium"><?= $asig['start_at'] ?></span></div>
+    <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">KM</label><span class="text-white font-medium"><?= number_format((float)($asig['start_km'] ?? 0), 0) ?> km</span></div>
   </div>
 
   <?php if ($yaFirmado): ?>
-    <div class="success">✅ Esta asignación ya fue firmada el <?= $asig['firma_fecha'] ?>.</div>
+    <div class="bg-success/10 border border-success text-success px-4 py-3.5 rounded-lg text-center text-sm mt-3">✅ Esta asignación ya fue firmada el <?= $asig['firma_fecha'] ?>.</div>
     <?php if ($asig['firma_data']): ?>
-      <div style="text-align:center;margin-top:12px">
-        <img src="<?= htmlspecialchars($asig['firma_data']) ?>" alt="Firma" style="max-width:300px;border:1px solid #333;border-radius:8px;background:#fff;padding:8px">
+      <div class="text-center mt-3">
+        <img src="<?= htmlspecialchars($asig['firma_data']) ?>" alt="Firma" class="max-w-[300px] mx-auto border border-border rounded-lg bg-white p-2">
       </div>
     <?php endif; ?>
   <?php else: ?>
-    <p style="font-size:13px;color:#8892a4;margin-bottom:4px">Dibuje su firma en el recuadro:</p>
-    <canvas id="sig-canvas" width="460" height="180"></canvas>
-    <div class="actions">
-      <button class="btn btn-ghost" onclick="clearSig()">🗑 Limpiar</button>
-      <button class="btn btn-primary" onclick="submitSig()" id="btnSubmit">✅ Firmar</button>
+    <p class="text-[13px] text-muted mb-1">Dibuje su firma en el recuadro:</p>
+    <canvas id="sig-canvas" width="460" height="180" class="block w-full border-2 border-dashed border-border rounded-lg bg-dark cursor-crosshair touch-none my-3"></canvas>
+    <div class="flex gap-3 mt-3">
+      <button class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-transparent text-muted border border-border hover:bg-surface2 transition-colors" onclick="clearSig()">🗑 Limpiar</button>
+      <button class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-dark hover:brightness-90 transition-all" onclick="submitSig()" id="btnSubmit">✅ Firmar</button>
     </div>
     <div id="result"></div>
   <?php endif; ?>
@@ -181,15 +177,15 @@ async function submitSig() {
     });
     const d = await res.json();
     if (res.ok && d.ok) {
-      document.getElementById('result').innerHTML = '<div class="success">✅ Firma guardada exitosamente. Puede cerrar esta página.</div>';
+      document.getElementById('result').innerHTML = '<div class="bg-success/10 border border-success text-success px-4 py-3.5 rounded-lg text-center text-sm mt-3">✅ Firma guardada exitosamente. Puede cerrar esta página.</div>';
       btn.style.display = 'none';
     } else {
-      document.getElementById('result').innerHTML = `<div class="error">❌ ${d.error || 'Error al guardar firma'}</div>`;
+      document.getElementById('result').innerHTML = `<div class="bg-danger/10 border border-danger text-danger px-4 py-3.5 rounded-lg text-center text-sm mt-3">❌ ${d.error || 'Error al guardar firma'}</div>`;
       btn.disabled = false;
       btn.textContent = '✅ Firmar';
     }
   } catch(e) {
-    document.getElementById('result').innerHTML = `<div class="error">❌ Error de conexión</div>`;
+    document.getElementById('result').innerHTML = `<div class="bg-danger/10 border border-danger text-danger px-4 py-3.5 rounded-lg text-center text-sm mt-3">❌ Error de conexión</div>`;
     btn.disabled = false;
     btn.textContent = '✅ Firmar';
   }

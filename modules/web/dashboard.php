@@ -117,7 +117,7 @@ $ots_activas = $db->query("
 ob_start();
 ?>
 <!-- KPIs -->
-<div class="kpi-grid">
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-7">
   <div class="kpi-card yellow">
     <div class="kpi-icon">🚗</div>
     <div class="kpi-label">Vehículos</div>
@@ -157,7 +157,7 @@ ob_start();
 </div>
 
 <!-- Charts -->
-<div class="chart-grid">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-7">
   <div class="chart-card">
     <div class="chart-title">⛽ Consumo total por vehículo (litros)</div>
     <div id="chart-consumo"></div>
@@ -169,12 +169,12 @@ ob_start();
 </div>
 
 <!-- Alertas e incidentes -->
-<div class="two-col">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
   <div>
     <div class="section-title">🔔 Recordatorios próximos (30 días)</div>
     <div class="alert-list">
       <?php if (!$alertas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Sin alertas próximas</div></div>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas próximas</div></div>
       <?php else: foreach ($alertas as $a):
         $dias = (int)$a['dias'];
         $cls  = $dias < 0 ? 'critical' : ($dias <= 7 ? '' : 'info');
@@ -192,7 +192,7 @@ ob_start();
     <div class="section-title">⚠️ Incidentes abiertos</div>
     <div class="alert-list">
       <?php if (!$inc_list): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Todo en orden</div></div>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Todo en orden</div></div>
       <?php else: foreach ($inc_list as $i): ?>
         <div class="alert-item critical">
           <div class="alert-dot"></div>
@@ -205,12 +205,12 @@ ob_start();
 </div>
 
 <!-- Preventivos & OTs activas -->
-<div class="two-col" style="margin-top:18px;">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
   <div>
     <div class="section-title">📅 Alertas Preventivas</div>
     <div class="alert-list">
       <?php if (!$preventivo_alertas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Sin alertas preventivas</div></div>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas preventivas</div></div>
       <?php else: foreach (array_slice($preventivo_alertas, 0, 8) as $pa):
         $cls = $pa['tipo'] === 'vencido' ? 'critical' : 'info';
       ?>
@@ -221,7 +221,7 @@ ob_start();
         </div>
       <?php endforeach; endif; ?>
       <?php if (count($preventivo_alertas) > 8): ?>
-        <a href="/preventivos.php" style="font-size:12px;color:#47ffe8;text-decoration:none;display:block;text-align:right;margin-top:6px;">Ver todas →</a>
+        <a href="/preventivos.php" class="text-xs text-accent2 no-underline block text-right mt-1.5 hover:underline">Ver todas →</a>
       <?php endif; ?>
     </div>
   </div>
@@ -229,7 +229,7 @@ ob_start();
     <div class="section-title">🔧 OTs Activas</div>
     <div class="alert-list">
       <?php if (!$ots_activas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div style="font-size:13px">Sin OTs pendientes</div></div>
+        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin OTs pendientes</div></div>
       <?php else: foreach ($ots_activas as $ot):
         $cls = $ot['estado'] === 'En proceso' ? '' : 'info';
       ?>

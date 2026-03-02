@@ -1,5 +1,25 @@
 # FlotaControl — Sistema de Administración de Flotas
-## PHP + MySQL/MariaDB | Red Local
+## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
+
+> **v3.2.0** — Última actualización: 2026-03-02
+
+---
+
+## Características principales
+
+- **Frontend moderno**: Tailwind CSS con tema oscuro/claro intercambiable
+- **16 módulos completos**: Vehículos, Asignaciones, Combustible, Mantenimientos, Incidentes, Recordatorios, Reportes, Componentes, Preventivos, Operadores, Proveedores, Sucursales, Catálogos, Usuarios, Auditoría, Permisos
+- **Responsive**: Mobile-first hasta pantallas 4K
+- **API REST versionada**: `/api/v1/` con documentación Swagger UI
+- **Reglas de negocio estrictas**: Bloqueos, odómetro, máquina de estados OT
+- **Sistema de notificaciones**: En tiempo real con polling
+- **Firma digital**: Canvas con soporte touch + link externo
+- **Exportaciones**: CSV, XLSX y PDF
+- **Auditoría completa**: Trazabilidad de todas las operaciones
+- **Etiquetas de vehículos**: Clasificación libre con badges de colores y filtrado
+- **Costo por kilómetro**: Cálculo automático gasto/km en Perfil 360
+- **Gráfica de kilometraje**: Historial visual con Chart.js en Perfil 360
+- **Telemetría preparada**: Estructura de datos lista para integración GPS/OBD
 
 ---
 
@@ -211,6 +231,12 @@ Header set X-Frame-Options "SAMEORIGIN"
 
 - Guía de despliegue: `DEPLOY.md`
 - Tecnologías usadas: `TECNOLOGIAS.md`
+- Changelog completo: `docs/CHANGELOG.md`
+- Arquitectura del sistema: `docs/ARQUITECTURA.md`
+- Documentación API: `docs/API.md`
+- Reglas de negocio: `docs/REGLAS_NEGOCIO.md`
+- Plan de mejoras: `docs/PLAN_MEJORAS.md`
+- Migración Tailwind CSS: `docs/OBJ1_TAILWIND_CSS.md`
 
 ---
 

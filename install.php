@@ -846,6 +846,62 @@ foreach ($asgExtraCols as $col => $def) {
   }
 }
 
+// 3.9 Etiquetas de vehículos
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS vehiculo_etiquetas (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    vehiculo_id INT NOT NULL,
+    etiqueta    VARCHAR(60) NOT NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_veh_etiq (vehiculo_id, etiqueta),
+    INDEX idx_etiqueta (etiqueta),
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: vehiculo_etiquetas', true);
+} catch (Throwable $e) {
+  step('Tabla: vehiculo_etiquetas', false, $e->getMessage());
+}
+
+// 3.10 Base para telemetría futura
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS telemetria_logs (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    vehiculo_id INT NOT NULL,
+    tipo        VARCHAR(50) NOT NULL COMMENT 'gps, velocidad, rpm, temperatura, combustible_nivel, etc.',
+    valor       VARCHAR(255) NOT NULL,
+    unidad      VARCHAR(20) NULL,
+    latitud     DECIMAL(10,7) NULL,
+    longitud    DECIMAL(10,7) NULL,
+    fuente      VARCHAR(50) NOT NULL DEFAULT 'manual' COMMENT 'manual, obd2, gps_tracker, api_externa',
+    recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_telem_veh (vehiculo_id, tipo),
+    INDEX idx_telem_fecha (recorded_at),
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: telemetria_logs (base telemetría)', true);
+} catch (Throwable $e) {
+  step('Tabla: telemetria_logs', false, $e->getMessage());
+}
+
+// 3.11 Columna aseguradora/poliza en vehiculos (para costo/km)
+$vehExtraCols = [
+  'costo_adquisicion' => "DECIMAL(12,2) NULL COMMENT 'Precio de compra'",
+  'aseguradora'       => "VARCHAR(120) NULL",
+  'poliza_numero'     => "VARCHAR(80) NULL",
+];
+foreach ($vehExtraCols as $col => $def) {
+  try {
+    if (!$existsColumn('vehiculos', $col)) {
+      $pdo->exec("ALTER TABLE vehiculos ADD COLUMN {$col} {$def}");
+      step("Vehículo extra: {$col}", true);
+    } else {
+      step("Vehículo extra: {$col}", true, 'Ya existe');
+    }
+  } catch (Throwable $e) {
+    step("Vehículo extra: {$col}", false, $e->getMessage());
+  }
+}
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [
