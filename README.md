@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.2.0** — Última actualización: 2026-03-02
+> **v3.3.0** — Última actualización: 2026-03-02
 
 ---
 
@@ -20,6 +20,10 @@
 - **Costo por kilómetro**: Cálculo automático gasto/km en Perfil 360
 - **Gráfica de kilometraje**: Historial visual con Chart.js en Perfil 360
 - **Telemetría preparada**: Estructura de datos lista para integración GPS/OBD
+- **Calendario de asignaciones**: Vista FullCalendar.js con toggle tabla/calendario
+- **Checklist dinámico**: Plantillas configurables de checklist con N items
+- **Aprobaciones multinivel**: Aprobación automática para OTs de alto costo
+- **Componentes en partidas**: Vinculación directa de componentes en OTs
 
 ---
 

@@ -29,6 +29,7 @@ ob_start();
     <?php foreach($proveedores as $p): ?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['nombre'])?></option><?php endforeach; ?>
   </select>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Nueva OT</button><?php endif; ?>
+  <button class="btn btn-ghost" id="btnPendApp" onclick="verPendientes()" style="display:none" title="Aprobaciones pendientes">⚠️ <span id="pendAppCount">0</span> pendientes</button>
 </div>
 <div class="toolbar" style="padding-top:0;gap:8px;flex-wrap:wrap">
   <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Desde <input type="date" id="ffrom" onchange="load()" style="max-width:140px"></label>
@@ -37,7 +38,7 @@ ob_start();
   <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo máx <input type="number" id="fcmax" step="0.01" min="0" oninput="load()" placeholder="∞" style="max-width:100px"></label>
 </div>
 <div class="table-wrap">
-  <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Descripción</th><th>Costo</th><th>Items</th><th>KM</th><th>Proveedor</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
+  <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Descripción</th><th>Costo</th><th>Items</th><th>KM</th><th>Proveedor</th><th>Estado</th><th>Aprob.</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
   <tbody id="tbody"></tbody></table><div id="pgr"></div>
 </div>
 
@@ -91,6 +92,7 @@ ob_start();
     <div class="form-grid">
       <input type="hidden" name="id">
       <div class="form-group full"><label>Descripción *</label><input name="descripcion" placeholder="Aceite de motor 5W-30"></div>
+      <div class="form-group"><label>Componente</label><select name="component_id" id="selComponentItem"><option value="">— Sin componente —</option></select></div>
       <div class="form-group"><label>Cantidad</label><input name="cantidad" type="number" step="0.01" min="0.01" value="1"></div>
       <div class="form-group"><label>Unidad</label><select name="unidad">
         <?php foreach($unidades as $u): ?><option value="<?=htmlspecialchars($u['clave'])?>"><?=htmlspecialchars($u['nombre'])?> (<?=htmlspecialchars($u['clave'])?>)</option><?php endforeach; ?>
@@ -126,8 +128,13 @@ async function load(){
   const data=await api(url);
   pager.setTotal(data.total);
   const tbody=document.getElementById('tbody');
-  if(!data.rows.length){tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">Sin mantenimientos</div></div></td></tr>`;return;}
-  tbody.innerHTML=data.rows.map(r=>`<tr>
+  if(!data.rows.length){tbody.innerHTML=`<tr><td colspan="11"><div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">Sin mantenimientos</div></div></td></tr>`;return;}
+  const AB={'aprobada':'badge-green','pendiente':'badge-orange','rechazada':'badge-red','no_requerida':'badge-gray'};
+  tbody.innerHTML=data.rows.map(r=>{
+    const apEst = r.aprobacion_estado || 'no_requerida';
+    const apBadge = `<span class="badge ${AB[apEst]||'badge-gray'}">${apEst.replace('_',' ')}</span>`;
+    const approveBtn = apEst === 'pendiente' ? `<button class="btn btn-ghost btn-sm" onclick="aprobar(${r.id})" title="Aprobar/Rechazar">⚖️</button>` : '';
+    return `<tr>
     <td>${r.fecha}</td>
     <td><strong style="color:var(--accent2)">${r.placa||''} ${r.marca||''}</strong></td>
     <td><span class="badge badge-yellow">${r.tipo}</span></td>
@@ -137,12 +144,14 @@ async function load(){
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
     <td>${r.proveedor_nombre||'—'}</td>
     <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
+    <td>${apBadge}</td>
     <?php if(can('edit')): ?><td><div class="action-btns">
+      ${approveBtn}
       <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=mantenimiento&id=${r.id}','_blank')" title="Imprimir PDF">🖨️</button>
       <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})'>✏️</button>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="del(${r.id})">🗑️</button><?php endif; ?>
     </div></td><?php endif; ?>
-  </tr>`).join('');
+  </tr>`;}).join('');
 }
 
 function abrirNuevo(){
@@ -160,6 +169,7 @@ function editar(r){
   attMant.setEntityId(r.id);
   attMant.load();
   toggleCierreFields();
+  loadComponents(r.vehiculo_id);
 }
 
 function toggleCierreFields(){
@@ -262,6 +272,62 @@ function calcSubtotal() {
 document.getElementById('modalItem').querySelector('[name="cantidad"]')?.addEventListener('input', calcSubtotal);
 document.getElementById('modalItem').querySelector('[name="precio_unitario"]')?.addEventListener('input', calcSubtotal);
 
-document.addEventListener('DOMContentLoaded',load);
+// ═══ Aprobaciones ═══
+async function checkPendingApprovals() {
+  try {
+    const data = await api('/api/mantenimientos.php?action=pending_approvals');
+    const rows = data.rows || [];
+    const btn = document.getElementById('btnPendApp');
+    const cnt = document.getElementById('pendAppCount');
+    if (btn && cnt) {
+      cnt.textContent = rows.length;
+      btn.style.display = rows.length > 0 ? '' : 'none';
+    }
+  } catch(e) {}
+}
+
+async function verPendientes() {
+  try {
+    const data = await api('/api/mantenimientos.php?action=pending_approvals');
+    const rows = data.rows || [];
+    if (!rows.length) { toast('No hay aprobaciones pendientes'); return; }
+    const list = rows.map(r => `OT #${r.id} — ${r.placa} — ${r.tipo} — $${Number(r.costo).toFixed(2)}`).join('\n');
+    alert('Aprobaciones pendientes:\n\n' + list);
+  } catch(e) { toast('Error al cargar pendientes','error'); }
+}
+
+async function aprobar(mantId) {
+  const decision = prompt('Escriba "aprobar" para aprobar o "rechazar" para rechazar la OT #' + mantId);
+  if (!decision) return;
+  const dec = decision.trim().toLowerCase();
+  if (dec !== 'aprobar' && dec !== 'rechazar') { toast('Escriba "aprobar" o "rechazar"','error'); return; }
+  const comentario = prompt('Comentario (opcional):') || '';
+  try {
+    await api('/api/mantenimientos.php?action=aprobaciones', 'POST', {
+      mantenimiento_id: mantId,
+      decision: dec === 'aprobar' ? 'aprobado' : 'rechazado',
+      comentario: comentario
+    });
+    toast(dec === 'aprobar' ? 'OT aprobada' : 'OT rechazada');
+    load();
+    checkPendingApprovals();
+  } catch(e) { toast('Error: ' + (e.message || 'Error desconocido'),'error'); }
+}
+
+// ═══ Componentes para items ═══
+async function loadComponents(vehiculoId) {
+  const sel = document.getElementById('selComponentItem');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Sin componente —</option>';
+  if (!vehiculoId) return;
+  try {
+    const data = await api(`/api/componentes.php?vehiculo_id=${vehiculoId}`);
+    (data.rows || []).forEach(c => {
+      sel.innerHTML += `<option value="${c.id}">${c.tipo}: ${c.marca||''} ${c.modelo||''} ${c.numero_serie||''}</option>`;
+    });
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => { load(); checkPendingApprovals(); });
 </script>
 <?php $content=ob_get_clean(); echo render_layout('Mantenimientos / OT','mantenimientos',$content); ?>

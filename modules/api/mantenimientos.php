@@ -97,7 +97,7 @@ try {
 
                 $db->beginTransaction();
                 try {
-                    $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas) VALUES (?,?,?,?,?,?)")
+                    $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
                        ->execute([
                            $mantId,
                            $d['descripcion'],
@@ -105,6 +105,7 @@ try {
                            $d['unidad'] ?? 'PZA',
                            (float)($d['precio_unitario'] ?? 0),
                            $d['notas'] ?? null,
+                           !empty($d['component_id']) ? (int)$d['component_id'] : null,
                        ]);
                     $newId = (int)$db->lastInsertId();
 
@@ -143,13 +144,14 @@ try {
 
                 $db->beginTransaction();
                 try {
-                    $db->prepare("UPDATE mantenimiento_items SET descripcion = ?, cantidad = ?, unidad = ?, precio_unitario = ?, notas = ? WHERE id = ?")
+                    $db->prepare("UPDATE mantenimiento_items SET descripcion = ?, cantidad = ?, unidad = ?, precio_unitario = ?, notas = ?, component_id = ? WHERE id = ?")
                        ->execute([
                            $d['descripcion'],
                            (float)($d['cantidad'] ?? 1),
                            $d['unidad'] ?? 'PZA',
                            (float)($d['precio_unitario'] ?? 0),
                            $d['notas'] ?? null,
+                           !empty($d['component_id']) ? (int)$d['component_id'] : null,
                            (int)$d['id'],
                        ]);
                     // Recalcular costo total
@@ -197,6 +199,63 @@ try {
                 echo json_encode(['ok' => true]);
                 break;
         }
+        exit;
+    }
+
+    // ───────────── Aprobaciones multinivel ─────────────
+    if ($action === 'aprobaciones') {
+        $mantId = (int)($_GET['mantenimiento_id'] ?? 0);
+        if ($method === 'GET' && $mantId > 0) {
+            $stmt = $db->prepare("SELECT ma.*, u.nombre AS aprobador_nombre FROM mantenimiento_aprobaciones ma LEFT JOIN usuarios u ON u.id = ma.aprobador_id WHERE ma.mantenimiento_id = ? ORDER BY ma.nivel ASC, ma.id DESC");
+            $stmt->execute([$mantId]);
+            echo json_encode(['aprobaciones' => $stmt->fetchAll()]);
+            exit;
+        }
+        if ($method === 'POST') {
+            if (!in_array($rol, ['coordinador_it', 'admin'], true)) { http_response_code(403); echo json_encode(['error' => 'Solo coordinadores/admins pueden aprobar.']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            $mantId = (int)($d['mantenimiento_id'] ?? 0);
+            $decision = $d['decision'] ?? '';
+            $comentario = $d['comentario'] ?? null;
+            if ($mantId <= 0 || !in_array($decision, ['aprobado', 'rechazado'], true)) { http_response_code(400); echo json_encode(['error' => 'Datos incompletos']); exit; }
+            $mant = $db->prepare("SELECT costo, aprobacion_estado FROM mantenimientos WHERE id=? AND deleted_at IS NULL LIMIT 1");
+            $mant->execute([$mantId]);
+            $mantData = $mant->fetch();
+            if (!$mantData || $mantData['aprobacion_estado'] !== 'pendiente') { http_response_code(409); echo json_encode(['error' => 'La OT no tiene aprobación pendiente.']); exit; }
+            $costo = (float)$mantData['costo'];
+            // Determinar nivel actual
+            $maxNivel = $db->prepare("SELECT COALESCE(MAX(nivel),0) FROM mantenimiento_aprobaciones WHERE mantenimiento_id=? AND estado='aprobado'");
+            $maxNivel->execute([$mantId]);
+            $nivelActual = (int)$maxNivel->fetchColumn() + 1;
+            // Insertar decisión
+            $db->prepare("INSERT INTO mantenimiento_aprobaciones (mantenimiento_id, nivel, aprobador_id, estado, comentario) VALUES (?,?,?,?,?)")
+                ->execute([$mantId, $nivelActual, (int)($user['id'] ?? 0), $decision, $comentario]);
+            if ($decision === 'rechazado') {
+                $db->prepare("UPDATE mantenimientos SET aprobacion_estado='rechazada' WHERE id=?")->execute([$mantId]);
+            } else {
+                // Verificar si se requiere otro nivel
+                $umbralN2 = 15000;
+                try { $stN2 = $db->prepare("SELECT value_num FROM system_settings WHERE key_name='maintenance.umbral_aprobacion_n2' LIMIT 1"); $stN2->execute(); $v = $stN2->fetchColumn(); if ($v !== false) $umbralN2 = (float)$v; } catch (Throwable $e) {}
+                $nivelRequerido = $costo >= $umbralN2 ? 2 : 1;
+                if ($nivelActual >= $nivelRequerido) {
+                    $db->prepare("UPDATE mantenimientos SET aprobacion_estado='aprobada' WHERE id=?")->execute([$mantId]);
+                }
+            }
+            audit_log('mantenimiento_aprobaciones', $decision, $mantId, [], ['nivel' => $nivelActual, 'decision' => $decision]);
+            echo json_encode(['ok' => true, 'nivel' => $nivelActual]);
+            exit;
+        }
+    }
+
+    if ($action === 'pending_approvals' && $method === 'GET') {
+        if (!in_array($rol, ['coordinador_it', 'admin'], true)) { echo json_encode(['rows' => []]); exit; }
+        $stmt = $db->query("SELECT m.id, m.fecha, m.tipo, m.costo, m.descripcion, m.aprobacion_estado, v.placa, p.nombre AS proveedor_nombre
+            FROM mantenimientos m
+            LEFT JOIN vehiculos v ON v.id = m.vehiculo_id
+            LEFT JOIN proveedores p ON p.id = m.proveedor_id
+            WHERE m.deleted_at IS NULL AND m.aprobacion_estado = 'pendiente'
+            ORDER BY m.costo DESC, m.fecha ASC");
+        echo json_encode(['rows' => $stmt->fetchAll()]);
         exit;
     }
 
@@ -284,6 +343,14 @@ try {
                 }
                 $newId = (int)$db->lastInsertId();
 
+                // ═══ Aprobación multinivel automática ═══
+                $costoOT = (float)($d['costo'] ?? 0);
+                $umbralN1 = 5000;
+                try { $stU = $db->prepare("SELECT value_num FROM system_settings WHERE key_name='maintenance.umbral_aprobacion_n1' LIMIT 1"); $stU->execute(); $v = $stU->fetchColumn(); if ($v !== false) $umbralN1 = (float)$v; } catch (Throwable $e) {}
+                if ($costoOT >= $umbralN1) {
+                    $db->prepare("UPDATE mantenimientos SET requiere_aprobacion=1, aprobacion_estado='pendiente' WHERE id=?")->execute([$newId]);
+                }
+
                 // Si se marca "En proceso", actualizar estado del vehículo
                 if ($estadoInicial === 'En proceso') {
                     $db->prepare("UPDATE vehiculos SET estado = 'En mantenimiento' WHERE id = ? AND estado = 'Activo'")
@@ -320,6 +387,20 @@ try {
                     http_response_code(409);
                     echo json_encode(['error' => "Transición de estado no permitida: {$estadoAnterior} → {$estadoNuevo}"]);
                     break;
+                }
+                // ═══ Aprobación multinivel: bloquear Pendiente→En proceso si requiere aprobación ═══
+                if ($estadoAnterior === 'Pendiente' && $estadoNuevo === 'En proceso') {
+                    $aprobEst = $prev['aprobacion_estado'] ?? 'no_requerida';
+                    if ($aprobEst === 'pendiente') {
+                        http_response_code(409);
+                        echo json_encode(['error' => 'Esta OT requiere aprobación antes de iniciar. Estado actual: pendiente de aprobación.']);
+                        break;
+                    }
+                    if ($aprobEst === 'rechazada') {
+                        http_response_code(409);
+                        echo json_encode(['error' => 'Esta OT fue rechazada en el proceso de aprobación. No se puede iniciar.']);
+                        break;
+                    }
                 }
             }
 

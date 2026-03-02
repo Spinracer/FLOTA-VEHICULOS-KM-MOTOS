@@ -902,6 +902,170 @@ foreach ($vehExtraCols as $col => $def) {
   }
 }
 
+// ═══════════════════════════════════════════════════
+// 3.12 Plantillas de checklist dinámicas (Objetivo 3)
+// ═══════════════════════════════════════════════════
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS checklist_plantillas (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    nombre      VARCHAR(120) NOT NULL,
+    tipo        ENUM('entrega','retorno','ambos') NOT NULL DEFAULT 'ambos',
+    activo      TINYINT(1) NOT NULL DEFAULT 1,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_plantilla_nombre (nombre)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: checklist_plantillas', true);
+} catch (Throwable $e) {
+  step('Tabla: checklist_plantillas', false, $e->getMessage());
+}
+
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS checklist_plantilla_items (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    plantilla_id  INT NOT NULL,
+    label         VARCHAR(120) NOT NULL,
+    orden         INT NOT NULL DEFAULT 0,
+    requerido     TINYINT(1) NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_plantilla_items (plantilla_id, orden),
+    FOREIGN KEY (plantilla_id) REFERENCES checklist_plantillas(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: checklist_plantilla_items', true);
+} catch (Throwable $e) {
+  step('Tabla: checklist_plantilla_items', false, $e->getMessage());
+}
+
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS asignacion_checklist_respuestas (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    asignacion_id   BIGINT NOT NULL,
+    item_label      VARCHAR(120) NOT NULL,
+    momento         ENUM('entrega','retorno') NOT NULL,
+    checked         TINYINT(1) NOT NULL DEFAULT 0,
+    observacion     TEXT NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_acr_asig (asignacion_id, momento),
+    FOREIGN KEY (asignacion_id) REFERENCES asignaciones(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: asignacion_checklist_respuestas', true);
+} catch (Throwable $e) {
+  step('Tabla: asignacion_checklist_respuestas', false, $e->getMessage());
+}
+
+// Insertar plantilla por defecto si la tabla está vacía
+try {
+  $cnt = (int)$pdo->query("SELECT COUNT(*) FROM checklist_plantillas")->fetchColumn();
+  if ($cnt === 0) {
+    $pdo->exec("INSERT INTO checklist_plantillas (nombre, tipo) VALUES ('Estándar Flota', 'ambos')");
+    $defPlantilla = (int)$pdo->lastInsertId();
+    $defItems = ['Gata','Herramientas','Llanta de repuesto','BAC Flota','Revisión general OK','Luces funcionando','Frenos OK','Documentos vigentes'];
+    $orden = 0;
+    foreach ($defItems as $label) {
+      $pdo->prepare("INSERT INTO checklist_plantilla_items (plantilla_id, label, orden) VALUES (?,?,?)")
+          ->execute([$defPlantilla, $label, $orden++]);
+    }
+    step('Plantilla checklist por defecto insertada', true, count($defItems).' items');
+  } else {
+    step('Plantilla checklist por defecto', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Plantilla checklist por defecto', false, $e->getMessage());
+}
+
+// ═══════════════════════════════════════════════════
+// 3.13 Sistema de aprobación multinivel para OTs (Objetivo 3)
+// ═══════════════════════════════════════════════════
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS mantenimiento_aprobaciones (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    mantenimiento_id  INT NOT NULL,
+    nivel             INT NOT NULL DEFAULT 1 COMMENT '1=soporte, 2=coordinador',
+    aprobador_id      INT NULL,
+    estado            ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
+    comentario        TEXT NULL,
+    fecha             DATETIME NULL,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_aprobaciones_mant (mantenimiento_id, nivel),
+    FOREIGN KEY (mantenimiento_id) REFERENCES mantenimientos(id) ON DELETE CASCADE,
+    FOREIGN KEY (aprobador_id) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: mantenimiento_aprobaciones', true);
+} catch (Throwable $e) {
+  step('Tabla: mantenimiento_aprobaciones', false, $e->getMessage());
+}
+
+// Columna requiere_aprobacion en mantenimientos
+try {
+  if (!$existsColumn('mantenimientos', 'requiere_aprobacion')) {
+    $pdo->exec("ALTER TABLE mantenimientos ADD COLUMN requiere_aprobacion TINYINT(1) NOT NULL DEFAULT 0");
+    step('Mant extra: requiere_aprobacion', true);
+  } else {
+    step('Mant extra: requiere_aprobacion', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Mant extra: requiere_aprobacion', false, $e->getMessage());
+}
+
+try {
+  if (!$existsColumn('mantenimientos', 'aprobacion_estado')) {
+    $pdo->exec("ALTER TABLE mantenimientos ADD COLUMN aprobacion_estado ENUM('no_requerida','pendiente','aprobada','rechazada') NOT NULL DEFAULT 'no_requerida'");
+    step('Mant extra: aprobacion_estado', true);
+  } else {
+    step('Mant extra: aprobacion_estado', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Mant extra: aprobacion_estado', false, $e->getMessage());
+}
+
+// Settings para umbrales de aprobación
+try {
+  $stCheck = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE key_name=?");
+  $stCheck->execute(['maintenance.umbral_aprobacion_n1']);
+  if ((int)$stCheck->fetchColumn() === 0) {
+    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, descripcion) VALUES (?,?,?)")
+        ->execute(['maintenance.umbral_aprobacion_n1', 5000, 'Costo mínimo para requerir aprobación nivel 1 (soporte)']);
+    step('Setting: umbral_aprobacion_n1', true, '$5,000');
+  } else {
+    step('Setting: umbral_aprobacion_n1', true, 'Ya existe');
+  }
+  $stCheck->execute(['maintenance.umbral_aprobacion_n2']);
+  if ((int)$stCheck->fetchColumn() === 0) {
+    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, descripcion) VALUES (?,?,?)")
+        ->execute(['maintenance.umbral_aprobacion_n2', 15000, 'Costo mínimo para requerir aprobación nivel 2 (coordinador)']);
+    step('Setting: umbral_aprobacion_n2', true, '$15,000');
+  } else {
+    step('Setting: umbral_aprobacion_n2', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Settings aprobación', false, $e->getMessage());
+}
+
+// ═══════════════════════════════════════════════════
+// 3.14 Control de repuestos en partidas OT (Objetivo 3)
+// ═══════════════════════════════════════════════════
+try {
+  if (!$existsColumn('mantenimiento_items', 'component_id')) {
+    $pdo->exec("ALTER TABLE mantenimiento_items ADD COLUMN component_id INT NULL COMMENT 'Referencia a componente del inventario'");
+    step('Items extra: component_id', true);
+  } else {
+    step('Items extra: component_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Items extra: component_id', false, $e->getMessage());
+}
+
+// Columna plantilla_id en asignaciones
+try {
+  if (!$existsColumn('asignaciones', 'plantilla_id')) {
+    $pdo->exec("ALTER TABLE asignaciones ADD COLUMN plantilla_id INT NULL COMMENT 'Plantilla de checklist usada'");
+    step('Asignación extra: plantilla_id', true);
+  } else {
+    step('Asignación extra: plantilla_id', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Asignación extra: plantilla_id', false, $e->getMessage());
+}
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [

@@ -8,12 +8,18 @@ ob_start();
 ?>
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por placa, operador..." oninput="load()"></div>
-  <select id="fv" onchange="load()" style="max-width:180px">
+  <select id="fv" onchange="load();loadCalendar()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
     <?php foreach($vehiculos as $v): ?><option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['placa'].' '.$v['marca']) ?></option><?php endforeach; ?>
   </select>
   <select id="fe" onchange="load()" style="max-width:160px"><option value="">Todos</option><option>Activa</option><option>Cerrada</option></select>
+  <button class="btn btn-ghost" id="btn-view-toggle" onclick="toggleView()">📅 Calendario</button>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="openNew()">+ Nueva Asignación</button><?php endif; ?>
+</div>
+
+<!-- Vista Calendario -->
+<div id="calendar-view" style="display:none;background:var(--bg2);border-radius:12px;padding:16px;margin-bottom:16px">
+  <div id="fc-calendar" style="min-height:500px"></div>
 </div>
 
 <div class="table-wrap">
@@ -50,6 +56,13 @@ ob_start();
       <div class="form-group full"><label>Notas</label><textarea name="start_notes" placeholder="Observaciones de entrega..."></textarea></div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Entrega</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+          <select id="plantilla-select" onchange="loadPlantillaItems()" style="flex:1;font-size:12px">
+            <option value="">— Plantilla dinámica —</option>
+          </select>
+          <span style="font-size:11px;color:var(--text2)">o usa el checklist fijo ↓</span>
+        </div>
+        <div id="dynamic-checklist-items" style="display:none;margin-bottom:10px;padding:8px;border:1px dashed var(--border);border-radius:6px"></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas</label>
@@ -109,8 +122,78 @@ ob_start();
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 <script>
 const pager = new Paginator('pgr', load, 25);
+let calendarView = false;
+let fcInstance = null;
+
+// ── FullCalendar ──
+function toggleView() {
+  calendarView = !calendarView;
+  document.getElementById('calendar-view').style.display = calendarView ? '' : 'none';
+  document.querySelector('.table-wrap').style.display = calendarView ? 'none' : '';
+  document.getElementById('btn-view-toggle').textContent = calendarView ? '📋 Tabla' : '📅 Calendario';
+  if (calendarView && !fcInstance) initCalendar();
+  if (calendarView) loadCalendar();
+}
+function initCalendar() {
+  const el = document.getElementById('fc-calendar');
+  fcInstance = new FullCalendar.Calendar(el, {
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' },
+    eventClick: info => { if (info.event.extendedProps.estado === 'Activa') openClose(info.event.extendedProps._raw); },
+    height: 'auto',
+    themeSystem: 'standard',
+  });
+  fcInstance.render();
+}
+async function loadCalendar() {
+  if (!fcInstance) return;
+  const vid = document.getElementById('fv').value;
+  const info = fcInstance.view;
+  const from = info.activeStart.toISOString().slice(0,10);
+  const to = info.activeEnd.toISOString().slice(0,10);
+  try {
+    const data = await api(`/api/asignaciones.php?action=calendar&from=${from}&to=${to}&vehiculo_id=${vid}`);
+    fcInstance.removeAllEvents();
+    (data.events || []).forEach(ev => {
+      ev._raw = ev.extendedProps;
+      fcInstance.addEvent(ev);
+    });
+  } catch(e) {}
+}
+
+// ── Dynamic checklist plantillas ──
+async function loadPlantillas() {
+  try {
+    const data = await api('/api/asignaciones.php?action=checklist_plantillas');
+    const sel = document.getElementById('plantilla-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Plantilla dinámica —</option>';
+    (data.plantillas || []).forEach(p => {
+      sel.innerHTML += `<option value="${p.id}">${p.nombre} (${p.tipo})</option>`;
+    });
+  } catch(e) {}
+}
+async function loadPlantillaItems() {
+  const sel = document.getElementById('plantilla-select');
+  const container = document.getElementById('dynamic-checklist-items');
+  if (!sel || !container) return;
+  const pid = sel.value;
+  if (!pid) { container.style.display = 'none'; container.innerHTML = ''; return; }
+  try {
+    const data = await api(`/api/asignaciones.php?action=checklist_items&plantilla_id=${pid}`);
+    const items = data.items || [];
+    if (!items.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    container.innerHTML = '<div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--accent2)">Items de plantilla:</div>' +
+      items.map(it => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px">
+        <input type="checkbox" class="dyn-check" data-label="${it.label}" ${it.requerido?'required':''} style="accent-color:#e8ff47"> ${it.label}${it.requerido?' *':''}
+      </label>`).join('');
+  } catch(e) { container.style.display = 'none'; }
+}
 
 // ── Firma canvas ──
 let firmaDrawing = false;
@@ -220,7 +303,19 @@ async function saveNew(){
     const cb = document.querySelector(`#modal-new [name="${f}"]`);
     d[f] = cb && cb.checked ? 1 : 0;
   });
-  await api('/api/asignaciones.php', 'POST', d);
+  // Plantilla ID
+  const pSel = document.getElementById('plantilla-select');
+  if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
+  const res = await api('/api/asignaciones.php', 'POST', d);
+  // Guardar respuestas dinámicas del checklist
+  if (res.id && pSel && pSel.value) {
+    const dynChecks = document.querySelectorAll('#dynamic-checklist-items .dyn-check');
+    if (dynChecks.length) {
+      const items = [];
+      dynChecks.forEach(cb => items.push({ label: cb.dataset.label, checked: cb.checked ? 1 : 0, observacion: null }));
+      try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) {}
+    }
+  }
   toast('Asignación creada');
   closeModal('modal-new');
   load();
@@ -264,7 +359,7 @@ async function delItem(id){
   });
 }
 
-document.addEventListener('DOMContentLoaded', load);
+document.addEventListener('DOMContentLoaded', () => { load(); loadPlantillas(); });
 </script>
 
 <?php $content = ob_get_clean(); echo render_layout('Asignaciones', 'asignaciones', $content); ?>

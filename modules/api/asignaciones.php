@@ -81,6 +81,118 @@ try {
     // ─── Sub-endpoint: snapshots de componentes ───
     $subAction = trim($_GET['action'] ?? '');
 
+    // ─── Sub-endpoint: calendario de asignaciones ───
+    if ($subAction === 'calendar' && $method === 'GET') {
+        $from = trim($_GET['from'] ?? '');
+        $to = trim($_GET['to'] ?? '');
+        if (!$from) $from = date('Y-m-01');
+        if (!$to) $to = date('Y-m-t');
+        $vid = (int)($_GET['vehiculo_id'] ?? 0);
+        $where = "WHERE a.deleted_at IS NULL AND a.start_at <= ? AND (a.end_at >= ? OR a.end_at IS NULL)";
+        $params = [$to . ' 23:59:59', $from . ' 00:00:00'];
+        if ($vid) { $where .= " AND a.vehiculo_id = ?"; $params[] = $vid; }
+        $stmt = $db->prepare("SELECT a.id, a.vehiculo_id, a.operador_id, a.start_at, a.end_at, a.estado,
+            v.placa, v.marca, o.nombre AS operador_nombre
+            FROM asignaciones a
+            JOIN vehiculos v ON v.id = a.vehiculo_id
+            JOIN operadores o ON o.id = a.operador_id
+            $where ORDER BY a.start_at ASC");
+        $stmt->execute($params);
+        $events = [];
+        foreach ($stmt->fetchAll() as $r) {
+            $events[] = [
+                'id' => (int)$r['id'],
+                'title' => $r['placa'] . ' — ' . $r['operador_nombre'],
+                'start' => $r['start_at'],
+                'end' => $r['end_at'] ?: null,
+                'color' => $r['estado'] === 'Activa' ? '#2ed573' : '#8892a4',
+                'extendedProps' => [
+                    'estado' => $r['estado'],
+                    'placa' => $r['placa'],
+                    'marca' => $r['marca'],
+                    'operador' => $r['operador_nombre'],
+                ],
+            ];
+        }
+        echo json_encode(['events' => $events]);
+        exit;
+    }
+
+    // ─── Sub-endpoint: plantillas de checklist ───
+    if ($subAction === 'checklist_plantillas') {
+        if ($method === 'GET') {
+            try { $stmt = $db->query("SELECT id, nombre, tipo FROM checklist_plantillas WHERE activo = 1 ORDER BY nombre"); echo json_encode(['plantillas' => $stmt->fetchAll()]); }
+            catch (Throwable $e) { echo json_encode(['plantillas' => []]); }
+            exit;
+        }
+        if ($method === 'POST') {
+            if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            $nombre = trim($d['nombre'] ?? '');
+            $tipo = $d['tipo'] ?? 'ambos';
+            if (!$nombre) { http_response_code(400); echo json_encode(['error' => 'Nombre requerido']); exit; }
+            $db->prepare("INSERT INTO checklist_plantillas (nombre, tipo) VALUES (?,?)")->execute([$nombre, $tipo]);
+            $pid = (int)$db->lastInsertId();
+            $items = $d['items'] ?? [];
+            $orden = 0;
+            foreach ($items as $item) {
+                $label = trim($item['label'] ?? '');
+                if ($label === '') continue;
+                $db->prepare("INSERT INTO checklist_plantilla_items (plantilla_id, label, orden, requerido) VALUES (?,?,?,?)")
+                    ->execute([$pid, $label, $orden++, (int)($item['requerido'] ?? 0)]);
+            }
+            audit_log('checklist_plantillas', 'create', $pid, [], $d);
+            echo json_encode(['ok' => true, 'id' => $pid]);
+            exit;
+        }
+        if ($method === 'DELETE') {
+            if (!can('delete')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos']); exit; }
+            $pid = (int)($_GET['id'] ?? 0);
+            $db->prepare("UPDATE checklist_plantillas SET activo=0 WHERE id=?")->execute([$pid]);
+            echo json_encode(['ok' => true]);
+            exit;
+        }
+    }
+
+    // ─── Sub-endpoint: items de una plantilla ───
+    if ($subAction === 'checklist_items' && $method === 'GET') {
+        $pid = (int)($_GET['plantilla_id'] ?? 0);
+        if ($pid <= 0) { http_response_code(400); echo json_encode(['error' => 'plantilla_id requerido']); exit; }
+        $stmt = $db->prepare("SELECT id, label, orden, requerido FROM checklist_plantilla_items WHERE plantilla_id=? ORDER BY orden");
+        $stmt->execute([$pid]);
+        echo json_encode(['items' => $stmt->fetchAll()]);
+        exit;
+    }
+
+    // ─── Sub-endpoint: respuestas de checklist ───
+    if ($subAction === 'checklist_respuestas') {
+        $asigId = (int)($_GET['asignacion_id'] ?? 0);
+        if ($method === 'GET' && $asigId > 0) {
+            $momento = trim($_GET['momento'] ?? '');
+            $where = "WHERE asignacion_id = ?";
+            $params = [$asigId];
+            if ($momento) { $where .= " AND momento = ?"; $params[] = $momento; }
+            try { $stmt = $db->prepare("SELECT * FROM asignacion_checklist_respuestas $where ORDER BY id ASC"); $stmt->execute($params); echo json_encode(['respuestas' => $stmt->fetchAll()]); }
+            catch (Throwable $e) { echo json_encode(['respuestas' => []]); }
+            exit;
+        }
+        if ($method === 'POST') {
+            if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            $asigId = (int)($d['asignacion_id'] ?? 0);
+            $momento = $d['momento'] ?? 'entrega';
+            $items = $d['items'] ?? [];
+            if ($asigId <= 0 || empty($items)) { http_response_code(400); echo json_encode(['error' => 'Datos incompletos']); exit; }
+            $db->prepare("DELETE FROM asignacion_checklist_respuestas WHERE asignacion_id=? AND momento=?")->execute([$asigId, $momento]);
+            foreach ($items as $item) {
+                $db->prepare("INSERT INTO asignacion_checklist_respuestas (asignacion_id, item_label, momento, checked, observacion) VALUES (?,?,?,?,?)")
+                    ->execute([$asigId, trim($item['label'] ?? ''), $momento, (int)($item['checked'] ?? 0), $item['observacion'] ?? null]);
+            }
+            echo json_encode(['ok' => true]);
+            exit;
+        }
+    }
+
     // ─── Sub-endpoint: generar link de firma ───
     if ($subAction === 'firma_link' && $method === 'POST') {
         if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); exit; }

@@ -1,5 +1,31 @@
 # FlotaControl — Changelog
 
+## [3.3.0] — 2026-03-02
+
+### Nuevas Funcionalidades — Objetivo 3: Mejoras Asignaciones + Mantenimientos
+
+- **Calendario visual de asignaciones**: Vista FullCalendar.js con toggle tabla/calendario, filtrado por vehículo, eventos coloreados por estado, vistas mensual/semanal/listado.
+- **Checklist dinámico con plantillas**: Plantillas configurables de checklist (entrega/retorno/ambos) con N items ordenados. Selector de plantilla en modal de nueva asignación. Respuestas vinculadas a cada asignación. Compatible con checklist fijo existente.
+- **Aprobaciones multinivel para OTs**: Activación automática por umbral de costo ($5,000 N1 / $15,000 N2). Bloqueo de transición Pendiente→En proceso si pendiente/rechazada. Botón de aprobación/rechazo directa en tabla. Contador de pendientes para coordinadores.
+- **Componentes en partidas de mantenimiento**: Selector de componente vinculado al vehículo de la OT. Columna `component_id` en `mantenimiento_items`.
+
+### Migraciones
+- **install.php §3.12**: Tablas `checklist_plantillas`, `checklist_plantilla_items`, `asignacion_checklist_respuestas`. Plantilla estándar con 8 items pre-cargados.
+- **install.php §3.13**: Tabla `mantenimiento_aprobaciones`. Columnas `requiere_aprobacion`, `aprobacion_estado` en mantenimientos. Settings de umbrales.
+- **install.php §3.14**: Columnas `component_id` en mantenimiento_items, `plantilla_id` en asignaciones.
+
+### API
+- `asignaciones.php`: +4 sub-endpoints (calendar, checklist_plantillas, checklist_items, checklist_respuestas)
+- `mantenimientos.php`: +3 sub-endpoints (aprobaciones, pending_approvals), approval gate, auto-trigger, component_id en items CRUD
+
+### Dependencias
+- **FullCalendar 6.1.10** (CDN) para vista de calendario de asignaciones.
+
+### Documentación
+- `docs/OBJ3_ASIGNACIONES_MANTENIMIENTOS.md` — Documentación completa del objetivo.
+
+---
+
 ## [3.2.0] — 2026-03-02
 
 ### Nuevas Funcionalidades — Objetivo 2: Mejoras del Módulo Vehículos
