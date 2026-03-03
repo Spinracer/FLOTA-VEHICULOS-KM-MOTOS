@@ -1,5 +1,34 @@
 # FlotaControl — Changelog
 
+## [3.6.0] — 2026-03-02
+
+### Nuevo Módulo — Objetivo 6: Centro de Alertas
+
+- **Módulo alertas completo**: Nuevo centro de mando unificado para todas las alertas del sistema.
+- **Escaneo automático**: 8 detectores (licencias, seguros, componentes, recordatorios, stock bajo, incidentes sin atender, contratos, mantenimientos vencidos).
+- **Priorización inteligente**: 4 niveles (Baja, Normal, Alta, Urgente) con badges visuales y auto-detección de prioridad según urgencia.
+- **Historial de cambios**: Timeline completo de cada alerta (creación, asignación, cambios de estado, notas).
+- **Asignación de responsables**: Asignación directa a usuarios con notificación automática.
+- **KPI cards**: Activas, Urgentes, Altas, Sin Asignar en tiempo real.
+- **Filtros avanzados**: Por tipo (10), prioridad (4), estado (4), búsqueda libre.
+- **Creación manual**: Formulario completo con selects dinámicos de vehículos y usuarios.
+- **Anti-duplicación**: Verificación automática antes de crear alertas escaneadas.
+- **Auto-resolución**: Alertas de recordatorios se auto-resuelven cuando el recordatorio cambia de estado.
+
+### Migraciones
+- **install.php §3.17**: 2 tablas (alertas con 10 tipos ENUM y 7 índices, alerta_historial con FK CASCADE).
+
+### API
+- `alertas.php`: Nuevo — scan, stats, historial, CRUD completo.
+
+### Navegación
+- Sidebar: nueva entrada "🚨 Centro de Alertas" en sección Gestión.
+
+### Documentación
+- `docs/OBJ6_CENTRO_ALERTAS.md`
+
+---
+
 ## [3.5.0] — 2026-03-02
 
 ### Nuevas Funcionalidades — Objetivo 5: Operadores + Componentes + Proveedores + Sucursales

@@ -1232,6 +1232,55 @@ try {
   } else { step('Components: stock_minimo', true, 'Ya existe'); }
 } catch (Throwable $e) { step('Components: stock_minimo', false, $e->getMessage()); }
 
+// 3.17 Centro de Alertas Unificado (Objetivo 6)
+// ═══════════════════════════════════════════════════
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS alertas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tipo ENUM('vencimiento','mantenimiento','incidente','combustible','recordatorio','componente','licencia','contrato','seguro','inventario') NOT NULL,
+    prioridad ENUM('Baja','Normal','Alta','Urgente') NOT NULL DEFAULT 'Normal',
+    titulo VARCHAR(250) NOT NULL,
+    mensaje TEXT NULL,
+    estado ENUM('Activa','Atendida','Descartada','Resuelta') NOT NULL DEFAULT 'Activa',
+    entidad VARCHAR(60) NULL COMMENT 'Tabla fuente: vehiculos, operadores, etc.',
+    entidad_id INT NULL COMMENT 'ID del registro fuente',
+    vehiculo_id INT NULL,
+    responsable_id INT NULL COMMENT 'Usuario asignado',
+    fecha_referencia DATE NULL COMMENT 'Fecha de vencimiento, límite, etc.',
+    resuelto_at DATETIME NULL,
+    resuelto_por INT NULL,
+    notas TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_alerta_tipo (tipo),
+    INDEX idx_alerta_estado (estado),
+    INDEX idx_alerta_prioridad (prioridad),
+    INDEX idx_alerta_vehiculo (vehiculo_id),
+    INDEX idx_alerta_responsable (responsable_id),
+    INDEX idx_alerta_fecha_ref (fecha_referencia),
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE SET NULL,
+    FOREIGN KEY (responsable_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (resuelto_por) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: alertas', true);
+} catch (Throwable $e) { step('Tabla: alertas', false, $e->getMessage()); }
+
+// -- Historial de alertas (acciones)
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS alerta_historial (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    alerta_id INT NOT NULL,
+    usuario_id INT NULL,
+    accion VARCHAR(60) NOT NULL COMMENT 'creada, asignada, atendida, descartada, resuelta, nota',
+    comentario TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ahist_alerta (alerta_id),
+    FOREIGN KEY (alerta_id) REFERENCES alertas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: alerta_historial', true);
+} catch (Throwable $e) { step('Tabla: alerta_historial', false, $e->getMessage()); }
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [

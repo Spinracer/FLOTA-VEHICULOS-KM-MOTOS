@@ -89,6 +89,7 @@ tailwind.config = {
     <?= $nav('/reportes.php', 'reportes', '📈', 'Reportes') ?>
     <?= $nav('/componentes.php', 'componentes', '🧰', 'Componentes') ?>
     <?= $nav('/preventivos.php', 'preventivos', '📅', 'Preventivos') ?>
+    <?= $nav('/alertas.php', 'alertas', '🚨', 'Centro de Alertas') ?>
 
     <?php if ($can_edit || $is_admin): ?>
     <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-4 pb-1.5 nav-section-label">Administración</div>

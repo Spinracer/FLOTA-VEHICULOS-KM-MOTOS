@@ -1,14 +1,14 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.5.0** — Última actualización: 2026-03-02
+> **v3.6.0** — Última actualización: 2026-03-02
 
 ---
 
 ## Características principales
 
 - **Frontend moderno**: Tailwind CSS con tema oscuro/claro intercambiable
-- **16 módulos completos**: Vehículos, Asignaciones, Combustible, Mantenimientos, Incidentes, Recordatorios, Reportes, Componentes, Preventivos, Operadores, Proveedores, Sucursales, Catálogos, Usuarios, Auditoría, Permisos
+- **16 módulos completos**: Vehículos, Asignaciones, Combustible, Mantenimientos, Incidentes, Recordatorios, Reportes, Componentes, Preventivos, Operadores, Proveedores, Sucursales, Alertas, Catálogos, Usuarios, Auditoría, Permisos
 - **Responsive**: Mobile-first hasta pantallas 4K
 - **API REST versionada**: `/api/v1/` con documentación Swagger UI
 - **Reglas de negocio estrictas**: Bloqueos, odómetro, máquina de estados OT
@@ -35,6 +35,9 @@
 - **Evaluación de proveedores**: Ranking 4 dimensiones con estrellas
 - **Contratos de proveedores**: Registro con estado y montos
 - **Dashboard comparativo sucursales**: 4 gráficos Chart.js
+- **Centro de Alertas**: Módulo unificado con escaneo automático de 8 fuentes
+- **Priorización de alertas**: 4 niveles con detección inteligente de urgencia
+- **Historial de alertas**: Timeline completo de acciones y cambios de estado
 
 ---
 
