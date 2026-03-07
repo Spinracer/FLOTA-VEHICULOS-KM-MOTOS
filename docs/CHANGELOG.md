@@ -1,5 +1,45 @@
 # FlotaControl — Changelog
 
+## [3.8.0] — 2026-03-07
+
+### Mejora Mayor — Objetivo 8: Seguridad Avanzada
+
+- **Protección CSRF**: Token por sesión (64 hex chars) validado en todas las operaciones de escritura.
+- **Meta tag CSRF**: Inyectado automáticamente en layout → leído por `app.js` como header `X-CSRF-Token`.
+- **Rate Limiting**: Límites por acción — login (5/min), API write (60/min), API read (120/min).
+- **Rate Limiting DB-backed**: Tabla `rate_limits` con limpieza automática probabilística.
+- **2FA TOTP**: Implementación RFC 6238 en PHP puro, compatible con Google Authenticator/Authy.
+- **Activación guiada**: QR code dinámico + código manual + verificación en tiempo real.
+- **Flujo login 2FA**: Verificación de código tras contraseña → `is_logged_in()` bloqueado hasta completar.
+- **Desactivación segura**: Requiere confirmación con contraseña actual.
+- **Admin reset 2FA**: Coordinador IT puede resetear 2FA de cualquier usuario.
+- **Dashboard de Seguridad**: KPIs (2FA, logins fallidos, rate limits), tabla de eventos de seguridad.
+- **Navegación**: Todos los usuarios ven "Seguridad 2FA", admins ven panel completo.
+- **Integración automática**: CSRF + rate limiting se aplican via `require_login()`.
+
+### Migraciones
+- **install.php §3.18**: Tabla `rate_limits`, columnas `totp_secret` y `totp_enabled` en usuarios.
+
+### Archivos nuevos
+- `includes/csrf.php`, `includes/rate_limit.php`, `includes/totp.php`
+- `modules/api/seguridad.php`, `modules/web/seguridad.php`
+- `api/seguridad.php`, `seguridad.php`
+- `docs/OBJ8_SEGURIDAD_AVANZADA.md`
+
+### Archivos modificados
+- `includes/auth.php`: CSRF/rate limit/TOTP integrados
+- `includes/layout.php`: Meta CSRF + nav Seguridad
+- `assets/app.js`: Header X-CSRF-Token
+- `index.php`: CSRF en login, rate limiting, flujo 2FA
+
+### Bugfix
+- **resetForm() radio bug**: Corregido `resetForm()` que destruía `value` de radio buttons y checkboxes, causando "Data truncated" en firma_tipo.
+- **getForm() radio bug**: Corregido `getForm()` que sobreescribía valor de radio buttons con el último del DOM, ignorando `checked`. Ahora solo captura el radio seleccionado.
+- **Validación API firma_tipo**: Añadida validación defensiva para valores ENUM inválidos.
+- **Cache-busting**: `app.js` se carga con `?v=` basado en `filemtime()` para evitar caché stale.
+
+---
+
 ## [3.7.0] — 2026-03-07
 
 ### Mejora Mayor — Objetivo 7: Dashboard Ejecutivo Mejorado

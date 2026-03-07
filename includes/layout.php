@@ -25,6 +25,7 @@ function render_layout(string $page_title, string $active_page, string $content)
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= csrf_meta() ?>
 <title><?= htmlspecialchars($page_title) ?> — <?= APP_NAME ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -104,6 +105,10 @@ tailwind.config = {
     <?= $nav('/usuarios.php', 'usuarios', '🔑', 'Usuarios') ?>
     <?= $nav('/auditoria.php', 'auditoria', '📜', 'Auditoría') ?>
     <?= $nav('/permisos.php', 'permisos', '🔐', 'Permisos') ?>
+    <?= $nav('/seguridad.php', 'seguridad', '🛡️', 'Seguridad') ?>
+    <?php else: ?>
+    <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-4 pb-1.5 nav-section-label">Mi Cuenta</div>
+    <?= $nav('/seguridad.php', 'seguridad', '🛡️', 'Seguridad 2FA') ?>
     <?php endif; ?>
   </nav>
 
@@ -151,7 +156,7 @@ tailwind.config = {
     </div>
   </header>
 
-  <script src="/assets/app.js"></script>
+  <script src="/assets/app.js?v=<?= filemtime(__DIR__.'/../assets/app.js') ?>"></script>
   <div class="page-content flex-1 p-4 sm:p-8">
     <?= $content ?>
   </div>

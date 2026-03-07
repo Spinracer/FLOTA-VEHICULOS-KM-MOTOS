@@ -13,10 +13,19 @@ function toast(msg, type = 'success') {
 }
 
 // ── API HELPER ─────────────────────────────────
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+
 async function api(url, method = 'GET', data = null) {
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRF-Token': getCsrfToken()
+    }
   };
   if (data && method !== 'GET') opts.body = JSON.stringify(data);
   try {
@@ -52,6 +61,17 @@ document.addEventListener('keydown', e => {
 function getForm(modalId) {
   const data = {};
   document.querySelectorAll(`#${modalId} [name]`).forEach(el => {
+    // For radio buttons, only capture the checked one
+    if (el.type === 'radio') {
+      if (el.checked) data[el.name] = el.value.trim();
+      else if (!(el.name in data)) data[el.name] = '';
+      return;
+    }
+    // For checkboxes, capture checked state
+    if (el.type === 'checkbox') {
+      data[el.name] = el.checked ? (el.value || '1') : '0';
+      return;
+    }
     data[el.name] = el.value.trim();
   });
   return data;

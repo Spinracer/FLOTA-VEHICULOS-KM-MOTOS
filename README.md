@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.7.0** — Última actualización: 2026-03-07
+> **v3.8.0** — Última actualización: 2026-03-07
 
 ---
 
@@ -41,6 +41,10 @@
 - **Dashboard Ejecutivo**: 6 KPIs con tendencias, 5 gráficos Chart.js interactivos
 - **Filtros dinámicos en Dashboard**: Por sucursal, vehículo y período
 - **API Dashboard dedicada**: Endpoint centralizado con datos en tiempo real
+- **Protección CSRF**: Tokens por sesión en todas las operaciones de escritura
+- **Rate Limiting**: 5/min login, 60/min escritura, 120/min lectura con DB backend
+- **2FA TOTP opcional**: Compatible con Google Authenticator / Authy / Microsoft Auth
+- **Dashboard de Seguridad**: KPIs, eventos de seguridad y gestión 2FA
 
 ---
 

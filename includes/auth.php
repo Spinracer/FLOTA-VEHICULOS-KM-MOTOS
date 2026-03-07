@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/audit.php';
+require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/rate_limit.php';
+require_once __DIR__ . '/totp.php';
 
 // ─────────────────────────────────────────────────────────
 // ROLES DEL SISTEMA
@@ -60,14 +63,34 @@ function session_init(): void {
 
 function is_logged_in(): bool {
     session_init();
-    return isset($_SESSION['user_id']);
+    if (!isset($_SESSION['user_id'])) return false;
+    // If 2FA is pending, user is not fully authenticated
+    if (!empty($_SESSION['2fa_pending'])) return false;
+    return true;
 }
 
 function require_login(): void {
     session_init();
     if (!is_logged_in()) {
+        // API requests get JSON response
+        if (str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/')) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'No autenticado.']);
+            exit;
+        }
         header('Location: /index.php');
         exit;
+    }
+
+    // Enforce CSRF on write operations for API requests
+    if (str_contains($_SERVER['REQUEST_URI'] ?? '', '/api/')) {
+        csrf_enforce();
+        // Rate limiting: write vs read
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $action = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) ? 'api_write' : 'api_read';
+        $identifier = (string)($_SESSION['user_id'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+        rate_limit_enforce($action, $identifier);
     }
 }
 

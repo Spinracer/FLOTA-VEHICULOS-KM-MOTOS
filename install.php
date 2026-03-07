@@ -1281,6 +1281,36 @@ try {
   step('Tabla: alerta_historial', true);
 } catch (Throwable $e) { step('Tabla: alerta_historial', false, $e->getMessage()); }
 
+// ─────────────────────────────────────────────────────────
+// 3.18 Seguridad Avanzada (Objetivo 8): rate_limits + 2FA
+// ─────────────────────────────────────────────────────────
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS rate_limits (
+    rate_key VARCHAR(200) NOT NULL PRIMARY KEY,
+    hits INT UNSIGNED NOT NULL DEFAULT 1,
+    window_start DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_rl_window (window_start)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: rate_limits', true);
+} catch (Throwable $e) { step('Tabla: rate_limits', false, $e->getMessage()); }
+
+// -- 2FA columns on usuarios
+try {
+  $cols = $pdo->query("SHOW COLUMNS FROM usuarios LIKE 'totp_secret'")->fetch();
+  if (!$cols) {
+    $pdo->exec("ALTER TABLE usuarios ADD COLUMN totp_secret VARCHAR(32) NULL DEFAULT NULL");
+    step('Columna: usuarios.totp_secret', true);
+  } else { step('Columna: usuarios.totp_secret', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Columna: usuarios.totp_secret', false, $e->getMessage()); }
+
+try {
+  $cols = $pdo->query("SHOW COLUMNS FROM usuarios LIKE 'totp_enabled'")->fetch();
+  if (!$cols) {
+    $pdo->exec("ALTER TABLE usuarios ADD COLUMN totp_enabled TINYINT(1) NOT NULL DEFAULT 0");
+    step('Columna: usuarios.totp_enabled', true);
+  } else { step('Columna: usuarios.totp_enabled', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Columna: usuarios.totp_enabled', false, $e->getMessage()); }
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [
