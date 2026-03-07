@@ -63,8 +63,16 @@ function fillForm(modalId, data) {
   });
 }
 function resetForm(modalId) {
-  document.querySelectorAll(`#${modalId} input:not([type=hidden]), #${modalId} select, #${modalId} textarea`)
+  document.querySelectorAll(`#${modalId} input:not([type=hidden]):not([type=radio]):not([type=checkbox]), #${modalId} select, #${modalId} textarea`)
     .forEach(el => el.value = '');
+  // Reset radio buttons to their default checked state (preserving value attributes)
+  document.querySelectorAll(`#${modalId} input[type=radio]`).forEach(el => {
+    el.checked = el.defaultChecked;
+  });
+  // Uncheck all checkboxes
+  document.querySelectorAll(`#${modalId} input[type=checkbox]`).forEach(el => {
+    el.checked = false;
+  });
   // Set today for date inputs
   const today = new Date().toISOString().split('T')[0];
   document.querySelectorAll(`#${modalId} input[type=date]`).forEach(el => el.value = today);

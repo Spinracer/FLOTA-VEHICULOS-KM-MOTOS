@@ -408,6 +408,9 @@ try {
                 // Generate firma token if digital signature requested
                 $firmaToken = null;
                 $firmaTipo = $d['firma_tipo'] ?? 'ninguna';
+                if (!in_array($firmaTipo, ['digital', 'fisica', 'ninguna'], true)) {
+                    $firmaTipo = 'ninguna';
+                }
                 $firmaData = $d['firma_data'] ?? null;
                 if ($firmaTipo === 'digital' && !$firmaData) {
                     $firmaToken = bin2hex(random_bytes(32));
