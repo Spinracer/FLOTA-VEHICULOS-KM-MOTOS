@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.6.0** — Última actualización: 2026-03-02
+> **v3.7.0** — Última actualización: 2026-03-07
 
 ---
 
@@ -38,6 +38,9 @@
 - **Centro de Alertas**: Módulo unificado con escaneo automático de 8 fuentes
 - **Priorización de alertas**: 4 niveles con detección inteligente de urgencia
 - **Historial de alertas**: Timeline completo de acciones y cambios de estado
+- **Dashboard Ejecutivo**: 6 KPIs con tendencias, 5 gráficos Chart.js interactivos
+- **Filtros dinámicos en Dashboard**: Por sucursal, vehículo y período
+- **API Dashboard dedicada**: Endpoint centralizado con datos en tiempo real
 
 ---
 

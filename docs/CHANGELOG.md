@@ -1,5 +1,26 @@
 # FlotaControl — Changelog
 
+## [3.7.0] — 2026-03-07
+
+### Mejora Mayor — Objetivo 7: Dashboard Ejecutivo Mejorado
+
+- **Dashboard completamente reescrito**: De estático server-side a dinámico con API dedicada.
+- **API /api/dashboard.php**: Nuevo endpoint centralizado con KPIs, gráficos, listas y filtros.
+- **Filtros dinámicos**: Por sucursal, vehículo y período (mes/trimestre/semestre/año).
+- **6 KPIs mejorados**: Vehículos, Operadores, Combustible, Mantenimiento, Incidentes, Alertas.
+- **Tendencias automáticas**: Comparativa % vs período anterior en gasto combustible y mantenimiento.
+- **5 gráficos Chart.js**: Gasto mensual (línea doble), Top 10 vehículos (bar horizontal apilado), Distribución mantenimiento (doughnut), Incidentes mensuales (bar), Eficiencia operadores (bar horizontal).
+- **3 paneles de listas**: Recordatorios próximos, OTs activas, Alertas activas (integrado con Centro de Alertas).
+- **Responsive**: Grid adaptativo 1→2→3 columnas.
+
+### API
+- `dashboard.php`: Nuevo — KPIs con trends, 5 datasets de gráficos, 3 listas, filtros dinámicos.
+
+### Documentación
+- `docs/OBJ7_DASHBOARD_EJECUTIVO.md`
+
+---
+
 ## [3.6.0] — 2026-03-02
 
 ### Nuevo Módulo — Objetivo 6: Centro de Alertas

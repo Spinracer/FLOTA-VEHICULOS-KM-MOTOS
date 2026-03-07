@@ -1,257 +1,324 @@
 <?php
 require_once __DIR__ . '/../../includes/layout.php';
 require_login();
-
-$db = getDB();
-
-// KPIs
-$total_veh    = $db->query("SELECT COUNT(*) FROM vehiculos")->fetchColumn();
-$total_op     = $db->query("SELECT COUNT(*) FROM operadores WHERE estado='Activo'")->fetchColumn();
-$inc_abiertos = $db->query("SELECT COUNT(*) FROM incidentes WHERE estado='Abierto'")->fetchColumn();
-$total_mant   = $db->query("SELECT COUNT(*) FROM mantenimientos")->fetchColumn();
-
-$mes_actual = date('Y-m');
-$stmt = $db->prepare("SELECT COALESCE(SUM(litros),0) as litros, COALESCE(SUM(total),0) as gasto FROM combustible WHERE DATE_FORMAT(fecha,'%Y-%m') = ?");
-$stmt->execute([$mes_actual]);
-$comb_mes = $stmt->fetch();
-
-// Alertas recordatorios próximos 30 días
-$alertas = $db->query("
-    SELECT r.*, v.placa, v.marca, v.modelo,
-           DATEDIFF(r.fecha_limite, CURDATE()) as dias
-    FROM recordatorios r
-    JOIN vehiculos v ON v.id = r.vehiculo_id
-    WHERE r.estado = 'Pendiente'
-      AND r.fecha_limite <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-    ORDER BY r.fecha_limite ASC
-    LIMIT 8
-")->fetchAll();
-
-// Incidentes abiertos recientes
-$inc_list = $db->query("
-    SELECT i.*, v.placa, v.marca FROM incidentes i
-    JOIN vehiculos v ON v.id = i.vehiculo_id
-    WHERE i.estado = 'Abierto'
-    ORDER BY i.fecha DESC LIMIT 6
-")->fetchAll();
-
-// Consumo por vehículo (top 6)
-$consumo_chart = $db->query("
-    SELECT v.placa as label, COALESCE(SUM(c.litros),0) as value
-    FROM vehiculos v
-    LEFT JOIN combustible c ON c.vehiculo_id = v.id
-    GROUP BY v.id, v.placa
-    HAVING value > 0
-    ORDER BY value DESC LIMIT 6
-")->fetchAll();
-
-// Gasto mantenimiento por vehículo (top 6)
-$mant_chart = $db->query("
-    SELECT v.placa as label, COALESCE(SUM(m.costo),0) as value
-    FROM vehiculos v
-    LEFT JOIN mantenimientos m ON m.vehiculo_id = v.id
-    GROUP BY v.id, v.placa
-    HAVING value > 0
-    ORDER BY value DESC LIMIT 6
-")->fetchAll();
-
-// Alertas preventivos: intervalos vencidos o próximos
-$preventivo_alertas = [];
-try {
-    $piStmt = $db->query("
-        SELECT pi.id, pi.tipo, pi.cada_km, pi.cada_dias, pi.ultimo_km, pi.ultima_fecha,
-               v.id AS vid, v.placa, v.marca, v.km_actual
-        FROM preventive_intervals pi
-        JOIN vehiculos v ON v.id = pi.vehiculo_id
-        WHERE pi.activo = 1
-        ORDER BY v.placa
-    ");
-    $piRows = $piStmt->fetchAll();
-    foreach ($piRows as $pi) {
-        $alerts = [];
-        if ($pi['cada_km'] && $pi['ultimo_km'] !== null) {
-            $nextKm = (float)$pi['ultimo_km'] + (float)$pi['cada_km'];
-            $kmAct  = (float)$pi['km_actual'];
-            if ($kmAct >= $nextKm) {
-                $alerts[] = ['tipo' => 'vencido', 'msg' => 'Km excedido: ' . number_format($kmAct,0) . ' / ' . number_format($nextKm,0)];
-            } elseif ($kmAct >= $nextKm - 500) {
-                $alerts[] = ['tipo' => 'proximo', 'msg' => 'Faltan ' . number_format($nextKm - $kmAct,0) . ' km'];
-            }
-        }
-        if ($pi['cada_dias'] && $pi['ultima_fecha']) {
-            $nextDate = date('Y-m-d', strtotime($pi['ultima_fecha'] . " +{$pi['cada_dias']} days"));
-            $today    = date('Y-m-d');
-            $diff     = (int)((strtotime($nextDate) - strtotime($today)) / 86400);
-            if ($diff <= 0) {
-                $alerts[] = ['tipo' => 'vencido', 'msg' => 'Fecha vencida: ' . $nextDate];
-            } elseif ($diff <= 15) {
-                $alerts[] = ['tipo' => 'proximo', 'msg' => "Faltan {$diff} días"];
-            }
-        }
-        foreach ($alerts as $a) {
-            $preventivo_alertas[] = array_merge($a, [
-                'interval_id' => $pi['id'],
-                'placa' => $pi['placa'],
-                'marca' => $pi['marca'],
-                'servicio' => $pi['tipo'],
-            ]);
-        }
-    }
-} catch (Throwable $e) {
-    // Tabla no existe aún → ignorar
-}
-
-// OTs pendientes/en proceso
-$ots_activas = $db->query("
-    SELECT m.id, m.tipo, m.estado, m.fecha, m.costo,
-           v.placa, v.marca, p.nombre AS proveedor
-    FROM mantenimientos m
-    JOIN vehiculos v ON v.id = m.vehiculo_id
-    LEFT JOIN proveedores p ON p.id = m.proveedor_id
-    WHERE m.estado IN ('Pendiente','En proceso')
-      AND m.deleted_at IS NULL
-    ORDER BY m.fecha DESC
-    LIMIT 8
-")->fetchAll();
-
 ob_start();
 ?>
-<!-- KPIs -->
-<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-7">
-  <div class="kpi-card yellow">
-    <div class="kpi-icon">🚗</div>
-    <div class="kpi-label">Vehículos</div>
-    <div class="kpi-value"><?= $total_veh ?></div>
-    <div class="kpi-sub">en inventario</div>
-  </div>
-  <div class="kpi-card cyan">
-    <div class="kpi-icon">⛽</div>
-    <div class="kpi-label">Litros este mes</div>
-    <div class="kpi-value"><?= number_format($comb_mes['litros'], 0) ?></div>
-    <div class="kpi-sub"><?= date('F Y') ?></div>
-  </div>
-  <div class="kpi-card green">
-    <div class="kpi-icon">💰</div>
-    <div class="kpi-label">Gasto combustible</div>
-    <div class="kpi-value">$<?= number_format($comb_mes['gasto'], 0) ?></div>
-    <div class="kpi-sub">mes actual</div>
-  </div>
-  <div class="kpi-card red">
-    <div class="kpi-icon">⚠️</div>
-    <div class="kpi-label">Incidentes abiertos</div>
-    <div class="kpi-value"><?= $inc_abiertos ?></div>
-    <div class="kpi-sub">pendientes de resolver</div>
-  </div>
-  <div class="kpi-card blue">
-    <div class="kpi-icon">🔧</div>
-    <div class="kpi-label">Mantenimientos</div>
-    <div class="kpi-value"><?= $total_mant ?></div>
-    <div class="kpi-sub">histórico total</div>
-  </div>
-  <div class="kpi-card orange">
-    <div class="kpi-icon">👤</div>
-    <div class="kpi-label">Operadores activos</div>
-    <div class="kpi-value"><?= $total_op ?></div>
-    <div class="kpi-sub">registrados</div>
-  </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+
+<!-- ═══════════════ FILTROS ═══════════════ -->
+<div class="toolbar" style="flex-wrap:wrap;gap:8px">
+  <div style="font-size:18px;font-weight:700;font-family:var(--font-heading);color:var(--accent);margin-right:auto">📊 Dashboard Ejecutivo</div>
+  <select id="fSuc" onchange="onSucChange();loadDash()" style="max-width:170px">
+    <option value="">Todas las sucursales</option>
+  </select>
+  <select id="fVeh" onchange="loadDash()" style="max-width:160px">
+    <option value="">Todos los vehículos</option>
+  </select>
+  <select id="fPeriodo" onchange="loadDash()" style="max-width:140px">
+    <option value="mes">Este Mes</option>
+    <option value="trimestre">Trimestre</option>
+    <option value="semestre">Semestre</option>
+    <option value="anio" selected>Este Año</option>
+  </select>
+  <button class="btn btn-ghost" onclick="loadDash()" title="Actualizar">🔄</button>
 </div>
 
-<!-- Charts -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-7">
+<!-- ═══════════════ KPIs ═══════════════ -->
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mb-6" id="kpiGrid">
+  <!-- Rendered by JS -->
+</div>
+
+<!-- ═══════════════ CHARTS ROW 1 ═══════════════ -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
   <div class="chart-card">
-    <div class="chart-title">⛽ Consumo total por vehículo (litros)</div>
-    <div id="chart-consumo"></div>
+    <div class="chart-title">📈 Gasto Mensual (12 meses)</div>
+    <canvas id="chGastoMensual" height="220"></canvas>
   </div>
   <div class="chart-card">
-    <div class="chart-title">💸 Gasto en mantenimiento por vehículo</div>
-    <div id="chart-mant"></div>
+    <div class="chart-title">🏆 Top 10 Vehículos por Costo</div>
+    <canvas id="chTopVeh" height="220"></canvas>
   </div>
 </div>
 
-<!-- Alertas e incidentes -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-  <div>
-    <div class="section-title">🔔 Recordatorios próximos (30 días)</div>
-    <div class="alert-list">
-      <?php if (!$alertas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas próximas</div></div>
-      <?php else: foreach ($alertas as $a):
-        $dias = (int)$a['dias'];
-        $cls  = $dias < 0 ? 'critical' : ($dias <= 7 ? '' : 'info');
-        $txt  = $dias < 0 ? "Vencido hace ".abs($dias)."d" : ($dias === 0 ? 'Hoy' : "En {$dias}d");
-      ?>
-        <div class="alert-item <?= $cls ?>">
-          <div class="alert-dot"></div>
-          <div class="alert-text"><strong><?= htmlspecialchars($a['placa']) ?></strong> — <?= htmlspecialchars($a['tipo']) ?></div>
-          <div class="alert-meta"><?= $txt ?></div>
-        </div>
-      <?php endforeach; endif; ?>
-    </div>
+<!-- ═══════════════ CHARTS ROW 2 ═══════════════ -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
+  <div class="chart-card">
+    <div class="chart-title">🔧 Distribución Mantenimiento</div>
+    <canvas id="chDistMant" height="200"></canvas>
   </div>
-  <div>
-    <div class="section-title">⚠️ Incidentes abiertos</div>
-    <div class="alert-list">
-      <?php if (!$inc_list): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Todo en orden</div></div>
-      <?php else: foreach ($inc_list as $i): ?>
-        <div class="alert-item critical">
-          <div class="alert-dot"></div>
-          <div class="alert-text"><strong><?= htmlspecialchars($i['placa']) ?> <?= htmlspecialchars($i['marca']) ?></strong> — <?= htmlspecialchars(mb_substr($i['descripcion'],0,55)) ?><?= strlen($i['descripcion'])>55?'...':'' ?></div>
-          <div class="alert-meta"><?= $i['fecha'] ?></div>
-        </div>
-      <?php endforeach; endif; ?>
-    </div>
+  <div class="chart-card">
+    <div class="chart-title">⚠️ Incidentes Mensuales</div>
+    <canvas id="chIncMensual" height="200"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">⛽ Eficiencia Operadores (km/L)</div>
+    <canvas id="chEficiencia" height="200"></canvas>
   </div>
 </div>
 
-<!-- Preventivos & OTs activas -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+<!-- ═══════════════ LISTAS ═══════════════ -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
   <div>
-    <div class="section-title">📅 Alertas Preventivas</div>
-    <div class="alert-list">
-      <?php if (!$preventivo_alertas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas preventivas</div></div>
-      <?php else: foreach (array_slice($preventivo_alertas, 0, 8) as $pa):
-        $cls = $pa['tipo'] === 'vencido' ? 'critical' : 'info';
-      ?>
-        <div class="alert-item <?= $cls ?>">
-          <div class="alert-dot"></div>
-          <div class="alert-text"><strong><?= htmlspecialchars($pa['placa']) ?></strong> — <?= htmlspecialchars($pa['servicio']) ?></div>
-          <div class="alert-meta"><?= htmlspecialchars($pa['msg']) ?></div>
-        </div>
-      <?php endforeach; endif; ?>
-      <?php if (count($preventivo_alertas) > 8): ?>
-        <a href="/preventivos.php" class="text-xs text-accent2 no-underline block text-right mt-1.5 hover:underline">Ver todas →</a>
-      <?php endif; ?>
-    </div>
+    <div class="section-title">🔔 Recordatorios Próximos</div>
+    <div class="alert-list" id="listRec"></div>
   </div>
   <div>
     <div class="section-title">🔧 OTs Activas</div>
-    <div class="alert-list">
-      <?php if (!$ots_activas): ?>
-        <div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin OTs pendientes</div></div>
-      <?php else: foreach ($ots_activas as $ot):
-        $cls = $ot['estado'] === 'En proceso' ? '' : 'info';
-      ?>
-        <div class="alert-item <?= $cls ?>">
-          <div class="alert-dot"></div>
-          <div class="alert-text"><strong><?= htmlspecialchars($ot['placa']) ?></strong> — <?= htmlspecialchars($ot['tipo']) ?> (<?= htmlspecialchars($ot['estado']) ?>)</div>
-          <div class="alert-meta">$<?= number_format($ot['costo'],0) ?> · <?= $ot['fecha'] ?></div>
-        </div>
-      <?php endforeach; endif; ?>
-    </div>
+    <div class="alert-list" id="listOTs"></div>
+  </div>
+  <div>
+    <div class="section-title">🚨 Alertas Activas</div>
+    <div class="alert-list" id="listAlertas"></div>
   </div>
 </div>
 
 <script>
-const consumoData = <?= json_encode(array_values($consumo_chart)) ?>;
-const mantData    = <?= json_encode(array_values($mant_chart)) ?>;
-document.addEventListener('DOMContentLoaded', () => {
-  renderBarChart('chart-consumo', consumoData, { unit: 'L',  color: '#47ffe8' });
-  renderBarChart('chart-mant',    mantData,    { unit: '$',  color: '#e8ff47' });
-});
-</script>
+const CHART_COLORS = {
+  accent: '#e8ff47', accent2: '#47ffe8', orange: '#f97316',
+  red: '#ef4444', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7',
+  pink: '#ec4899', cyan: '#06b6d4', gray: '#6b7280'
+};
+let charts = {};
 
+function isDark() {
+  return document.documentElement.classList.contains('dark') || !document.documentElement.classList.contains('light');
+}
+function chartColors() {
+  const d = isDark();
+  return { grid: d ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', text: d ? '#8892a4' : '#666' };
+}
+
+function trendBadge(val) {
+  if (!val) return '';
+  const cls = val > 0 ? 'color:#ef4444' : 'color:#22c55e';
+  const arrow = val > 0 ? '▲' : '▼';
+  return `<span style="font-size:11px;${cls}">${arrow} ${Math.abs(val)}%</span>`;
+}
+
+function renderKPIs(k) {
+  const items = [
+    { icon: '🚗', label: 'Vehículos', value: k.vehiculos, sub: 'en flota', cls: 'yellow' },
+    { icon: '👤', label: 'Operadores', value: k.operadores, sub: 'activos', cls: 'orange' },
+    { icon: '⛽', label: 'Combustible', value: '$' + Number(k.gasto_comb).toLocaleString('es', {maximumFractionDigits:0}), sub: k.litros.toLocaleString('es',{maximumFractionDigits:0}) + ' L', cls: 'cyan', trend: k.trend_comb },
+    { icon: '🔧', label: 'Mantenimiento', value: '$' + Number(k.gasto_mant).toLocaleString('es', {maximumFractionDigits:0}), sub: k.total_mant + ' OTs', cls: 'blue', trend: k.trend_mant },
+    { icon: '⚠️', label: 'Incidentes', value: k.inc_abiertos, sub: 'abiertos', cls: 'red' },
+    { icon: '🚨', label: 'Alertas', value: k.alertas_activas, sub: k.ots_pendientes + ' OTs pen.', cls: 'yellow' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = items.map(i => `
+    <div class="kpi-card ${i.cls}">
+      <div class="kpi-icon">${i.icon}</div>
+      <div class="kpi-label">${i.label}</div>
+      <div class="kpi-value">${i.value}</div>
+      <div class="kpi-sub">${i.sub} ${i.trend !== undefined ? trendBadge(i.trend) : ''}</div>
+    </div>`).join('');
+}
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => { if (c) c.destroy(); });
+  charts = {};
+}
+
+function renderCharts(data) {
+  destroyCharts();
+  const cc = chartColors();
+
+  // 1. Gasto mensual — línea doble
+  const gm = data.gasto_mensual;
+  charts.gastoMensual = new Chart(document.getElementById('chGastoMensual'), {
+    type: 'line',
+    data: {
+      labels: gm.map(r => r.mes),
+      datasets: [
+        { label: 'Combustible $', data: gm.map(r => r.combustible), borderColor: CHART_COLORS.accent2, backgroundColor: 'rgba(71,255,232,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
+        { label: 'Mantenimiento $', data: gm.map(r => r.mantenimiento), borderColor: CHART_COLORS.accent, backgroundColor: 'rgba(232,255,71,0.1)', fill: true, tension: 0.3, pointRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, interaction: { mode: 'index', intersect: false },
+      scales: {
+        y: { grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => '$' + v.toLocaleString() } },
+        x: { ticks: { color: cc.text, maxRotation: 45 } }
+      },
+      plugins: { legend: { labels: { color: cc.text } } }
+    }
+  });
+
+  // 2. Top vehículos — bar horizontal
+  const tv = data.top_vehiculos;
+  charts.topVeh = new Chart(document.getElementById('chTopVeh'), {
+    type: 'bar',
+    data: {
+      labels: tv.map(r => r.placa),
+      datasets: [
+        { label: 'Combustible', data: tv.map(r => Number(r.gasto_comb)), backgroundColor: CHART_COLORS.accent2 },
+        { label: 'Mantenimiento', data: tv.map(r => Number(r.gasto_mant)), backgroundColor: CHART_COLORS.orange }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      scales: {
+        x: { stacked: true, grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => '$' + v.toLocaleString() } },
+        y: { stacked: true, ticks: { color: cc.text } }
+      },
+      plugins: { legend: { labels: { color: cc.text } } }
+    }
+  });
+
+  // 3. Distribución mantenimiento — doughnut
+  const dm = data.dist_mant;
+  charts.distMant = new Chart(document.getElementById('chDistMant'), {
+    type: 'doughnut',
+    data: {
+      labels: dm.map(r => r.tipo),
+      datasets: [{
+        data: dm.map(r => Number(r.gasto)),
+        backgroundColor: [CHART_COLORS.accent, CHART_COLORS.blue, CHART_COLORS.orange, CHART_COLORS.purple, CHART_COLORS.green]
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: cc.text, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': $' + Number(ctx.parsed).toLocaleString() } }
+      }
+    }
+  });
+
+  // 4. Incidentes mensual — bar
+  const im = data.inc_mensual;
+  charts.incMensual = new Chart(document.getElementById('chIncMensual'), {
+    type: 'bar',
+    data: {
+      labels: im.map(r => r.mes),
+      datasets: [{ label: 'Incidentes', data: im.map(r => r.total), backgroundColor: 'rgba(239,68,68,0.6)', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { grid: { color: cc.grid }, ticks: { color: cc.text, stepSize: 1 } },
+        x: { ticks: { color: cc.text, maxRotation: 45 } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // 5. Eficiencia operadores — bar horizontal
+  const ef = data.top_eficiencia || [];
+  if (ef.length) {
+    charts.eficiencia = new Chart(document.getElementById('chEficiencia'), {
+      type: 'bar',
+      data: {
+        labels: ef.map(r => r.nombre),
+        datasets: [{ label: 'km/L', data: ef.map(r => Number(r.kml).toFixed(1)), backgroundColor: CHART_COLORS.green, borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true,
+        scales: {
+          x: { grid: { color: cc.grid }, ticks: { color: cc.text } },
+          y: { ticks: { color: cc.text, font: { size: 11 } } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  } else {
+    document.getElementById('chEficiencia').parentElement.innerHTML += '<div class="empty" style="padding:12px"><div class="empty-icon" style="font-size:24px">📉</div><div style="font-size:12px">Sin datos de eficiencia</div></div>';
+  }
+}
+
+function renderLists(lists) {
+  // Recordatorios
+  const recDiv = document.getElementById('listRec');
+  if (!lists.recordatorios.length) {
+    recDiv.innerHTML = '<div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas próximas</div></div>';
+  } else {
+    recDiv.innerHTML = lists.recordatorios.map(a => {
+      const d = parseInt(a.dias);
+      const cls = d < 0 ? 'critical' : (d <= 7 ? '' : 'info');
+      const txt = d < 0 ? `Vencido hace ${Math.abs(d)}d` : (d === 0 ? 'Hoy' : `En ${d}d`);
+      return `<div class="alert-item ${cls}"><div class="alert-dot"></div>
+        <div class="alert-text"><strong>${a.placa}</strong> — ${a.tipo}</div>
+        <div class="alert-meta">${txt}</div></div>`;
+    }).join('');
+  }
+
+  // OTs
+  const otDiv = document.getElementById('listOTs');
+  if (!lists.ots.length) {
+    otDiv.innerHTML = '<div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin OTs pendientes</div></div>';
+  } else {
+    otDiv.innerHTML = lists.ots.map(o => {
+      const cls = o.estado === 'En proceso' ? '' : 'info';
+      return `<div class="alert-item ${cls}"><div class="alert-dot"></div>
+        <div class="alert-text"><strong>${o.placa}</strong> — ${o.tipo} (${o.estado})</div>
+        <div class="alert-meta">$${Number(o.costo).toLocaleString()} · ${o.fecha}</div></div>`;
+    }).join('');
+  }
+
+  // Alertas
+  const alDiv = document.getElementById('listAlertas');
+  if (!lists.alertas.length) {
+    alDiv.innerHTML = '<div class="empty"><div class="empty-icon" style="font-size:28px">✅</div><div class="text-sm">Sin alertas activas</div></div>';
+  } else {
+    const PRI = {Urgente:'critical',Alta:'',Normal:'info',Baja:'info'};
+    alDiv.innerHTML = lists.alertas.map(a => `
+      <div class="alert-item ${PRI[a.prioridad]||'info'}"><div class="alert-dot"></div>
+        <div class="alert-text"><strong>${a.placa||'—'}</strong> — ${a.titulo}</div>
+        <div class="alert-meta">${a.prioridad}</div></div>`).join('');
+    alDiv.innerHTML += '<a href="/alertas.php" class="text-xs text-accent2 no-underline block text-right mt-1.5 hover:underline">Ver todas →</a>';
+  }
+}
+
+function fillFilters(filters) {
+  const selSuc = document.getElementById('fSuc');
+  const current = selSuc.value;
+  if (selSuc.options.length <= 1) {
+    filters.sucursales.forEach(s => {
+      const o = document.createElement('option'); o.value = s.id; o.textContent = s.nombre; selSuc.appendChild(o);
+    });
+  }
+  updateVehSelect(filters.vehiculos);
+}
+
+function updateVehSelect(vehs) {
+  const sel = document.getElementById('fVeh');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Todos los vehículos</option>';
+  vehs.forEach(v => {
+    const o = document.createElement('option'); o.value = v.id; o.textContent = v.placa + ' ' + v.marca; sel.appendChild(o);
+  });
+  sel.value = cur;
+}
+
+function onSucChange() {
+  // Al cambiar sucursal, resetear vehículo y recargar lista de vehículos filtrada
+  document.getElementById('fVeh').value = '';
+}
+
+async function loadDash() {
+  const suc = document.getElementById('fSuc').value;
+  const veh = document.getElementById('fVeh').value;
+  const per = document.getElementById('fPeriodo').value;
+  let url = `/api/dashboard.php?periodo=${per}`;
+  if (suc) url += `&sucursal_id=${suc}`;
+  if (veh) url += `&vehiculo_id=${veh}`;
+
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (!data.ok) { toast('Error cargando dashboard','error'); return; }
+
+    renderKPIs(data.kpis);
+    renderCharts(data.charts);
+    renderLists(data.lists);
+    fillFilters(data.filters);
+  } catch(e) {
+    toast('Error de conexión','error');
+    console.error(e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadDash);
+</script>
 <?php
 $content = ob_get_clean();
 echo render_layout('Dashboard', 'dashboard', $content);
