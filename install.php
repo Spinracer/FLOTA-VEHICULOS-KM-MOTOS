@@ -1022,7 +1022,7 @@ try {
   $stCheck = $pdo->prepare("SELECT COUNT(*) FROM system_settings WHERE key_name=?");
   $stCheck->execute(['maintenance.umbral_aprobacion_n1']);
   if ((int)$stCheck->fetchColumn() === 0) {
-    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, descripcion) VALUES (?,?,?)")
+    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, description) VALUES (?,?,?)")
         ->execute(['maintenance.umbral_aprobacion_n1', 5000, 'Costo mínimo para requerir aprobación nivel 1 (soporte)']);
     step('Setting: umbral_aprobacion_n1', true, '$5,000');
   } else {
@@ -1030,7 +1030,7 @@ try {
   }
   $stCheck->execute(['maintenance.umbral_aprobacion_n2']);
   if ((int)$stCheck->fetchColumn() === 0) {
-    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, descripcion) VALUES (?,?,?)")
+    $pdo->prepare("INSERT INTO system_settings (key_name, value_num, description) VALUES (?,?,?)")
         ->execute(['maintenance.umbral_aprobacion_n2', 15000, 'Costo mínimo para requerir aprobación nivel 2 (coordinador)']);
     step('Setting: umbral_aprobacion_n2', true, '$15,000');
   } else {
