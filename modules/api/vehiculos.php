@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
 require_once __DIR__ . '/../../includes/odometro.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 
 header('Content-Type: application/json');
@@ -196,6 +197,7 @@ try {
                 odometro_registrar($db, $newId, $kmNuevo, 'manual', (int)($_SESSION['user_id'] ?? 0));
             }
             audit_log('vehiculos', 'create', $newId, [], $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['id' => $newId, 'ok' => true]);
             break;
 
@@ -235,6 +237,7 @@ try {
                 audit_log('vehiculos', 'odometro_override', (int)$d['id'], ['km_anterior' => $prev['km_actual'] ?? null], ['km_nuevo' => $kmNuevo], ['reason' => $d['override_reason']]);
             }
             audit_log('vehiculos', 'update', (int)$d['id'], $prev, $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
             break;
 
@@ -265,6 +268,7 @@ try {
             // Soft-delete: marcar como eliminado en vez de borrar
             $db->prepare("UPDATE vehiculos SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
             audit_log('vehiculos', 'soft_delete', $id, $prev, []);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
             break;
 

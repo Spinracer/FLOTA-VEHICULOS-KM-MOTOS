@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
 require_once __DIR__ . '/../../includes/odometro.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 
 header('Content-Type: application/json');
@@ -359,6 +360,7 @@ try {
             }
 
             audit_log('asignaciones', 'create', $id, [], $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true, 'id' => $id]);
             break;
 
@@ -469,6 +471,7 @@ try {
             }
 
             audit_log('asignaciones', 'close', $id, $prev, $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
             break;
 
@@ -490,6 +493,7 @@ try {
                 $db->prepare("UPDATE asignaciones SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
             }
             audit_log('asignaciones', 'soft_delete', $id, $prev, []);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
             break;
 

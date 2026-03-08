@@ -6,6 +6,7 @@
  * Params: sucursal_id, vehiculo_id, periodo (mes|trimestre|semestre|anio), from, to
  */
 require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -13,6 +14,9 @@ $db = getDB();
 $sucursal = intval($_GET['sucursal_id'] ?? 0);
 $vehiculo = intval($_GET['vehiculo_id'] ?? 0);
 $periodo  = $_GET['periodo'] ?? 'anio';
+
+// Cache key based on filters
+$cacheKey = "dashboard:{$sucursal}:{$vehiculo}:{$periodo}:" . ($_GET['from'] ?? '') . ':' . ($_GET['to'] ?? '');
 
 // Período → rango de fechas
 $today = date('Y-m-d');
@@ -23,12 +27,13 @@ switch ($periodo) {
     default:          $from = date('Y-01-01'); break; // anio
 }
 $to = $today;
-// Override si se pasan from/to explícitos
 if (!empty($_GET['from'])) $from = $_GET['from'];
 if (!empty($_GET['to']))   $to   = $_GET['to'];
 
+$response = cache_remember($cacheKey, function() use ($db, $sucursal, $vehiculo, $from, $to) {
+
 // ── Helpers para filtros WHERE ──
-function buildWhere($table_alias, $sucursal, $vehiculo, $from, $to, $date_col = 'fecha') {
+$buildWhere = function($table_alias, $sucursal, $vehiculo, $from, $to, $date_col = 'fecha') {
     $w = []; $p = [];
     if ($sucursal) {
         $w[] = "$table_alias.sucursal_id = ?"; $p[] = $sucursal;
@@ -43,7 +48,7 @@ function buildWhere($table_alias, $sucursal, $vehiculo, $from, $to, $date_col = 
         $w[] = "$table_alias.$date_col <= ?"; $p[] = $to;
     }
     return [$w ? 'AND ' . implode(' AND ', $w) : '', $p];
-}
+};
 
 // ════════════════════════════════════════════════
 // 1. KPIs
@@ -64,13 +69,13 @@ $total_op = $db->prepare($opSql); $total_op->execute($opParams);
 $total_op = $total_op->fetchColumn();
 
 // Incidentes abiertos (periodo + filtros)
-[$wInc, $pInc] = buildWhere('i', $sucursal, $vehiculo, $from, $to);
+[$wInc, $pInc] = $buildWhere('i', $sucursal, $vehiculo, $from, $to);
 $inc_q = $db->prepare("SELECT COUNT(*) FROM incidentes i WHERE i.estado='Abierto' $wInc");
 $inc_q->execute($pInc);
 $inc_abiertos = $inc_q->fetchColumn();
 
 // Gasto combustible & litros (periodo)
-[$wC, $pC] = buildWhere('c', $sucursal, $vehiculo, $from, $to);
+[$wC, $pC] = $buildWhere('c', $sucursal, $vehiculo, $from, $to);
 $cStmt = $db->prepare("SELECT COALESCE(SUM(c.litros),0) as litros, COALESCE(SUM(c.total),0) as gasto FROM combustible c $wC");
 // remove leading AND
 $cSql = "SELECT COALESCE(SUM(c.litros),0) as litros, COALESCE(SUM(c.total),0) as gasto FROM combustible c WHERE 1=1 $wC";
@@ -78,7 +83,7 @@ $cStmt = $db->prepare($cSql); $cStmt->execute($pC);
 $comb = $cStmt->fetch();
 
 // Gasto mantenimiento (periodo)
-[$wM, $pM] = buildWhere('m', $sucursal, $vehiculo, $from, $to);
+[$wM, $pM] = $buildWhere('m', $sucursal, $vehiculo, $from, $to);
 $mSql = "SELECT COALESCE(SUM(m.costo),0) as gasto, COUNT(*) as total FROM mantenimientos m WHERE m.deleted_at IS NULL $wM";
 $mStmt = $db->prepare($mSql); $mStmt->execute($pM);
 $mant = $mStmt->fetch();
@@ -131,12 +136,12 @@ $diff = strtotime($to) - strtotime($from);
 $prev_to   = date('Y-m-d', strtotime($from) - 1);
 $prev_from = date('Y-m-d', strtotime($from) - $diff);
 
-[$wCp, $pCp] = buildWhere('c', $sucursal, $vehiculo, $prev_from, $prev_to);
+[$wCp, $pCp] = $buildWhere('c', $sucursal, $vehiculo, $prev_from, $prev_to);
 $cpSql = "SELECT COALESCE(SUM(c.total),0) as gasto FROM combustible c WHERE 1=1 $wCp";
 $cpStmt = $db->prepare($cpSql); $cpStmt->execute($pCp);
 $prev_gasto_comb = $cpStmt->fetchColumn();
 
-[$wMp, $pMp] = buildWhere('m', $sucursal, $vehiculo, $prev_from, $prev_to);
+[$wMp, $pMp] = $buildWhere('m', $sucursal, $vehiculo, $prev_from, $prev_to);
 $mpSql = "SELECT COALESCE(SUM(m.costo),0) as gasto FROM mantenimientos m WHERE m.deleted_at IS NULL $wMp";
 $mpStmt = $db->prepare($mpSql); $mpStmt->execute($pMp);
 $prev_gasto_mant = $mpStmt->fetchColumn();
@@ -303,7 +308,7 @@ $vehiculos_list = $vlStmt->fetchAll();
 // ════════════════════════════════════════════════
 // Respuesta
 // ════════════════════════════════════════════════
-echo json_encode([
+return [
     'ok'       => true,
     'periodo'  => ['from' => $from, 'to' => $to],
     'kpis'     => $kpis,
@@ -323,4 +328,7 @@ echo json_encode([
         'sucursales'       => $sucursales,
         'vehiculos'        => $vehiculos_list,
     ],
-], JSON_UNESCAPED_UNICODE);
+];
+}, 'dashboard');
+
+echo json_encode($response, JSON_UNESCAPED_UNICODE);

@@ -1,7 +1,7 @@
 # FlotaControl — Sistema de Administración de Flotas
 ## PHP + MySQL/MariaDB | Tailwind CSS | Red Local
 
-> **v3.8.0** — Última actualización: 2026-03-07
+> **v3.9.0** — Última actualización: 2026-03-08
 
 ---
 
@@ -45,6 +45,9 @@
 - **Rate Limiting**: 5/min login, 60/min escritura, 120/min lectura con DB backend
 - **2FA TOTP opcional**: Compatible con Google Authenticator / Authy / Microsoft Auth
 - **Dashboard de Seguridad**: KPIs, eventos de seguridad y gestión 2FA
+- **Caché inteligente**: Sistema file-based con TTL por módulo e invalidación automática
+- **Optimización N+1**: Alertas con batch lookup O(1) en lugar de N queries
+- **7 índices de rendimiento**: Queries optimizadas en dashboard, alertas y reportes
 
 ---
 

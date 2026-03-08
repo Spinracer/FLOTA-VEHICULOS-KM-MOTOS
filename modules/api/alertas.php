@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
 require_once __DIR__ . '/../../includes/notifications.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 header('Content-Type: application/json');
 
@@ -26,13 +27,15 @@ try {
     // ──── Escaneo automático: genera alertas desde otros módulos ────
     if ($action === 'scan') {
         $created = 0;
+        // Bulk-load existing alert keys to avoid N+1 queries
+        $existingKeys = loadExistingAlertKeys($db);
 
         // 1. Licencias de operadores por vencer (30 días)
         $stmt = $db->query("SELECT id, nombre, venc_licencia, DATEDIFF(venc_licencia, CURDATE()) AS dias
             FROM operadores WHERE deleted_at IS NULL AND venc_licencia IS NOT NULL
             AND DATEDIFF(venc_licencia, CURDATE()) <= 30 AND estado='Activo'");
         foreach ($stmt->fetchAll() as $op) {
-            if (!alertExists($db, 'licencia', 'operadores', $op['id'])) {
+            if (!alertExistsBatch($existingKeys, 'licencia', 'operadores', $op['id'])) {
                 $lbl = $op['dias'] < 0 ? 'VENCIDA' : "vence en {$op['dias']}d";
                 createAlert($db, 'licencia', $op['dias'] <= 0 ? 'Urgente' : ($op['dias'] <= 15 ? 'Alta' : 'Normal'),
                     "Licencia {$lbl}: {$op['nombre']}", "Vencimiento: {$op['venc_licencia']}", 'operadores', $op['id'], null, $op['venc_licencia']);
@@ -44,7 +47,7 @@ try {
         $stmt = $db->query("SELECT id, placa, marca, venc_seguro, DATEDIFF(venc_seguro, CURDATE()) AS dias
             FROM vehiculos WHERE venc_seguro IS NOT NULL AND DATEDIFF(venc_seguro, CURDATE()) <= 30 AND estado='Activo'");
         foreach ($stmt->fetchAll() as $v) {
-            if (!alertExists($db, 'seguro', 'vehiculos', $v['id'])) {
+            if (!alertExistsBatch($existingKeys, 'seguro', 'vehiculos', $v['id'])) {
                 $lbl = $v['dias'] < 0 ? 'VENCIDO' : "vence en {$v['dias']}d";
                 createAlert($db, 'seguro', $v['dias'] <= 0 ? 'Urgente' : ($v['dias'] <= 15 ? 'Alta' : 'Normal'),
                     "Seguro {$lbl}: {$v['placa']}", "Vehículo {$v['marca']} — Vencimiento: {$v['venc_seguro']}", 'vehiculos', $v['id'], $v['id'], $v['venc_seguro']);
@@ -60,7 +63,7 @@ try {
             JOIN vehiculos v ON v.id=vc.vehiculo_id
             WHERE vc.fecha_vencimiento IS NOT NULL AND DATEDIFF(vc.fecha_vencimiento, CURDATE()) <= 30");
         foreach ($stmt->fetchAll() as $vc) {
-            if (!alertExists($db, 'componente', 'vehicle_components', $vc['id'])) {
+            if (!alertExistsBatch($existingKeys, 'componente', 'vehicle_components', $vc['id'])) {
                 $lbl = $vc['dias'] < 0 ? 'VENCIDO' : "vence en {$vc['dias']}d";
                 createAlert($db, 'componente', $vc['dias'] <= 0 ? 'Urgente' : ($vc['dias'] <= 15 ? 'Alta' : 'Normal'),
                     "Componente {$lbl}: {$vc['comp']} ({$vc['placa']})", "Vencimiento: {$vc['fv']}", 'vehicle_components', $vc['id'], $vc['vid'], $vc['fv']);
@@ -75,7 +78,7 @@ try {
             JOIN vehiculos v ON v.id=r.vehiculo_id
             WHERE r.deleted_at IS NULL AND r.estado='Pendiente' AND DATEDIFF(r.fecha_limite, CURDATE()) <= 7");
         foreach ($stmt->fetchAll() as $r) {
-            if (!alertExists($db, 'recordatorio', 'recordatorios', $r['id'])) {
+            if (!alertExistsBatch($existingKeys, 'recordatorio', 'recordatorios', $r['id'])) {
                 $lbl = $r['dias'] < 0 ? 'VENCIDO' : "en {$r['dias']}d";
                 createAlert($db, 'recordatorio', $r['dias'] <= 0 ? 'Alta' : 'Normal',
                     "Recordatorio {$lbl}: {$r['tipo']} — {$r['placa']}", $r['descripcion'] ?: '', 'recordatorios', $r['id'], $r['vid'], $r['fecha_limite']);
@@ -87,7 +90,7 @@ try {
         $stmt = $db->query("SELECT id, nombre, stock, stock_minimo FROM components
             WHERE activo=1 AND stock_minimo > 0 AND stock <= stock_minimo");
         foreach ($stmt->fetchAll() as $c) {
-            if (!alertExists($db, 'inventario', 'components', $c['id'])) {
+            if (!alertExistsBatch($existingKeys, 'inventario', 'components', $c['id'])) {
                 createAlert($db, 'inventario', $c['stock'] <= 0 ? 'Urgente' : 'Alta',
                     "Stock bajo: {$c['nombre']} (quedan {$c['stock']})", "Mínimo: {$c['stock_minimo']}", 'components', $c['id'], null, null);
                 $created++;
@@ -100,7 +103,7 @@ try {
             FROM incidentes i JOIN vehiculos v ON v.id=i.vehiculo_id
             WHERE i.estado='Abierto' AND DATEDIFF(CURDATE(), i.fecha) > 3");
         foreach ($stmt->fetchAll() as $i) {
-            if (!alertExists($db, 'incidente', 'incidentes', $i['id'])) {
+            if (!alertExistsBatch($existingKeys, 'incidente', 'incidentes', $i['id'])) {
                 createAlert($db, 'incidente', $i['severidad'] === 'Crítica' ? 'Urgente' : 'Alta',
                     "Incidente sin atender ({$i['dias']}d): {$i['tipo']} — {$i['placa']}", "Severidad: {$i['severidad']}", 'incidentes', $i['id'], $i['vid'], $i['fecha']);
                 $created++;
@@ -113,7 +116,7 @@ try {
             FROM proveedor_contratos pc JOIN proveedores p ON p.id=pc.proveedor_id
             WHERE pc.estado='Vigente' AND pc.fecha_fin IS NOT NULL AND DATEDIFF(pc.fecha_fin, CURDATE()) <= 30");
         foreach ($stmt->fetchAll() as $c) {
-            if (!alertExists($db, 'contrato', 'proveedor_contratos', $c['id'])) {
+            if (!alertExistsBatch($existingKeys, 'contrato', 'proveedor_contratos', $c['id'])) {
                 $lbl = $c['dias'] < 0 ? 'VENCIDO' : "vence en {$c['dias']}d";
                 createAlert($db, 'contrato', $c['dias'] <= 0 ? 'Urgente' : ($c['dias'] <= 15 ? 'Alta' : 'Normal'),
                     "Contrato {$lbl}: {$c['titulo']} ({$c['nombre']})", "Fin: {$c['fecha_fin']}", 'proveedor_contratos', $c['id'], null, $c['fecha_fin']);
@@ -127,7 +130,7 @@ try {
             FROM preventivos p JOIN vehiculos v ON v.id=p.vehiculo_id
             WHERE p.activo=1 AND p.prox_fecha IS NOT NULL AND p.prox_fecha <= CURDATE()");
         foreach ($stmt->fetchAll() as $p) {
-            if (!alertExists($db, 'mantenimiento', 'preventivos', $p['id'])) {
+            if (!alertExistsBatch($existingKeys, 'mantenimiento', 'preventivos', $p['id'])) {
                 createAlert($db, 'mantenimiento', $p['dias'] > 15 ? 'Urgente' : 'Alta',
                     "Preventivo vencido ({$p['dias']}d): {$p['concepto']} — {$p['placa']}", "Fecha programada: {$p['prox_fecha']}", 'preventivos', $p['id'], $p['vid'], $p['prox_fecha']);
                 $created++;
@@ -140,24 +143,34 @@ try {
             AND entidad_id IN (SELECT id FROM recordatorios WHERE estado != 'Pendiente')");
 
         echo json_encode(['ok' => true, 'created' => $created]);
+        cache_invalidate_prefix('alertas');
+        cache_invalidate_prefix('dashboard');
         exit;
     }
 
-    // ──── Stats / KPIs ────
+    // ──── Stats / KPIs ──── (consolidated into fewer queries + cached)
     if ($action === 'stats') {
-        $total = (int)$db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa'")->fetchColumn();
-        $urgentes = (int)$db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa' AND prioridad='Urgente'")->fetchColumn();
-        $altas = (int)$db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa' AND prioridad='Alta'")->fetchColumn();
-        $sinAsignar = (int)$db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa' AND responsable_id IS NULL")->fetchColumn();
+        require_once __DIR__ . '/../../includes/cache.php';
+        $data = cache_remember('alertas:stats', function() use ($db) {
+            // Single query for all KPI counts using conditional aggregation
+            $counts = $db->query("SELECT
+                COUNT(*) as total,
+                SUM(prioridad='Urgente') as urgentes,
+                SUM(prioridad='Alta') as altas,
+                SUM(responsable_id IS NULL) as sin_asignar
+                FROM alertas WHERE estado='Activa'")->fetch();
 
-        $byTipo = $db->query("SELECT tipo, COUNT(*) as cnt FROM alertas WHERE estado='Activa' GROUP BY tipo ORDER BY cnt DESC")->fetchAll();
-        $byPrioridad = $db->query("SELECT prioridad, COUNT(*) as cnt FROM alertas WHERE estado='Activa' GROUP BY prioridad")->fetchAll();
-        $recientes = $db->query("SELECT DATE(created_at) as dia, COUNT(*) as cnt FROM alertas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY dia ORDER BY dia")->fetchAll();
+            $byTipo = $db->query("SELECT tipo, COUNT(*) as cnt FROM alertas WHERE estado='Activa' GROUP BY tipo ORDER BY cnt DESC")->fetchAll();
+            $byPrioridad = $db->query("SELECT prioridad, COUNT(*) as cnt FROM alertas WHERE estado='Activa' GROUP BY prioridad")->fetchAll();
+            $recientes = $db->query("SELECT DATE(created_at) as dia, COUNT(*) as cnt FROM alertas WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY dia ORDER BY dia")->fetchAll();
 
-        echo json_encode([
-            'activas' => $total, 'urgentes' => $urgentes, 'altas' => $altas, 'sin_asignar' => $sinAsignar,
-            'by_tipo' => $byTipo, 'by_prioridad' => $byPrioridad, 'recientes' => $recientes,
-        ]);
+            return [
+                'activas' => (int)$counts['total'], 'urgentes' => (int)$counts['urgentes'],
+                'altas' => (int)$counts['altas'], 'sin_asignar' => (int)$counts['sin_asignar'],
+                'by_tipo' => $byTipo, 'by_prioridad' => $byPrioridad, 'recientes' => $recientes,
+            ];
+        }, 'alertas');
+        echo json_encode($data);
         exit;
     }
 
@@ -227,6 +240,7 @@ try {
             }
 
             echo json_encode(['id' => $newId, 'ok' => true]);
+            cache_invalidate_prefix('alertas');
             break;
 
         case 'PUT':
@@ -267,6 +281,7 @@ try {
             }
 
             audit_log('alertas', 'update', $id, (array)$prevData, $d);
+            cache_invalidate_prefix('alertas');
             echo json_encode(['ok' => true]);
             break;
 
@@ -275,6 +290,7 @@ try {
             $id = (int)$_GET['id'];
             $db->prepare("DELETE FROM alertas WHERE id=?")->execute([$id]);
             audit_log('alertas', 'delete', $id, [], []);
+            cache_invalidate_prefix('alertas');
             echo json_encode(['ok' => true]);
             break;
     }
@@ -284,6 +300,20 @@ try {
 }
 
 // ──── Funciones auxiliares ────
+
+/**
+ * Load all existing active alert keys into a Set for batch lookup.
+ * Replaces N+1 individual queries with a single bulk query.
+ */
+function loadExistingAlertKeys(PDO $db): array {
+    $stmt = $db->query("SELECT CONCAT(tipo,':',entidad,':',entidad_id) AS k FROM alertas WHERE estado IN ('Activa','Atendida')");
+    return array_flip(array_column($stmt->fetchAll(), 'k'));
+}
+
+function alertExistsBatch(array &$existingKeys, string $tipo, string $entidad, int $entidadId): bool {
+    return isset($existingKeys["{$tipo}:{$entidad}:{$entidadId}"]);
+}
+
 function alertExists(PDO $db, string $tipo, string $entidad, int $entidadId): bool {
     $stmt = $db->prepare("SELECT id FROM alertas WHERE tipo=? AND entidad=? AND entidad_id=? AND estado IN ('Activa','Atendida') LIMIT 1");
     $stmt->execute([$tipo, $entidad, $entidadId]);

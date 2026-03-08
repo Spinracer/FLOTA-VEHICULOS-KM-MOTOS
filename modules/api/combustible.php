@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
 require_once __DIR__ . '/../../includes/odometro.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
@@ -347,6 +348,7 @@ try {
                 audit_log('combustible', 'odometro_override', $newId, [], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
             }
             audit_log('combustible', 'create', $newId, [], $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['id'=>$newId,'ok'=>true]);
             break;
 
@@ -404,6 +406,7 @@ try {
                 audit_log('combustible', 'odometro_override', (int)$d['id'], ['km_anterior' => $prev['km'] ?? null], ['km_nuevo' => $km], ['reason' => $d['override_reason']]);
             }
             audit_log('combustible', 'update', (int)$d['id'], $prev, $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok'=>true]);
             break;
 
@@ -419,6 +422,7 @@ try {
             $prev = $prevStmt->fetch() ?: [];
             $db->prepare("UPDATE combustible SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
             audit_log('combustible', 'soft_delete', $id, $prev, []);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok'=>true]);
             break;
     }

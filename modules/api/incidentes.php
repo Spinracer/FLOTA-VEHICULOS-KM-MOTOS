@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/audit.php';
+require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
@@ -147,6 +148,7 @@ try {
                     notify_roles($db, ['coordinador_it','admin','soporte'], 'alerta', "Incidente {$d['severidad']}", "Se reportó incidente de severidad {$d['severidad']} en vehículo {$placa}: {$d['tipo']}", 'incidentes', $newId);
                 } catch (Throwable $e) { /* no bloquear */ }
             }
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['id'=>$newId,'ok'=>true]);
             break;
         case 'PUT':
@@ -198,6 +200,7 @@ try {
                    $d['id']
                ]);
             audit_log('incidentes', 'update', (int)$d['id'], $prev, $d);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok'=>true]);
             break;
         case 'DELETE':
@@ -212,6 +215,7 @@ try {
             $prev = $prevStmt->fetch() ?: [];
             $db->prepare("UPDATE incidentes SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
             audit_log('incidentes', 'soft_delete', $id, $prev, []);
+            cache_invalidate_prefix('dashboard');
             echo json_encode(['ok'=>true]);
             break;
     }

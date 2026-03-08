@@ -1,5 +1,32 @@
 # FlotaControl — Changelog
 
+## [3.9.0] — 2026-03-08
+
+### Mejora Mayor — Objetivo 9: Rendimiento y Optimización
+
+- **Sistema de caché file-based**: `includes/cache.php` con TTL por categoría, invalidación por prefijo, limpieza probabilística.
+- **Caché en dashboard**: Respuesta completa cacheada 120s con clave basada en filtros.
+- **Fix N+1 en alertas**: `loadExistingAlertKeys()` carga hash en memoria → `alertExistsBatch()` en O(1) vs 1 query/alerta.
+- **Stats consolidados**: 4 COUNT queries → 1 query con `SUM(CASE WHEN ...)`.
+- **Invalidación automática**: `cache_invalidate_prefix()` en combustible, mantenimientos y alertas.
+- **7 índices de rendimiento**: Compuestos en combustible, mantenimientos, alertas, asignaciones y vehículos.
+
+### Migraciones
+- **install.php §3.19**: 7 índices — `idx_comb_vehiculo_fecha`, `idx_mant_proveedor`, `idx_alerta_entidad_compuesta`, `idx_asig_vehiculo_fechas`, `idx_veh_deleted_sucursal`, `idx_veh_estado`, `idx_comb_vehiculo_km_rec`.
+
+### Archivos nuevos
+- `includes/cache.php`
+- `docs/OBJ9_RENDIMIENTO.md`
+
+### Archivos modificados
+- `modules/api/dashboard.php`: Wrapped en `cache_remember()`
+- `modules/api/alertas.php`: N+1 fix, stats, cache
+- `modules/api/combustible.php`: Cache invalidation
+- `modules/api/mantenimientos.php`: Cache invalidation
+- `install.php`: §3.19 indexes
+
+---
+
 ## [3.8.0] — 2026-03-07
 
 ### Mejora Mayor — Objetivo 8: Seguridad Avanzada

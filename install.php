@@ -1311,6 +1311,37 @@ try {
   } else { step('Columna: usuarios.totp_enabled', true, 'Ya existe'); }
 } catch (Throwable $e) { step('Columna: usuarios.totp_enabled', false, $e->getMessage()); }
 
+// ─────────────────────────────────────────────────────────
+// 3.19 Rendimiento (Objetivo 9): Índices de optimización
+// ─────────────────────────────────────────────────────────
+$perf_indexes = [
+    // Dashboard: combustible por vehículo+fecha (KPIs, charts mensuales)
+    ['combustible', 'idx_comb_vehiculo_fecha', '(vehiculo_id, fecha)'],
+    // Dashboard: mantenimiento por proveedor (reporte talleres)
+    ['mantenimientos', 'idx_mant_proveedor', '(proveedor_id)'],
+    // Alertas scan: búsqueda rápida de duplicados
+    ['alertas', 'idx_alerta_entidad_compuesta', '(tipo, entidad, entidad_id, estado)'],
+    // Asignaciones: JOIN temporal eficiencia operadores
+    ['asignaciones', 'idx_asig_vehiculo_fechas', '(vehiculo_id, start_at, end_at)'],
+    // Vehículos: filtro deleted_at + sucursal (dashboard, listados)
+    ['vehiculos', 'idx_veh_deleted_sucursal', '(deleted_at, sucursal_id)'],
+    // Vehículos: estado para filtros frecuentes
+    ['vehiculos', 'idx_veh_estado', '(estado)'],
+    // Combustible: km por vehículo para eficiencia
+    ['combustible', 'idx_comb_vehiculo_km_rec', '(vehiculo_id, km)'],
+];
+foreach ($perf_indexes as [$tbl, $idx, $cols]) {
+    try {
+        $exists = $pdo->query("SHOW INDEX FROM `{$tbl}` WHERE Key_name = '{$idx}'")->fetch();
+        if (!$exists) {
+            $pdo->exec("ALTER TABLE `{$tbl}` ADD INDEX {$idx} {$cols}");
+            step("Índice: {$tbl}.{$idx}", true);
+        } else {
+            step("Índice: {$tbl}.{$idx}", true, 'Ya existe');
+        }
+    } catch (Throwable $e) { step("Índice: {$tbl}.{$idx}", false, $e->getMessage()); }
+}
+
 // 4. Usuarios iniciales del sistema
 $usuarios_iniciales = [
     [
