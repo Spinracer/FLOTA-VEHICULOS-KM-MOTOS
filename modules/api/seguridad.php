@@ -117,7 +117,7 @@ try {
         $totalUsers = (int)$db->query("SELECT COUNT(*) FROM usuarios WHERE activo = 1")->fetchColumn();
 
         // Recent failed logins (from audit)
-        $failedLogins = (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE modulo = 'auth' AND accion = 'login_failed' AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
+        $failedLogins = (int)$db->query("SELECT COUNT(*) FROM audit_logs WHERE entidad = 'auth' AND accion = 'login_failed' AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
 
         // Rate limit blocks in last hour
         $rateLimits = 0;
@@ -128,8 +128,8 @@ try {
         // Recent security events
         $events = $db->query("SELECT al.*, u.nombre as user_nombre
             FROM audit_logs al
-            LEFT JOIN usuarios u ON al.usuario_id = u.id
-            WHERE al.modulo IN ('auth','seguridad')
+            LEFT JOIN usuarios u ON al.user_id = u.id
+            WHERE al.entidad IN ('auth','seguridad')
             ORDER BY al.created_at DESC
             LIMIT 50")->fetchAll();
 

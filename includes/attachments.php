@@ -43,6 +43,11 @@ function attachment_upload(string $entidad, int $entidadId, array $file): array 
         throw new RuntimeException('El archivo excede el tamaño máximo de ' . round(UPLOAD_MAX_SIZE/1024/1024) . ' MB.');
     }
 
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, UPLOAD_ALLOWED_EXT)) {
+        throw new RuntimeException("Extensión no permitida: .{$ext}");
+    }
+
     $mime = mime_content_type($file['tmp_name']);
     // Also accept the browser-reported type for common images
     $browserMime = $file['type'] ?? '';
@@ -54,12 +59,6 @@ function attachment_upload(string $entidad, int $entidadId, array $file): array 
             throw new RuntimeException("Tipo de archivo no permitido: {$mime}");
         }
     }
-
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, UPLOAD_ALLOWED_EXT)) {
-        throw new RuntimeException("Extensión no permitida: .{$ext}");
-    }
-
     $dir = UPLOAD_BASE . '/' . $entidad . '/' . $entidadId;
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);

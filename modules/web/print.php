@@ -444,6 +444,7 @@ async function saveAsAttachment() {
   fd.append('entidad', entidad);
   fd.append('entidad_id', entidadId);
   fd.append('archivo[]', blob, fileName);
+  fd.append('_csrf_token', getCsrfToken());
 
   try {
     const res = await fetch('/api/attachments.php', { method: 'POST', body: fd });

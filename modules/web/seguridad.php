@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────
 // FlotaControl — Web: Seguridad (2FA + Dashboard)
 // ─────────────────────────────────────────────────────────
-require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/layout.php';
 require_login();
 
 $user = current_user();
@@ -188,7 +188,7 @@ async function loadStats() {
         '2fa_verified': '<span class="badge badge-green">2FA verificado</span>',
         '2fa_admin_reset': '<span class="badge badge-red">2FA reset (admin)</span>',
       }[e.accion] || `<span class="badge badge-gray">${e.accion}</span>`;
-      const details = e.datos_despues ? (() => { try { const d = JSON.parse(e.datos_despues); return d.email || ''; } catch { return ''; } })() : '';
+      const details = e.despues_json ? (() => { try { const d = JSON.parse(e.despues_json); return d.email || ''; } catch { return ''; } })() : '';
       return `<tr class="border-b border-border/50 hover:bg-surface2/50">
         <td class="py-2 pr-4 text-xs text-muted">${new Date(e.created_at).toLocaleString('es')}</td>
         <td class="py-2 pr-4">${e.user_nombre || '—'}</td>

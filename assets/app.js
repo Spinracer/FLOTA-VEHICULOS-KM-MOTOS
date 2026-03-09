@@ -30,8 +30,15 @@ async function api(url, method = 'GET', data = null) {
   if (data && method !== 'GET') opts.body = JSON.stringify(data);
   try {
     const res = await fetch(url, opts);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Error en la petición');
+    const text = await res.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      console.error('API response not JSON:', text.substring(0, 500));
+      throw new Error(res.ok ? 'Respuesta inválida del servidor' : `Error ${res.status}: ${text.substring(0, 200)}`);
+    }
+    if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
     return json;
   } catch (e) {
     toast(e.message, 'error');
@@ -217,7 +224,7 @@ class AttachmentWidget {
   async deleteAtt(id) {
     if (!confirm('¿Eliminar este adjunto?')) return;
     try {
-      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE'});
+      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE', headers:{'X-CSRF-Token': getCsrfToken()}});
       this.attachments = this.attachments.filter(a => a.id !== id);
       this.render();
       toast('Adjunto eliminado', 'warning');
@@ -232,6 +239,7 @@ class AttachmentWidget {
     fd.append('entidad', this.entidad);
     fd.append('entidad_id', this.entidadId);
     for (const f of this.pendingFiles) fd.append('archivo[]', f);
+    fd.append('_csrf_token', getCsrfToken());
     try {
       const res = await fetch('/api/attachments.php', {method:'POST', body: fd});
       if (!res.ok) throw new Error('Error al subir');

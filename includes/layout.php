@@ -255,12 +255,12 @@ async function loadNotifs() {
   } catch(e) {}
 }
 async function readNotif(id, el) {
-  await fetch(`/api/notificaciones.php?id=${id}`, {method:'PUT'});
+  await fetch(`/api/notificaciones.php?id=${id}`, {method:'PUT', headers:{'X-CSRF-Token': getCsrfToken()}});
   el.style.background = 'transparent';
   pollNotifs();
 }
 async function markAllRead() {
-  await fetch('/api/notificaciones.php?all=1', {method:'PUT'});
+  await fetch('/api/notificaciones.php?all=1', {method:'PUT', headers:{'X-CSRF-Token': getCsrfToken()}});
   pollNotifs(); loadNotifs();
 }
 // Close panel on outside click

@@ -93,7 +93,7 @@ function renderTable() {
 
 async function guardarPermisos() {
   if (['coordinador_it','admin'].includes(activeRole)) {
-    showToast('Los permisos de administrador no se pueden modificar.','error');
+    toast('Los permisos de administrador no se pueden modificar.','error');
     return;
   }
   const status = document.getElementById('save-status');
@@ -107,19 +107,17 @@ async function guardarPermisos() {
   });
   let ok = 0, fail = 0;
   for (const [mod, perms] of Object.entries(byModule)) {
-    const res = await fetch('/api/permisos.php', {
-      method:'PUT',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ rol: activeRole, modulo: mod, permisos: perms })
-    });
-    if (res.ok) ok++; else fail++;
+    try {
+      await api('/api/permisos.php', 'PUT', { rol: activeRole, modulo: mod, permisos: perms });
+      ok++;
+    } catch(e) { fail++; }
   }
   if (!matrix[activeRole]) matrix[activeRole] = {};
   for (const [mod, perms] of Object.entries(byModule)) {
     matrix[activeRole][mod] = perms;
   }
   status.textContent = `✅ ${ok} módulos actualizados` + (fail ? `, ${fail} errores` : '');
-  showToast(`Permisos de ${activeRole} actualizados (${ok} módulos).`,'ok');
+  toast(`Permisos de ${activeRole} actualizados (${ok} módulos).`,'success');
   setTimeout(() => status.textContent = '', 3000);
 }
 

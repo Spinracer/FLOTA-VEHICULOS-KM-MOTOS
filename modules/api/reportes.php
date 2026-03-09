@@ -12,6 +12,10 @@
  *   GET ?export=asignaciones&format=csv|xlsx|pdf  → Descarga
  *   GET ?export=incidentes&format=csv|xlsx|pdf    → Descarga
  */
+error_reporting(E_ALL);
+set_error_handler(function($severity, $msg, $file, $line) {
+    throw new ErrorException($msg, 0, $severity, $file, $line);
+});
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/export.php';
