@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+.installed.lock
 
 # Logs y temporales
 *.log

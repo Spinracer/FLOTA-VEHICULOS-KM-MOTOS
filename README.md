@@ -126,20 +126,22 @@ El instalador creará:
 
 ### 4. Credenciales iniciales
 
-| Perfil | Email | Contraseña |
-|---|---|---|
-| Coordinador IT | `coordinador@flotacontrol.local` | `CoordIT2024x` |
-| Soporte | `soporte@flotacontrol.local` | `Soporte2024x` |
-| Monitoreo | `monitoreo@flotacontrol.local` | `Monitor2024x` |
-| Dev Test | `dev@flotacontrol.local` | `DevTest2024x` |
+El instalador genera contraseñas aleatorias para los usuarios iniciales y las muestra **una sola vez** durante la instalación. Guárdalas de forma segura.
 
-> ⚠️ **Cambia la contraseña** desde `Sistema > Usuarios` al ingresar por primera vez.
+| Perfil | Email |
+|---|---|
+| Coordinador IT | `coordinador@flotacontrol.local` |
+| Soporte | `soporte@flotacontrol.local` |
+| Monitoreo | `monitoreo@flotacontrol.local` |
+
+> ⚠️ **Cambia las contraseñas** desde `Sistema > Usuarios` al ingresar por primera vez.
 
 ---
 
-### 5. Eliminar el instalador (importante)
+### 5. Protección post-instalación
 
-Después de instalar, **elimina o renombra** el archivo `install.php` para evitar que alguien lo vuelva a ejecutar:
+El instalador crea un archivo `.installed.lock` que impide la re-ejecución. Para reinstalar, elimina ese archivo.
+Opcionalmente, elimina `install.php` del servidor:
 ```bash
 rm /var/www/html/flotacontrol/install.php
 ```

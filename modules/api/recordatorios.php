@@ -74,4 +74,4 @@ try {
             echo json_encode(['ok'=>true]);
             break;
     }
-} catch (PDOException $e) { http_response_code(500); echo json_encode(['error'=>$e->getMessage()]); }
+} catch (PDOException $e) { http_response_code(500); echo json_encode(['error'=>safe_error_msg($e)]); }

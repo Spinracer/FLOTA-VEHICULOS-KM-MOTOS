@@ -584,4 +584,4 @@ try {
             echo json_encode(['ok'=>true]);
             break;
     }
-} catch (Throwable $e) { http_response_code(500); echo json_encode(['error'=>$e->getMessage()]); }
+} catch (Throwable $e) { http_response_code(500); echo json_encode(['error'=>safe_error_msg($e)]); }

@@ -12,10 +12,6 @@
  *   GET ?export=asignaciones&format=csv|xlsx|pdf  → Descarga
  *   GET ?export=incidentes&format=csv|xlsx|pdf    → Descarga
  */
-error_reporting(E_ALL);
-set_error_handler(function($severity, $msg, $file, $line) {
-    throw new ErrorException($msg, 0, $severity, $file, $line);
-});
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/export.php';
@@ -69,7 +65,7 @@ try {
                 break;
 
             case 'mantenimiento':
-                $where = "WHERE 1=1";
+                $where = "WHERE m.deleted_at IS NULL";
                 $params = [];
                 if ($from) { $where .= " AND m.fecha >= ?"; $params[] = $from; }
                 if ($to) { $where .= " AND m.fecha <= ?"; $params[] = $to; }
@@ -178,10 +174,10 @@ try {
                 if ($vid) { $where .= " AND v.id = ?"; $params[] = $vid; }
                 $stmt = $db->prepare("SELECT v.placa, v.marca, v.modelo, v.anio, v.estado, v.km_actual,
                     (SELECT COUNT(*) FROM asignaciones a WHERE a.vehiculo_id=v.id) AS asignaciones,
-                    (SELECT COUNT(*) FROM mantenimientos m WHERE m.vehiculo_id=v.id) AS mantenimientos,
+                    (SELECT COUNT(*) FROM mantenimientos m WHERE m.vehiculo_id=v.id AND m.deleted_at IS NULL) AS mantenimientos,
                     (SELECT COALESCE(SUM(c.litros),0) FROM combustible c WHERE c.vehiculo_id=v.id) AS litros,
                     (SELECT COALESCE(SUM(c.total),0) FROM combustible c WHERE c.vehiculo_id=v.id) AS gasto_comb,
-                    (SELECT COALESCE(SUM(m2.costo),0) FROM mantenimientos m2 WHERE m2.vehiculo_id=v.id) AS gasto_mant,
+                    (SELECT COALESCE(SUM(m2.costo),0) FROM mantenimientos m2 WHERE m2.vehiculo_id=v.id AND m2.deleted_at IS NULL) AS gasto_mant,
                     (SELECT COUNT(*) FROM incidentes i WHERE i.vehiculo_id=v.id) AS incidentes
                     FROM vehiculos v $where ORDER BY v.placa");
                 $stmt->execute($params);
@@ -293,7 +289,7 @@ try {
             break;
 
         case 'mantenimiento':
-            $where = "WHERE 1=1";
+            $where = "WHERE m.deleted_at IS NULL";
             $params = [];
             if ($from) { $where .= " AND m.fecha >= ?"; $params[] = $from; }
             if ($to) { $where .= " AND m.fecha <= ?"; $params[] = $to; }
@@ -377,8 +373,8 @@ try {
             $stmt = $db->prepare("SELECT v.id, v.placa, v.marca, v.modelo, v.estado, v.km_actual,
                 (SELECT COUNT(*) FROM asignaciones a WHERE a.vehiculo_id=v.id) as total_asignaciones,
                 (SELECT COUNT(*) FROM asignaciones a WHERE a.vehiculo_id=v.id AND a.estado='Activa') as asignaciones_activas,
-                (SELECT COUNT(*) FROM mantenimientos m WHERE m.vehiculo_id=v.id) as total_mantenimientos,
-                (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id) as gasto_mantenimiento,
+                (SELECT COUNT(*) FROM mantenimientos m WHERE m.vehiculo_id=v.id AND m.deleted_at IS NULL) as total_mantenimientos,
+                (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id AND m.deleted_at IS NULL) as gasto_mantenimiento,
                 (SELECT COALESCE(SUM(c.litros),0) FROM combustible c WHERE c.vehiculo_id=v.id) as total_litros,
                 (SELECT COALESCE(SUM(c.total),0) FROM combustible c WHERE c.vehiculo_id=v.id) as gasto_combustible,
                 (SELECT COUNT(*) FROM incidentes i WHERE i.vehiculo_id=v.id) as total_incidentes
@@ -415,8 +411,8 @@ try {
             }
             $stmt = $db->prepare("SELECT v.placa, v.marca, v.modelo,
                 COALESCE(SUM(c.total),0) as gasto_combustible,
-                (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id) as gasto_mantenimiento,
-                COALESCE(SUM(c.total),0) + (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id) as gasto_total
+                (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id AND m.deleted_at IS NULL) as gasto_mantenimiento,
+                COALESCE(SUM(c.total),0) + (SELECT COALESCE(SUM(m.costo),0) FROM mantenimientos m WHERE m.vehiculo_id=v.id AND m.deleted_at IS NULL) as gasto_total
                 FROM vehiculos v
                 LEFT JOIN combustible c ON c.vehiculo_id=v.id " . ($from||$to ? "AND ".str_replace('WHERE ','',str_replace('c.','c.',$where)) : "") . "
                 WHERE v.deleted_at IS NULL
@@ -439,7 +435,7 @@ try {
                 SUM(CASE WHEN m.estado='Completado' THEN 1 ELSE 0 END) as completados,
                 SUM(CASE WHEN m.estado IN ('En proceso','Pendiente') THEN 1 ELSE 0 END) as activos
                 FROM proveedores p
-                LEFT JOIN mantenimientos m ON m.proveedor_id=p.id
+                LEFT JOIN mantenimientos m ON m.proveedor_id=p.id AND m.deleted_at IS NULL
                 WHERE p.es_taller_autorizado=1
                 GROUP BY p.id, p.nombre, p.es_taller_autorizado
                 ORDER BY gasto_total DESC");
@@ -625,5 +621,6 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    $msg = (defined('APP_DEBUG') && APP_DEBUG) ? $e->getMessage() : 'Error interno del servidor.';
+    echo json_encode(['error' => $msg]);
 }

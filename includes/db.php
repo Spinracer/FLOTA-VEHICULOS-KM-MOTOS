@@ -65,3 +65,11 @@ function getDB(): PDO {
     }
     return $pdo;
 }
+
+/**
+ * Devuelve un mensaje de error seguro para respuestas API.
+ * En modo debug muestra el detalle; en producción, un mensaje genérico.
+ */
+function safe_error_msg(Throwable $e): string {
+    return (defined('APP_DEBUG') && APP_DEBUG) ? $e->getMessage() : 'Error interno del servidor.';
+}

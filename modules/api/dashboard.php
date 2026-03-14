@@ -328,5 +328,5 @@ echo json_encode($response, JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => false, 'error' => safe_error_msg($e)], JSON_UNESCAPED_UNICODE);
 }

@@ -52,10 +52,12 @@ function session_init(): void {
         $name     = getenv('SESSION_NAME') ?: 'FLOTACONTROL';
         $lifetime = (int)(getenv('SESSION_LIFETIME') ?: 7200);
         session_name($name);
+        $isSecure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                   || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
         session_set_cookie_params([
             'lifetime' => $lifetime,
             'path'     => '/',
-            'secure'   => false,   // true en HTTPS
+            'secure'   => $isSecure,
             'httponly' => true,
             'samesite' => 'Strict',
         ]);

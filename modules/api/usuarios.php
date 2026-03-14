@@ -62,6 +62,6 @@ try {
     }
 } catch (PDOException $e) {
     http_response_code(500);
-    $msg = str_contains($e->getMessage(),'Duplicate') ? 'Ya existe un usuario con ese email.' : $e->getMessage();
+    $msg = str_contains($e->getMessage(),'Duplicate') ? 'Ya existe un usuario con ese email.' : safe_error_msg($e);
     echo json_encode(['error'=>$msg]);
 }

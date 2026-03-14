@@ -25,7 +25,7 @@ function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
         return ['reason' => 'El vehículo ya tiene una asignación activa.', 'blocking_type' => 'asignacion', 'blocking_id' => (int)$row['id']];
     }
 
-    $stmt2 = $db->prepare("SELECT id FROM mantenimientos WHERE vehiculo_id=? AND estado IN ('En proceso','Pendiente') ORDER BY id DESC LIMIT 1");
+    $stmt2 = $db->prepare("SELECT id FROM mantenimientos WHERE vehiculo_id=? AND estado = 'En proceso' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
     $stmt2->execute([$vehiculoId]);
     $row2 = $stmt2->fetch();
     if ($row2) {
@@ -187,7 +187,8 @@ try {
         if ($asigId <= 0) { http_response_code(400); echo json_encode(['error' => 'ID inválido.']); exit; }
         $token = bin2hex(random_bytes(32));
         $col = $momento === 'entrega' ? 'firma_entrega_token' : 'firma_token';
-        $db->prepare("UPDATE asignaciones SET {$col} = ? WHERE id = ?")->execute([$token, $asigId]);
+        $colTs = $momento === 'entrega' ? 'firma_entrega_token_created_at' : 'firma_token_created_at';
+        $db->prepare("UPDATE asignaciones SET {$col} = ?, {$colTs} = NOW() WHERE id = ?")->execute([$token, $asigId]);
         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
                  . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $link = $baseUrl . '/firma.php?token=' . $token;
@@ -271,7 +272,7 @@ try {
             $per = min(100, max(5, (int)($_GET['per'] ?? 25)));
             $off = ($page - 1) * $per;
 
-            $where = "WHERE (v.placa LIKE ? OR v.marca LIKE ? OR o.nombre LIKE ? OR a.estado LIKE ? )";
+            $where = "WHERE a.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR o.nombre LIKE ? OR a.estado LIKE ? )";
             $params = [$q, $q, $q, $q];
             if ($vid) { $where .= " AND a.vehiculo_id=?"; $params[] = $vid; }
             if ($estado !== '') { $where .= " AND a.estado=?"; $params[] = $estado; }
@@ -566,7 +567,7 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM asignaciones WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("DELETE FROM asignaciones WHERE id = ?")->execute([$id]);
+            $db->prepare("UPDATE asignaciones SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
             audit_log('asignaciones', 'delete', $id, $prev, []);
             cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
@@ -578,5 +579,5 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => safe_error_msg($e)]);
 }

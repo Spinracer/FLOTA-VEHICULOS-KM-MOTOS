@@ -27,12 +27,12 @@ if ($method === 'POST') {
         exit;
     }
     // Try retorno token first, then entrega token
-    $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_token = ? LIMIT 1");
+    $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_token = ? AND (firma_token_created_at IS NULL OR firma_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
     $stmt->execute([$token]);
     $asig = $stmt->fetch();
     $momento = 'retorno';
     if (!$asig) {
-        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_entrega_token = ? LIMIT 1");
+        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_entrega_token = ? AND (firma_entrega_token_created_at IS NULL OR firma_entrega_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
         $stmt->execute([$token]);
         $asig = $stmt->fetch();
         $momento = 'entrega';
@@ -70,7 +70,7 @@ $stmt = $db->prepare("
     FROM asignaciones a
     LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
     LEFT JOIN operadores o ON o.id = a.operador_id
-    WHERE a.firma_token = ?
+    WHERE a.firma_token = ? AND (a.firma_token_created_at IS NULL OR a.firma_token_created_at > NOW() - INTERVAL 48 HOUR)
     LIMIT 1
 ");
 $stmt->execute([$token]);
@@ -83,7 +83,7 @@ if (!$asig) {
         FROM asignaciones a
         LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
         LEFT JOIN operadores o ON o.id = a.operador_id
-        WHERE a.firma_entrega_token = ?
+        WHERE a.firma_entrega_token = ? AND (a.firma_entrega_token_created_at IS NULL OR a.firma_entrega_token_created_at > NOW() - INTERVAL 48 HOUR)
         LIMIT 1
     ");
     $stmt->execute([$token]);

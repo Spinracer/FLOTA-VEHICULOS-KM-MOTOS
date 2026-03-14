@@ -10,7 +10,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
 
 function combustible_bloqueo_mantenimiento(PDO $db, int $vehiculoId, ?int $excludeMaintenanceId = null): ?array {
-    $sql = "SELECT id, estado FROM mantenimientos WHERE vehiculo_id=? AND estado IN ('En proceso','Pendiente')";
+    $sql = "SELECT id, estado FROM mantenimientos WHERE vehiculo_id=? AND estado = 'En proceso' AND deleted_at IS NULL";
     $params = [$vehiculoId];
     if ($excludeMaintenanceId) {
         $sql .= " AND id<>?";
@@ -428,5 +428,5 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    echo json_encode(['error'=>$e->getMessage()]);
+    echo json_encode(['error'=>safe_error_msg($e)]);
 }

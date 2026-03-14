@@ -288,6 +288,6 @@ try {
     }
 } catch (Throwable $e) {
     http_response_code(500);
-    $msg = str_contains($e->getMessage(), 'Duplicate') ? 'Ya existe un vehículo con esa placa.' : $e->getMessage();
+    $msg = str_contains($e->getMessage(), 'Duplicate') ? 'Ya existe un vehículo con esa placa.' : safe_error_msg($e);
     echo json_encode(['error' => $msg]);
 }

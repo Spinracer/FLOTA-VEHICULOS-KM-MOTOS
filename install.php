@@ -26,6 +26,14 @@
   <p>Este script creará la base de datos y tablas necesarias para el sistema.</p>
 
 <?php
+// ─── Bloqueo de reinstalación ───
+$lockFile = __DIR__ . '/.installed.lock';
+if (file_exists($lockFile)) {
+    echo '<div class="step info">⚠️ El sistema ya fue instalado. Eliminá <code>.installed.lock</code> para reinstalar.</div>';
+    echo '<a href="/index.php" class="btn">Ir al sistema →</a></div></body></html>';
+    exit;
+}
+
 // Cargar .env si existe
 $envFile = __DIR__ . '/.env';
 if (file_exists($envFile)) {
@@ -868,6 +876,8 @@ $asgExtraCols = [
   'firma_entrega_fecha'   => "DATETIME NULL",
   'firma_entrega_ip'      => "VARCHAR(45) NULL",
   'firma_entrega_token'   => "VARCHAR(128) NULL",
+  'firma_token_created_at' => "DATETIME NULL",
+  'firma_entrega_token_created_at' => "DATETIME NULL",
 ];
 foreach ($asgExtraCols as $col => $def) {
   try {
@@ -1115,6 +1125,18 @@ try {
   }
 } catch (Throwable $e) {
   step('Asignación extra: plantilla_id', false, $e->getMessage());
+}
+
+// Columna deleted_at en asignaciones (soft-delete)
+try {
+  if (!$existsColumn('asignaciones', 'deleted_at')) {
+    $pdo->exec("ALTER TABLE asignaciones ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL");
+    step('Asignación extra: deleted_at', true);
+  } else {
+    step('Asignación extra: deleted_at', true, 'Ya existe');
+  }
+} catch (Throwable $e) {
+  step('Asignación extra: deleted_at', false, $e->getMessage());
 }
 
 // 3.15 Seguimiento de incidentes (Objetivo 4)
@@ -1422,30 +1444,22 @@ foreach ([
     } catch (Throwable $e) { step("Columna {$tbl}.{$col}", false, $e->getMessage()); }
 }
 
+$generatedPasswords = [];
 $usuarios_iniciales = [
     [
         'nombre' => 'Coordinador IT',
         'email'  => 'coordinador@flotacontrol.local',
-        'pass'   => 'CoordIT2024x',
         'rol'    => 'coordinador_it',
     ],
     [
         'nombre' => 'Soporte Sistema',
         'email'  => 'soporte@flotacontrol.local',
-        'pass'   => 'Soporte2024x',
         'rol'    => 'soporte',
     ],
     [
         'nombre' => 'Monitor Flota',
         'email'  => 'monitoreo@flotacontrol.local',
-        'pass'   => 'Monitor2024x',
         'rol'    => 'monitoreo',
-    ],
-    [
-        'nombre' => 'Dev Test',
-        'email'  => 'dev@flotacontrol.local',
-        'pass'   => 'DevTest2024x',
-        'rol'    => 'coordinador_it',
     ],
 ];
 foreach ($usuarios_iniciales as $u) {
@@ -1453,9 +1467,11 @@ foreach ($usuarios_iniciales as $u) {
         $exists = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = ?");
         $exists->execute([$u['email']]);
         if (!$exists->fetchColumn()) {
-            $hash = password_hash($u['pass'], PASSWORD_DEFAULT);
+            $pass = bin2hex(random_bytes(8)); // 16 chars random password
+            $hash = password_hash($pass, PASSWORD_DEFAULT);
             $pdo->prepare("INSERT INTO usuarios (nombre,email,password,rol) VALUES (?,?,?,?)")
                 ->execute([$u['nombre'], $u['email'], $hash, $u['rol']]);
+            $generatedPasswords[] = ['nombre' => $u['nombre'], 'email' => $u['email'], 'pass' => $pass, 'rol' => $u['rol']];
             step("Usuario '{$u['nombre']}' ({$u['rol']}) creado", true);
         } else {
             step("Usuario '{$u['email']}' ya existe", true, "No se sobreescribió");
@@ -1465,19 +1481,22 @@ foreach ($usuarios_iniciales as $u) {
     }
 }
 
-if ($ok): ?>
+if ($ok): 
+// Crear lock file para evitar reinstalación accidental
+file_put_contents($lockFile, date('Y-m-d H:i:s') . ' — Instalación completada');
+?>
 <div class="creds">
   <strong>✅ Instalación completada</strong><br><br>
-  <strong style="color:var(--accent,#e8ff47)">Usuarios creados:</strong><br><br>
-  🔑 <strong>Coordinador IT</strong> (admin total)<br>
-  &nbsp;&nbsp;&nbsp;📧 coordinador@flotacontrol.local &nbsp;|&nbsp; 🔒 CoordIT2024x<br><br>
-  🛠️ <strong>Soporte</strong> (crear/editar)<br>
-  &nbsp;&nbsp;&nbsp;📧 soporte@flotacontrol.local &nbsp;&nbsp;&nbsp;&nbsp;|&nbsp; 🔒 Soporte2024x<br><br>
-  👁️ <strong>Monitoreo</strong> (solo lectura)<br>
-  &nbsp;&nbsp;&nbsp;📧 monitoreo@flotacontrol.local &nbsp;|&nbsp; 🔒 Monitor2024x<br><br>
-  🧪 <strong>Dev Test</strong> (coordinador_it)<br>
-  &nbsp;&nbsp;&nbsp;📧 dev@flotacontrol.local &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp; 🔒 DevTest2024x<br><br>
-  <small style="color:#ff4757">⚠️ Cambia las contraseñas al ingresar. Elimina <code>install.php</code> del servidor.</small>
+  <?php if (count($generatedPasswords) > 0): ?>
+  <strong style="color:var(--accent,#e8ff47)">Usuarios creados (guarda estas contraseñas):</strong><br><br>
+  <?php foreach ($generatedPasswords as $gp): ?>
+  🔑 <strong><?=htmlspecialchars($gp['nombre'])?></strong> (<?=htmlspecialchars($gp['rol'])?>)<br>
+  &nbsp;&nbsp;&nbsp;📧 <?=htmlspecialchars($gp['email'])?> &nbsp;|&nbsp; 🔒 <?=htmlspecialchars($gp['pass'])?><br><br>
+  <?php endforeach; ?>
+  <?php else: ?>
+  <strong style="color:var(--accent,#e8ff47)">Los usuarios ya existían — no se generaron contraseñas nuevas.</strong><br><br>
+  <?php endif; ?>
+  <small style="color:#ff4757">⚠️ Cambia las contraseñas al ingresar. Las contraseñas no se mostrarán de nuevo.</small>
 </div>
 <a href="/index.php" class="btn">Ir al sistema →</a>
 <?php else: ?>
