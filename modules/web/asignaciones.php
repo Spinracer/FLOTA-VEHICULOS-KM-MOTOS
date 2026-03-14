@@ -79,18 +79,6 @@ ob_start();
         </div>
         <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
       </div>
-      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
-        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✍️ Firma de Entrega</label>
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400"><input type="radio" name="firma_entrega_tipo" value="ninguna" checked> Sin firma</label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400"><input type="radio" name="firma_entrega_tipo" value="digital"> Firma digital</label>
-        </div>
-        <div id="firma-entrega-area" style="display:none">
-          <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Dibuje la firma de quien entrega el vehículo:</p>
-          <canvas id="firma-entrega-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#1a1e27;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="clearFirmaEntrega()">Limpiar</button>
-        </div>
-      </div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar un bloqueo."></textarea></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-new')">Cancelar</button><button class="btn btn-primary" onclick="saveNew()">Guardar</button></div>
@@ -237,28 +225,10 @@ if (firmaCanvas) {
 }
 function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); } }
 
-// Firma entrega canvas
-let firmaEntDrawing = false;
-const firmaEntCanvas = document.getElementById('firma-entrega-canvas');
-const firmaEntCtx = firmaEntCanvas ? firmaEntCanvas.getContext('2d') : null;
-if (firmaEntCanvas) {
-  firmaEntCanvas.addEventListener('mousedown', e => { firmaEntDrawing = true; firmaEntCtx.beginPath(); firmaEntCtx.moveTo(e.offsetX, e.offsetY); });
-  firmaEntCanvas.addEventListener('mousemove', e => { if (!firmaEntDrawing) return; firmaEntCtx.lineTo(e.offsetX, e.offsetY); firmaEntCtx.strokeStyle = '#e8ff47'; firmaEntCtx.lineWidth = 2; firmaEntCtx.stroke(); });
-  firmaEntCanvas.addEventListener('mouseup', () => firmaEntDrawing = false);
-  firmaEntCanvas.addEventListener('mouseleave', () => firmaEntDrawing = false);
-  firmaEntCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaEntDrawing = true; const t = e.touches[0]; const r = firmaEntCanvas.getBoundingClientRect(); firmaEntCtx.beginPath(); firmaEntCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
-  firmaEntCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaEntDrawing) return; const t = e.touches[0]; const r = firmaEntCanvas.getBoundingClientRect(); firmaEntCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaEntCtx.strokeStyle = '#e8ff47'; firmaEntCtx.lineWidth = 2; firmaEntCtx.stroke(); });
-  firmaEntCanvas.addEventListener('touchend', () => firmaEntDrawing = false);
-}
-function clearFirmaEntrega() { if (firmaEntCtx) { firmaEntCtx.clearRect(0, 0, firmaEntCanvas.width, firmaEntCanvas.height); } }
-
 // Firma type toggle
 document.querySelectorAll('[name="firma_tipo"]').forEach(r => r.addEventListener('change', () => {
   document.getElementById('firma-digital-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
   document.getElementById('firma-fisica-area').style.display = r.value === 'fisica' && r.checked ? '' : 'none';
-}));
-document.querySelectorAll('[name="firma_entrega_tipo"]').forEach(r => r.addEventListener('change', () => {
-  document.getElementById('firma-entrega-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
 }));
 
 // ── Auto-fill checklist + km from vehicle ──
@@ -365,12 +335,6 @@ async function saveNew(){
   // Plantilla ID
   const pSel = document.getElementById('plantilla-select');
   if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
-  // Firma de entrega
-  const firmaEntRadio = document.querySelector('#modal-new [name="firma_entrega_tipo"]:checked');
-  d.firma_entrega_tipo = firmaEntRadio ? firmaEntRadio.value : 'ninguna';
-  if (d.firma_entrega_tipo === 'digital' && firmaEntCanvas) {
-    d.firma_entrega_data = firmaEntCanvas.toDataURL('image/png');
-  }
   const res = await api('/api/asignaciones.php', 'POST', d);
   // Guardar respuestas dinámicas del checklist
   if (res.id && pSel && pSel.value) {
