@@ -325,8 +325,8 @@ try {
 
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_detalles)
-                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?)");
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles)
+                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
@@ -340,6 +340,13 @@ try {
                     (int)($d['checklist_llanta'] ?? 0),
                     (int)($d['checklist_bac'] ?? 0),
                     (int)($d['checklist_revision'] ?? 0),
+                    (int)($d['checklist_luces'] ?? 0),
+                    (int)($d['checklist_liquidos'] ?? 0),
+                    (int)($d['checklist_motor'] ?? 0),
+                    (int)($d['checklist_parabrisas'] ?? 0),
+                    (int)($d['checklist_documentacion'] ?? 0),
+                    (int)($d['checklist_frenos'] ?? 0),
+                    (int)($d['checklist_espejos'] ?? 0),
                     $d['checklist_detalles'] ?: null,
                 ]);
 
@@ -420,7 +427,9 @@ try {
 
                 $stmt = $db->prepare("UPDATE asignaciones
                     SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?,
-                        end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?, end_checklist_detalles=?,
+                        end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?,
+                        end_checklist_luces=?, end_checklist_liquidos=?, end_checklist_motor=?, end_checklist_parabrisas=?, end_checklist_documentacion=?, end_checklist_frenos=?, end_checklist_espejos=?,
+                        end_checklist_detalles=?,
                         firma_tipo=?, firma_data=?, firma_token=?, firma_fecha=IF(?='ninguna',NULL,NOW()), firma_ip=?
                     WHERE id=?");
                 $stmt->execute([
@@ -434,6 +443,13 @@ try {
                     (int)($d['end_checklist_llanta'] ?? 0),
                     (int)($d['end_checklist_bac'] ?? 0),
                     (int)($d['end_checklist_revision'] ?? 0),
+                    (int)($d['end_checklist_luces'] ?? 0),
+                    (int)($d['end_checklist_liquidos'] ?? 0),
+                    (int)($d['end_checklist_motor'] ?? 0),
+                    (int)($d['end_checklist_parabrisas'] ?? 0),
+                    (int)($d['end_checklist_documentacion'] ?? 0),
+                    (int)($d['end_checklist_frenos'] ?? 0),
+                    (int)($d['end_checklist_espejos'] ?? 0),
                     $d['end_checklist_detalles'] ?: null,
                     $firmaTipo,
                     $firmaData ?: null,

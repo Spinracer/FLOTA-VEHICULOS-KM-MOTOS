@@ -65,10 +65,17 @@ ob_start();
         <div id="dynamic-checklist-items" style="display:none;margin-bottom:10px;padding:8px;border:1px dashed var(--border);border-radius:6px"></div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta repuesto</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta de repuesto</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión general OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_luces" value="1" style="accent-color:#e8ff47"> Luces en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_liquidos" value="1" style="accent-color:#e8ff47"> Nivel de líquidos OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_motor" value="1" style="accent-color:#e8ff47"> Motor en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_parabrisas" value="1" style="accent-color:#e8ff47"> Parabrisas sin daños</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_documentacion" value="1" style="accent-color:#e8ff47"> Documentación en regla</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_frenos" value="1" style="accent-color:#e8ff47"> Frenos operativos</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_espejos" value="1" style="accent-color:#e8ff47"> Espejos completos</label>
         </div>
         <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
       </div>
@@ -90,10 +97,17 @@ ob_start();
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Retorno</label>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta repuesto</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta de repuesto</label>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión general OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_luces" value="1" style="accent-color:#e8ff47"> Luces en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_liquidos" value="1" style="accent-color:#e8ff47"> Nivel de líquidos OK</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_motor" value="1" style="accent-color:#e8ff47"> Motor en buen estado</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_parabrisas" value="1" style="accent-color:#e8ff47"> Parabrisas sin daños</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_documentacion" value="1" style="accent-color:#e8ff47"> Documentación en regla</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_frenos" value="1" style="accent-color:#e8ff47"> Frenos operativos</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_espejos" value="1" style="accent-color:#e8ff47"> Espejos completos</label>
         </div>
         <div style="margin-top:6px"><textarea name="end_checklist_detalles" placeholder="Detalles del checklist de retorno..." style="font-size:12px"></textarea></div>
       </div>
@@ -241,8 +255,9 @@ async function enviarLinkFirma() {
   if (!asigId) { toast('Primero guarda la asignación','error'); return; }
   try {
     const res = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: parseInt(asigId) });
-    if (res.link) {
-      await navigator.clipboard.writeText(res.link);
+    if (res.token) {
+      const link = window.location.origin + '/firma.php?token=' + res.token;
+      await navigator.clipboard.writeText(link);
       toast('Link de firma copiado al portapapeles');
     }
   } catch(e) { toast('Error al generar link de firma','error'); }

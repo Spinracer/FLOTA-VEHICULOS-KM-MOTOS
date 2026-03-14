@@ -95,12 +95,16 @@ function trendBadge(val) {
   return `<span style="font-size:11px;${cls}">${arrow} ${Math.abs(val)}%</span>`;
 }
 
+function fmtCurrency(val) {
+  return '<span class="kpi-currency">L</span>' + Number(val).toLocaleString('es', {maximumFractionDigits:0});
+}
+
 function renderKPIs(k) {
   const items = [
     { icon: '🚗', label: 'Vehículos', value: k.vehiculos, sub: 'en flota', cls: 'yellow' },
     { icon: '👤', label: 'Operadores', value: k.operadores, sub: 'activos', cls: 'orange' },
-    { icon: '⛽', label: 'Combustible', value: 'L ' + Number(k.gasto_comb).toLocaleString('es', {maximumFractionDigits:0}), sub: k.litros.toLocaleString('es',{maximumFractionDigits:0}) + ' L', cls: 'cyan', trend: k.trend_comb },
-    { icon: '🔧', label: 'Mantenimiento', value: 'L ' + Number(k.gasto_mant).toLocaleString('es', {maximumFractionDigits:0}), sub: k.total_mant + ' OTs', cls: 'blue', trend: k.trend_mant },
+    { icon: '⛽', label: 'Combustible', value: fmtCurrency(k.gasto_comb), sub: Number(k.litros).toLocaleString('es',{maximumFractionDigits:0}) + ' litros', cls: 'cyan', trend: k.trend_comb },
+    { icon: '🔧', label: 'Mantenimiento', value: fmtCurrency(k.gasto_mant), sub: k.total_mant + ' OTs', cls: 'blue', trend: k.trend_mant },
     { icon: '⚠️', label: 'Incidentes', value: k.inc_abiertos, sub: 'abiertos', cls: 'red' },
     { icon: '🚨', label: 'Alertas', value: k.alertas_activas, sub: k.ots_pendientes + ' OTs pen.', cls: 'yellow' },
   ];
