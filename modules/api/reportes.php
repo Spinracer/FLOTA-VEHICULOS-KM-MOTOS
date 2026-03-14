@@ -59,9 +59,12 @@ try {
                     $rows[] = array_values($r);
                 }
                 audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'combustible', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
+                $totalLitros = 0; $totalGasto = 0;
+                foreach ($rows as $r) { $totalLitros += (float)($r[4] ?? 0); $totalGasto += (float)($r[6] ?? 0); }
+                $totals = ['label' => 'TOTAL', 'values' => ['','','','', number_format($totalLitros,1).' L', '', 'L '.number_format($totalGasto,2), '','','','','','']];
                 export_dispatch($format, 'reporte_combustible',
                     ['Fecha','Placa','Marca','Conductor','Litros','Costo/L','Total','KM','Tipo Carga','Proveedor','Método Pago','Recibo','Notas'],
-                    $rows, 'Reporte de Combustible'
+                    $rows, 'Reporte de Combustible', $totals
                 );
                 break;
 
@@ -83,9 +86,12 @@ try {
                     $rows[] = array_values($r);
                 }
                 audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'mantenimiento', 'formato' => $format, 'filtros' => compact('from','to','vid','provId')]);
+                $totalCosto = 0;
+                foreach ($rows as $r) { $totalCosto += (float)($r[5] ?? 0); }
+                $totals = ['label' => 'TOTAL', 'values' => ['','','','','','L '.number_format($totalCosto,2),'','','','']];
                 export_dispatch($format, 'reporte_mantenimiento',
                     ['Fecha','Placa','Marca','Tipo','Descripción','Costo','KM','Próx. KM','Proveedor','Estado'],
-                    $rows, 'Reporte de Mantenimiento'
+                    $rows, 'Reporte de Mantenimiento', $totals
                 );
                 break;
 
@@ -128,9 +134,12 @@ try {
                     $rows[] = array_values($r);
                 }
                 audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'incidentes', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
+                $totalCosto = 0;
+                foreach ($rows as $r) { $totalCosto += (float)($r[7] ?? 0); }
+                $totals = ['label' => 'TOTAL', 'values' => ['','','','','','','','L '.number_format($totalCosto,2)]];
                 export_dispatch($format, 'reporte_incidentes',
                     ['Fecha','Placa','Marca','Tipo','Descripción','Severidad','Estado','Costo Est.'],
-                    $rows, 'Reporte de Incidentes'
+                    $rows, 'Reporte de Incidentes', $totals
                 );
                 break;
 
@@ -150,9 +159,12 @@ try {
                 $rows = [];
                 while ($r = $stmt->fetch()) { $rows[] = array_values($r); }
                 audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'vehiculos', 'formato' => $format]);
+                $tLit = 0; $tGC = 0; $tGM = 0;
+                foreach ($rows as $r) { $tLit += (float)($r[8] ?? 0); $tGC += (float)($r[9] ?? 0); $tGM += (float)($r[10] ?? 0); }
+                $totals = ['label' => 'TOTAL', 'values' => ['','','','','','','','',number_format($tLit,0).' L','L '.number_format($tGC,2),'L '.number_format($tGM,2),'']];
                 export_dispatch($format, 'reporte_vehiculos',
                     ['Placa','Marca','Modelo','Año','Estado','KM','Asignaciones','Mantenimientos','Litros','Gasto Comb.','Gasto Mant.','Incidentes'],
-                    $rows, 'Reporte de Vehículos'
+                    $rows, 'Reporte de Vehículos', $totals
                 );
                 break;
 

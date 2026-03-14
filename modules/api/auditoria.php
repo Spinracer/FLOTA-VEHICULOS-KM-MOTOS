@@ -3,19 +3,21 @@
  * API: Consulta de Auditoría (audit_logs)
  *
  * GET  → listar con filtros: entidad, accion, user_id, desde, hasta, q
+ * GET  ?export=1&format=csv|xlsx|pdf → descarga
  * Solo accesible por coordinador_it / admin
  */
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/export.php';
 require_login();
 require_role('coordinador_it', 'admin');
-header('Content-Type: application/json');
 
 $db     = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method !== 'GET') {
     http_response_code(405);
+    header('Content-Type: application/json');
     echo json_encode(['error' => 'Método no permitido.']);
     exit;
 }
@@ -27,9 +29,8 @@ try {
     $userId  = (int)($_GET['user_id'] ?? 0);
     $desde   = trim($_GET['desde'] ?? '');
     $hasta   = trim($_GET['hasta'] ?? '');
-    $page    = max(1, (int)($_GET['page'] ?? 1));
-    $per     = min(200, max(10, (int)($_GET['per'] ?? 50)));
-    $off     = ($page - 1) * $per;
+    $doExport = !empty($_GET['export']);
+    $format   = trim($_GET['format'] ?? 'csv');
 
     $where  = "WHERE (a.entidad LIKE ? OR a.accion LIKE ? OR a.user_email LIKE ? OR CAST(a.entidad_id AS CHAR) LIKE ?)";
     $params = [$q, $q, $q, $q];
@@ -54,6 +55,33 @@ try {
         $where   .= " AND a.created_at <= ?";
         $params[] = $hasta . ' 23:59:59';
     }
+
+    // ─── EXPORTACIÓN ───
+    if ($doExport) {
+        $exportLimit = $doExport ? 10000 : 200;
+        $stmt = $db->prepare("
+            SELECT a.created_at, a.user_email, a.user_rol, a.entidad, a.entidad_id, a.accion, a.ip
+            FROM audit_logs a
+            $where
+            ORDER BY a.created_at DESC, a.id DESC
+            LIMIT ?
+        ");
+        $stmt->execute(array_merge($params, [$exportLimit]));
+        $rows = [];
+        while ($r = $stmt->fetch()) {
+            $rows[] = array_values($r);
+        }
+        $headers = ['Fecha','Usuario','Rol','Entidad','ID','Acción','IP'];
+        audit_log('auditoria', 'export_' . $format, null, [], ['formato' => $format, 'registros' => count($rows)]);
+        export_dispatch($format, 'reporte_auditoria', $headers, $rows, 'Reporte de Auditoría');
+        exit;
+    }
+
+    // ─── JSON (paginado) ───
+    header('Content-Type: application/json');
+    $page    = max(1, (int)($_GET['page'] ?? 1));
+    $per     = min(200, max(10, (int)($_GET['per'] ?? 50)));
+    $off     = ($page - 1) * $per;
 
     // Total
     $totalStmt = $db->prepare("SELECT COUNT(*) FROM audit_logs a $where");

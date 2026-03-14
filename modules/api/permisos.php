@@ -23,8 +23,8 @@ try {
 
     switch ($method) {
         case 'GET':
-            // Lista de usuarios (no-admin) para tabs
-            $usersStmt = $db->query("SELECT id, nombre, email, rol FROM usuarios WHERE activo=1 AND rol NOT IN ('coordinador_it','admin') ORDER BY nombre");
+            // Lista de todos los usuarios activos
+            $usersStmt = $db->query("SELECT id, nombre, email, rol FROM usuarios WHERE activo=1 ORDER BY nombre");
             $users = $usersStmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Matriz de permisos por usuario

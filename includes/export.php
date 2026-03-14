@@ -85,8 +85,9 @@ function export_xlsx(string $filename, array $headers, array $rows, string $titl
  * @param array $headers Cabeceras de columnas
  * @param array $rows Filas de datos
  * @param string $title Título del reporte
+ * @param array $totals Fila de totales opcional ['label' => 'Total', 'values' => ['','','L 1,234.00',...]]
  */
-function export_pdf(string $filename, array $headers, array $rows, string $title = 'Reporte'): void {
+function export_pdf(string $filename, array $headers, array $rows, string $title = 'Reporte', array $totals = []): void {
     header('Content-Type: text/html; charset=utf-8');
     // No forzamos descarga, se abre en navegador para imprimir/guardar como PDF
     header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -159,6 +160,20 @@ function export_pdf(string $filename, array $headers, array $rows, string $title
     }
     echo '</tbody></table>';
 
+    // Fila de totales monetarios (si se proporcionan)
+    if (!empty($totals)) {
+        echo '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:10pt">';
+        echo '<tr style="background:#f0f4ff;font-weight:bold;border:2px solid #1a1f2e">';
+        $vals = $totals['values'] ?? [];
+        $label = $totals['label'] ?? 'Total';
+        foreach ($headers as $i => $h) {
+            $v = $vals[$i] ?? '';
+            if ($i === 0) $v = $label;
+            echo '<td style="padding:8px 10px;' . ($v ? 'font-weight:bold;' : '') . '">' . $esc($v) . '</td>';
+        }
+        echo '</tr></table>';
+    }
+
     // Pie de página
     echo '<div class="footer">';
     echo '<span>FlotaControl — Sistema de Gestión de Flota Vehicular</span>';
@@ -182,15 +197,16 @@ function export_pdf(string $filename, array $headers, array $rows, string $title
  * @param array $headers Cabeceras
  * @param array $rows Datos
  * @param string $title Título del reporte
+ * @param array $totals Totales opcionales para PDF
  */
-function export_dispatch(string $format, string $baseFilename, array $headers, array $rows, string $title = 'Reporte'): void {
+function export_dispatch(string $format, string $baseFilename, array $headers, array $rows, string $title = 'Reporte', array $totals = []): void {
     $ts = date('Ymd_His');
     switch ($format) {
         case 'xlsx':
             export_xlsx("{$baseFilename}_{$ts}.xlsx", $headers, $rows, $title);
             break;
         case 'pdf':
-            export_pdf("{$baseFilename}_{$ts}.pdf", $headers, $rows, $title);
+            export_pdf("{$baseFilename}_{$ts}.pdf", $headers, $rows, $title, $totals);
             break;
         case 'csv':
         default:

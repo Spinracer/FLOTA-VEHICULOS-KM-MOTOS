@@ -15,6 +15,12 @@ ob_start();
   </select>
   <input type="date" id="fDesde" onchange="load()" title="Desde" style="max-width:160px">
   <input type="date" id="fHasta" onchange="load()" title="Hasta" style="max-width:160px">
+  <div class="export-group" style="display:inline-flex;gap:4px;margin-left:auto;">
+    <button class="btn btn-primary btn-sm" onclick="exportAudit('csv')" title="Exportar CSV con filtros">📥 CSV</button>
+    <button class="btn btn-primary btn-sm" onclick="exportAudit('xlsx')" title="Exportar Excel con filtros" style="background:#217346;border-color:#217346;">📊 XLSX</button>
+    <button class="btn btn-primary btn-sm" onclick="exportAudit('pdf')" title="Exportar PDF con filtros" style="background:#d32f2f;border-color:#d32f2f;">📄 PDF</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportAudit('csv',true)" title="Exportar TODO sin filtros">📦 Todo</button>
+  </div>
 </div>
 <div class="table-wrap">
   <table><thead><tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Entidad</th><th>ID</th><th>Acción</th><th>IP</th><th>Detalle</th></tr></thead>
@@ -96,6 +102,28 @@ function verDetalle(r) {
 
   document.getElementById('detalleContent').innerHTML = html;
   openModal('modalDetalle');
+}
+
+function exportAudit(format, all) {
+  let qs = `format=${format}`;
+  if (!all) {
+    const q     = document.getElementById('s').value;
+    const ent   = document.getElementById('fEntidad').value;
+    const acc   = document.getElementById('fAccion').value;
+    const desde = document.getElementById('fDesde').value;
+    const hasta = document.getElementById('fHasta').value;
+    if (q)     qs += `&q=${encodeURIComponent(q)}`;
+    if (ent)   qs += `&entidad=${encodeURIComponent(ent)}`;
+    if (acc)   qs += `&accion=${encodeURIComponent(acc)}`;
+    if (desde) qs += `&desde=${encodeURIComponent(desde)}`;
+    if (hasta) qs += `&hasta=${encodeURIComponent(hasta)}`;
+  }
+  qs += '&export=1';
+  if (format === 'pdf') {
+    window.open(`/api/auditoria.php?${qs}`, '_blank');
+  } else {
+    window.location.href = `/api/auditoria.php?${qs}`;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', load);
