@@ -117,6 +117,8 @@ tr:hover td { background: rgba(255,255,255,.02); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .form-group { display: flex; flex-direction: column; gap: 5px; }
 .form-group.full { grid-column: 1 / -1; }
+.ck-item { display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding:6px 8px; border-radius:6px; background:var(--bg2); border:1px solid var(--border); text-transform:none; letter-spacing:0; color:var(--text); font-weight:400; }
+.ck-item input[type=checkbox] { accent-color:#e8ff47; width:auto; }
 label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
 input, select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 13px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; transition: var(--tr); outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,255,71,.1); }

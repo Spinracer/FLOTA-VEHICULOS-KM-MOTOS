@@ -63,19 +63,19 @@ ob_start();
           <span style="font-size:11px;color:var(--text2)">o usa el checklist fijo ↓</span>
         </div>
         <div id="dynamic-checklist-items" style="display:none;margin-bottom:10px;padding:8px;border:1px dashed var(--border);border-radius:6px"></div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta de repuesto</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión general OK</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_luces" value="1" style="accent-color:#e8ff47"> Luces en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_liquidos" value="1" style="accent-color:#e8ff47"> Nivel de líquidos OK</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_motor" value="1" style="accent-color:#e8ff47"> Motor en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_parabrisas" value="1" style="accent-color:#e8ff47"> Parabrisas sin daños</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_documentacion" value="1" style="accent-color:#e8ff47"> Documentación en regla</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_frenos" value="1" style="accent-color:#e8ff47"> Frenos operativos</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="checklist_espejos" value="1" style="accent-color:#e8ff47"> Espejos completos</label>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px">
+          <label class="ck-item"><input type="checkbox" name="checklist_gata" value="1"> Gata</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_herramientas" value="1"> Herramientas</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_llanta" value="1"> Llanta de repuesto</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_bac" value="1"> BAC Flota</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_revision" value="1"> Revisión general</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_luces" value="1"> Luces</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_liquidos" value="1"> Nivel de líquidos</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_motor" value="1"> Motor</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_parabrisas" value="1"> Parabrisas</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_documentacion" value="1"> Documentación</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_frenos" value="1"> Frenos</label>
+          <label class="ck-item"><input type="checkbox" name="checklist_espejos" value="1"> Espejos</label>
         </div>
         <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
       </div>
@@ -95,19 +95,19 @@ ob_start();
       <div class="form-group full"><label>Notas de cierre</label><textarea name="end_notes" placeholder="Observaciones de retorno..."></textarea></div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Retorno</label>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_gata" value="1" style="accent-color:#e8ff47"> Gata</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_llanta" value="1" style="accent-color:#e8ff47"> Llanta de repuesto</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_bac" value="1" style="accent-color:#e8ff47"> BAC Flota</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_revision" value="1" style="accent-color:#e8ff47"> Revisión general OK</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_luces" value="1" style="accent-color:#e8ff47"> Luces en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_liquidos" value="1" style="accent-color:#e8ff47"> Nivel de líquidos OK</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_motor" value="1" style="accent-color:#e8ff47"> Motor en buen estado</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_parabrisas" value="1" style="accent-color:#e8ff47"> Parabrisas sin daños</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_documentacion" value="1" style="accent-color:#e8ff47"> Documentación en regla</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_frenos" value="1" style="accent-color:#e8ff47"> Frenos operativos</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" name="end_checklist_espejos" value="1" style="accent-color:#e8ff47"> Espejos completos</label>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px">
+          <label class="ck-item"><input type="checkbox" name="end_checklist_gata" value="1"> Gata</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_herramientas" value="1"> Herramientas</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_llanta" value="1"> Llanta de repuesto</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_bac" value="1"> BAC Flota</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_revision" value="1"> Revisión general</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_luces" value="1"> Luces</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_liquidos" value="1"> Nivel de líquidos</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_motor" value="1"> Motor</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_parabrisas" value="1"> Parabrisas</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_documentacion" value="1"> Documentación</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_frenos" value="1"> Frenos</label>
+          <label class="ck-item"><input type="checkbox" name="end_checklist_espejos" value="1"> Espejos</label>
         </div>
         <div style="margin-top:6px"><textarea name="end_checklist_detalles" placeholder="Detalles del checklist de retorno..." style="font-size:12px"></textarea></div>
       </div>
@@ -314,7 +314,7 @@ async function saveNew(){
   if(!d.vehiculo_id || !d.operador_id || !d.start_at){ toast('Vehículo, operador e inicio son obligatorios','error'); return; }
   d.start_at = d.start_at.replace('T',' ')+':00';
   // Checklist checkboxes
-  ['checklist_gata','checklist_herramientas','checklist_llanta','checklist_bac','checklist_revision'].forEach(f => {
+  ['checklist_gata','checklist_herramientas','checklist_llanta','checklist_bac','checklist_revision','checklist_luces','checklist_liquidos','checklist_motor','checklist_parabrisas','checklist_documentacion','checklist_frenos','checklist_espejos'].forEach(f => {
     const cb = document.querySelector(`#modal-new [name="${f}"]`);
     d[f] = cb && cb.checked ? 1 : 0;
   });
@@ -350,7 +350,7 @@ async function saveClose(){
   if(!d.id || !d.end_at || !d.end_km){ toast('Fin y km fin son obligatorios','error'); return; }
   d.end_at = d.end_at.replace('T',' ')+':00';
   // End checklist checkboxes
-  ['end_checklist_gata','end_checklist_herramientas','end_checklist_llanta','end_checklist_bac','end_checklist_revision'].forEach(f => {
+  ['end_checklist_gata','end_checklist_herramientas','end_checklist_llanta','end_checklist_bac','end_checklist_revision','end_checklist_luces','end_checklist_liquidos','end_checklist_motor','end_checklist_parabrisas','end_checklist_documentacion','end_checklist_frenos','end_checklist_espejos'].forEach(f => {
     const cb = document.querySelector(`#modal-close [name="${f}"]`);
     d[f] = cb && cb.checked ? 1 : 0;
   });

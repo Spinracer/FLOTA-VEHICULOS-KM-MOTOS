@@ -414,14 +414,24 @@ try {
 
             $db->beginTransaction();
             try {
-                // Generate firma token if digital signature requested
-                $firmaToken = null;
+                // Check if firma already exists (e.g. signed via external link)
+                $existingFirma = $db->prepare("SELECT firma_tipo, firma_data, firma_token FROM asignaciones WHERE id = ?");
+                $existingFirma->execute([$id]);
+                $ef = $existingFirma->fetch();
+
                 $firmaTipo = $d['firma_tipo'] ?? 'ninguna';
                 if (!in_array($firmaTipo, ['digital', 'fisica', 'ninguna'], true)) {
                     $firmaTipo = 'ninguna';
                 }
                 $firmaData = $d['firma_data'] ?? null;
-                if ($firmaTipo === 'digital' && !$firmaData) {
+                $firmaToken = null;
+
+                // If user says 'ninguna' but a firma already exists from external link, preserve it
+                if ($firmaTipo === 'ninguna' && !empty($ef['firma_data'])) {
+                    $firmaTipo = $ef['firma_tipo'] ?: 'digital';
+                    $firmaData = $ef['firma_data'];
+                    $firmaToken = $ef['firma_token'];
+                } elseif ($firmaTipo === 'digital' && !$firmaData) {
                     $firmaToken = bin2hex(random_bytes(32));
                 }
 
@@ -430,7 +440,7 @@ try {
                         end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?,
                         end_checklist_luces=?, end_checklist_liquidos=?, end_checklist_motor=?, end_checklist_parabrisas=?, end_checklist_documentacion=?, end_checklist_frenos=?, end_checklist_espejos=?,
                         end_checklist_detalles=?,
-                        firma_tipo=?, firma_data=?, firma_token=?, firma_fecha=IF(?='ninguna',NULL,NOW()), firma_ip=?
+                        firma_tipo=?, firma_data=COALESCE(?,firma_data), firma_token=COALESCE(?,firma_token), firma_fecha=COALESCE(firma_fecha,IF(?='ninguna',NULL,NOW())), firma_ip=COALESCE(firma_ip,?)
                     WHERE id=?");
                 $stmt->execute([
                     $d['end_at'] ?: date('Y-m-d H:i:s'),
