@@ -1,1 +1,1 @@
-<?php require __DIR__.'/modules/api/preventivos.php';
+<?php require_once __DIR__ . '/../modules/api/preventivos.php';
