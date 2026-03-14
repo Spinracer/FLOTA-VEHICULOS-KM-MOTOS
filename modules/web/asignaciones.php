@@ -26,7 +26,7 @@ ob_start();
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>Vehículo</th><th>Operador</th><th>Inicio</th><th>KM Inicio</th><th>Fin</th><th>KM Fin</th><th>Estado</th>
+        <th>ID</th><th>Vehículo</th><th>Operador</th><th>Inicio</th><th>KM Inicio</th><th>Fin</th><th>KM Fin</th><th>Firma</th><th>Estado</th>
         <?php if(can('edit')): ?><th>Acciones</th><?php endif; ?>
       </tr>
     </thead>
@@ -78,6 +78,18 @@ ob_start();
           <label class="ck-item"><input type="checkbox" name="checklist_espejos" value="1"> Espejos</label>
         </div>
         <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
+      </div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✍️ Firma de Entrega</label>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400"><input type="radio" name="firma_entrega_tipo" value="ninguna" checked> Sin firma</label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--text);font-weight:400"><input type="radio" name="firma_entrega_tipo" value="digital"> Firma digital</label>
+        </div>
+        <div id="firma-entrega-area" style="display:none">
+          <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Dibuje la firma de quien entrega el vehículo:</p>
+          <canvas id="firma-entrega-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#1a1e27;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="clearFirmaEntrega()">Limpiar</button>
+        </div>
       </div>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar un bloqueo."></textarea></div>
     </div>
@@ -225,19 +237,41 @@ if (firmaCanvas) {
 }
 function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); } }
 
+// Firma entrega canvas
+let firmaEntDrawing = false;
+const firmaEntCanvas = document.getElementById('firma-entrega-canvas');
+const firmaEntCtx = firmaEntCanvas ? firmaEntCanvas.getContext('2d') : null;
+if (firmaEntCanvas) {
+  firmaEntCanvas.addEventListener('mousedown', e => { firmaEntDrawing = true; firmaEntCtx.beginPath(); firmaEntCtx.moveTo(e.offsetX, e.offsetY); });
+  firmaEntCanvas.addEventListener('mousemove', e => { if (!firmaEntDrawing) return; firmaEntCtx.lineTo(e.offsetX, e.offsetY); firmaEntCtx.strokeStyle = '#e8ff47'; firmaEntCtx.lineWidth = 2; firmaEntCtx.stroke(); });
+  firmaEntCanvas.addEventListener('mouseup', () => firmaEntDrawing = false);
+  firmaEntCanvas.addEventListener('mouseleave', () => firmaEntDrawing = false);
+  firmaEntCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaEntDrawing = true; const t = e.touches[0]; const r = firmaEntCanvas.getBoundingClientRect(); firmaEntCtx.beginPath(); firmaEntCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
+  firmaEntCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaEntDrawing) return; const t = e.touches[0]; const r = firmaEntCanvas.getBoundingClientRect(); firmaEntCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaEntCtx.strokeStyle = '#e8ff47'; firmaEntCtx.lineWidth = 2; firmaEntCtx.stroke(); });
+  firmaEntCanvas.addEventListener('touchend', () => firmaEntDrawing = false);
+}
+function clearFirmaEntrega() { if (firmaEntCtx) { firmaEntCtx.clearRect(0, 0, firmaEntCanvas.width, firmaEntCanvas.height); } }
+
 // Firma type toggle
 document.querySelectorAll('[name="firma_tipo"]').forEach(r => r.addEventListener('change', () => {
   document.getElementById('firma-digital-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
   document.getElementById('firma-fisica-area').style.display = r.value === 'fisica' && r.checked ? '' : 'none';
 }));
+document.querySelectorAll('[name="firma_entrega_tipo"]').forEach(r => r.addEventListener('change', () => {
+  document.getElementById('firma-entrega-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
+}));
 
-// ── Auto-fill checklist from vehicle ──
+// ── Auto-fill checklist + km from vehicle ──
 async function autoFillChecklist() {
   const vid = document.querySelector('#modal-new [name="vehiculo_id"]').value;
   if (!vid) return;
   try {
-    const data = await api(`/api/vehiculos.php?action=profile&id=${vid}`);
-    const v = data.vehiculo;
+    // Fetch vehicle profile and last km in parallel
+    const [profileData, kmData] = await Promise.all([
+      api(`/api/vehiculos.php?action=profile&id=${vid}`),
+      api(`/api/asignaciones.php?action=last_km&vehiculo_id=${vid}`)
+    ]);
+    const v = profileData.vehiculo;
     if (v) {
       document.querySelector('#modal-new [name="checklist_gata"]').checked = !!parseInt(v.tiene_gata);
       document.querySelector('#modal-new [name="checklist_herramientas"]').checked = !!parseInt(v.tiene_herramientas);
@@ -245,8 +279,10 @@ async function autoFillChecklist() {
       document.querySelector('#modal-new [name="checklist_bac"]').checked = !!parseInt(v.tiene_bac_flota);
       document.querySelector('#modal-new [name="checklist_revision"]').checked = !!parseInt(v.revision_ok);
       if (v.detalles_checklist) document.querySelector('#modal-new [name="checklist_detalles"]').value = v.detalles_checklist;
-      if (v.km_actual) document.querySelector('#modal-new [name="start_km"]').value = v.km_actual;
     }
+    // Auto-fill km: prefer last assignment end_km, fallback to vehicle km_actual
+    const lastKm = kmData.km || (v ? v.km_actual : null);
+    if (lastKm) document.querySelector('#modal-new [name="start_km"]').value = lastKm;
   } catch(e) {}
 }
 
@@ -273,11 +309,18 @@ async function load(){
   const EB = {'Activa':'badge-green','Cerrada':'badge-gray'};
 
   if(!data.rows.length){
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">📝</div><div class="empty-title">Sin asignaciones</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><div class="empty-icon">📝</div><div class="empty-title">Sin asignaciones</div></div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = data.rows.map(r => `
+  tbody.innerHTML = data.rows.map(r => {
+    const fe = r.firma_entrega_tipo && r.firma_entrega_tipo !== 'ninguna';
+    const fr = r.firma_tipo && r.firma_tipo !== 'ninguna';
+    let firmaHtml = '—';
+    if (fe && fr) firmaHtml = '<span title="Entrega + Retorno firmados">✍️✍️</span>';
+    else if (fe) firmaHtml = '<span title="Firma de entrega">✍️ Ent</span>';
+    else if (fr) firmaHtml = '<span title="Firma de retorno">✍️ Ret</span>';
+    return `
     <tr>
       <td>${r.id}</td>
       <td><strong style="color:var(--accent2)">${r.placa || ''} ${r.marca || ''}</strong></td>
@@ -286,6 +329,7 @@ async function load(){
       <td>${r.start_km ? Number(r.start_km).toLocaleString()+' km' : '—'}</td>
       <td>${r.end_at ? String(r.end_at).slice(0,16) : '—'}</td>
       <td>${r.end_km ? Number(r.end_km).toLocaleString()+' km' : '—'}</td>
+      <td style="font-size:12px">${firmaHtml}</td>
       <td><span class="badge ${EB[r.estado] || 'badge-gray'}">${r.estado}</span></td>
       <?php if(can('edit')): ?>
       <td>
@@ -298,7 +342,7 @@ async function load(){
         </div>
       </td>
       <?php endif; ?>
-    </tr>`).join('');
+    </tr>`}).join('');
 }
 
 function openNew(){
@@ -321,6 +365,12 @@ async function saveNew(){
   // Plantilla ID
   const pSel = document.getElementById('plantilla-select');
   if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
+  // Firma de entrega
+  const firmaEntRadio = document.querySelector('#modal-new [name="firma_entrega_tipo"]:checked');
+  d.firma_entrega_tipo = firmaEntRadio ? firmaEntRadio.value : 'ninguna';
+  if (d.firma_entrega_tipo === 'digital' && firmaEntCanvas) {
+    d.firma_entrega_data = firmaEntCanvas.toDataURL('image/png');
+  }
   const res = await api('/api/asignaciones.php', 'POST', d);
   // Guardar respuestas dinámicas del checklist
   if (res.id && pSel && pSel.value) {

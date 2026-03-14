@@ -140,9 +140,18 @@ case 'asignacion':
     $content .= '<div style="border:1px solid #ddd;min-height:50px;padding:8px;font-size:11px">' . htmlspecialchars($a['notas'] ?? '') . '</div>';
     $content .= '</div>';
 
-    // Firma digital del operador
+    // Firma digital de entrega
+    if (!empty($a['firma_entrega_data'])) {
+        $content .= '<div class="section"><h3>Firma de Entrega</h3>';
+        $content .= '<div style="text-align:center;padding:8px">';
+        $content .= '<img src="' . htmlspecialchars($a['firma_entrega_data']) . '" alt="Firma Entrega" style="max-width:280px;border:1px solid #ccc;padding:4px;background:#fff">';
+        $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Tipo: ' . htmlspecialchars($a['firma_entrega_tipo'] ?? 'digital') . ' — Fecha: ' . ($a['firma_entrega_fecha'] ?? '—') . '</p>';
+        $content .= '</div></div>';
+    }
+
+    // Firma digital de retorno (operador)
     if (!empty($a['firma_data'])) {
-        $content .= '<div class="section"><h3>Firma Digital del Operador</h3>';
+        $content .= '<div class="section"><h3>Firma de Retorno / Operador</h3>';
         $content .= '<div style="text-align:center;padding:8px">';
         $content .= '<img src="' . htmlspecialchars($a['firma_data']) . '" alt="Firma" style="max-width:280px;border:1px solid #ccc;padding:4px;background:#fff">';
         $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Tipo: ' . htmlspecialchars($a['firma_tipo'] ?? 'digital') . ' — Fecha: ' . ($a['firma_fecha'] ?? '—') . ' — IP: ' . ($a['firma_ip'] ?? '—') . '</p>';

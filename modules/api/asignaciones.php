@@ -82,6 +82,22 @@ try {
     // ─── Sub-endpoint: snapshots de componentes ───
     $subAction = trim($_GET['action'] ?? '');
 
+    // ─── Sub-endpoint: último km de un vehículo ───
+    if ($subAction === 'last_km' && $method === 'GET') {
+        $vid = (int)($_GET['vehiculo_id'] ?? 0);
+        if ($vid <= 0) { http_response_code(400); echo json_encode(['error' => 'vehiculo_id requerido']); exit; }
+        $stmt = $db->prepare("SELECT end_km FROM asignaciones WHERE vehiculo_id=? AND estado='Cerrada' AND end_km IS NOT NULL AND deleted_at IS NULL ORDER BY end_at DESC LIMIT 1");
+        $stmt->execute([$vid]);
+        $lastKm = $stmt->fetchColumn();
+        if (!$lastKm) {
+            $stmtV = $db->prepare("SELECT km_actual FROM vehiculos WHERE id=?");
+            $stmtV->execute([$vid]);
+            $lastKm = $stmtV->fetchColumn();
+        }
+        echo json_encode(['km' => $lastKm ? (float)$lastKm : null]);
+        exit;
+    }
+
     // ─── Sub-endpoint: calendario de asignaciones ───
     if ($subAction === 'calendar' && $method === 'GET') {
         $from = trim($_GET['from'] ?? '');
@@ -325,8 +341,13 @@ try {
 
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles)
-                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                // Firma de entrega
+                $firmaEntregaTipo = $d['firma_entrega_tipo'] ?? 'ninguna';
+                if (!in_array($firmaEntregaTipo, ['digital', 'fisica', 'ninguna'], true)) $firmaEntregaTipo = 'ninguna';
+                $firmaEntregaData = ($firmaEntregaTipo === 'digital') ? ($d['firma_entrega_data'] ?? null) : null;
+
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip)
+                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
@@ -348,6 +369,10 @@ try {
                     (int)($d['checklist_frenos'] ?? 0),
                     (int)($d['checklist_espejos'] ?? 0),
                     $d['checklist_detalles'] ?: null,
+                    $firmaEntregaTipo,
+                    $firmaEntregaData,
+                    $firmaEntregaTipo !== 'ninguna' ? date('Y-m-d H:i:s') : null,
+                    $firmaEntregaTipo !== 'ninguna' ? ($_SERVER['REMOTE_ADDR'] ?? null) : null,
                 ]);
 
                 $id = (int)$db->lastInsertId();

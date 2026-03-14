@@ -846,6 +846,10 @@ $asgExtraCols = [
   'firma_token'           => "VARCHAR(128) NULL",
   'firma_fecha'           => "DATETIME NULL",
   'firma_ip'              => "VARCHAR(45) NULL",
+  'firma_entrega_tipo'    => "ENUM('digital','fisica','ninguna') NOT NULL DEFAULT 'ninguna'",
+  'firma_entrega_data'    => "LONGTEXT NULL",
+  'firma_entrega_fecha'   => "DATETIME NULL",
+  'firma_entrega_ip'      => "VARCHAR(45) NULL",
 ];
 foreach ($asgExtraCols as $col => $def) {
   try {

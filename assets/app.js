@@ -21,6 +21,7 @@ function getCsrfToken() {
 async function api(url, method = 'GET', data = null) {
   const opts = {
     method,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
@@ -30,6 +31,7 @@ async function api(url, method = 'GET', data = null) {
   if (data && method !== 'GET') opts.body = JSON.stringify(data);
   try {
     const res = await fetch(url, opts);
+    if (res.status === 401) { window.location.href = '/index.php'; return; }
     const text = await res.text();
     let json;
     try {
@@ -163,7 +165,7 @@ class AttachmentWidget {
   async load() {
     if (!this.entidadId) { this.render(); return; }
     try {
-      const res = await fetch(`/api/attachments.php?entidad=${this.entidad}&entidad_id=${this.entidadId}`);
+      const res = await fetch(`/api/attachments.php?entidad=${this.entidad}&entidad_id=${this.entidadId}`, {credentials:'include'});
       if (res.ok) {
         const d = await res.json();
         this.attachments = d.attachments || [];
@@ -224,7 +226,7 @@ class AttachmentWidget {
   async deleteAtt(id) {
     if (!confirm('¿Eliminar este adjunto?')) return;
     try {
-      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE', headers:{'X-CSRF-Token': getCsrfToken()}});
+      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}});
       this.attachments = this.attachments.filter(a => a.id !== id);
       this.render();
       toast('Adjunto eliminado', 'warning');
@@ -241,7 +243,7 @@ class AttachmentWidget {
     for (const f of this.pendingFiles) fd.append('archivo[]', f);
     fd.append('_csrf_token', getCsrfToken());
     try {
-      const res = await fetch('/api/attachments.php', {method:'POST', headers:{'X-CSRF-Token': getCsrfToken()}, body: fd});
+      const res = await fetch('/api/attachments.php', {method:'POST', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}, body: fd});
       if (!res.ok) throw new Error('Error al subir');
       const d = await res.json();
       this.pendingFiles = [];
