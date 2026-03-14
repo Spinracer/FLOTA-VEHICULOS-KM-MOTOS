@@ -26,21 +26,39 @@ if ($method === 'POST') {
         echo json_encode(['error' => 'Firma inválida.']);
         exit;
     }
-    $stmt = $db->prepare("SELECT id, estado, firma_data FROM asignaciones WHERE firma_token = ? LIMIT 1");
+    // Try retorno token first, then entrega token
+    $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_token = ? LIMIT 1");
     $stmt->execute([$token]);
     $asig = $stmt->fetch();
+    $momento = 'retorno';
+    if (!$asig) {
+        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_entrega_token = ? LIMIT 1");
+        $stmt->execute([$token]);
+        $asig = $stmt->fetch();
+        $momento = 'entrega';
+    }
     if (!$asig) {
         http_response_code(404);
         echo json_encode(['error' => 'Asignación no encontrada o token expirado.']);
         exit;
     }
-    if ($asig['firma_data']) {
-        http_response_code(409);
-        echo json_encode(['error' => 'Esta asignación ya tiene una firma registrada.']);
-        exit;
+    if ($momento === 'entrega') {
+        if ($asig['firma_entrega_data']) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Esta asignación ya tiene firma de entrega registrada.']);
+            exit;
+        }
+        $db->prepare("UPDATE asignaciones SET firma_entrega_data = ?, firma_entrega_tipo = 'digital', firma_entrega_fecha = NOW(), firma_entrega_ip = ? WHERE firma_entrega_token = ?")
+           ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
+    } else {
+        if ($asig['firma_data']) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Esta asignación ya tiene una firma registrada.']);
+            exit;
+        }
+        $db->prepare("UPDATE asignaciones SET firma_data = ?, firma_tipo = 'digital', firma_fecha = NOW(), firma_ip = ? WHERE firma_token = ?")
+           ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
     }
-    $db->prepare("UPDATE asignaciones SET firma_data = ?, firma_tipo = 'digital', firma_fecha = NOW(), firma_ip = ? WHERE firma_token = ?")
-       ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
     echo json_encode(['ok' => true, 'message' => 'Firma guardada exitosamente.']);
     exit;
 }
@@ -57,13 +75,28 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$token]);
 $asig = $stmt->fetch();
+$momento = 'retorno';
+if (!$asig) {
+    $stmt = $db->prepare("
+        SELECT a.*, v.placa, v.marca, v.modelo,
+               o.nombre AS operador_nombre
+        FROM asignaciones a
+        LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
+        LEFT JOIN operadores o ON o.id = a.operador_id
+        WHERE a.firma_entrega_token = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $asig = $stmt->fetch();
+    $momento = 'entrega';
+}
 
 if (!$asig) {
     http_response_code(404);
     die('Asignación no encontrada o token expirado.');
 }
 
-$yaFirmado = !empty($asig['firma_data']);
+$yaFirmado = $momento === 'entrega' ? !empty($asig['firma_entrega_data']) : !empty($asig['firma_data']);
 $folio = 'ASG-' . str_pad($asig['id'], 6, '0', STR_PAD_LEFT);
 ?>
 <!DOCTYPE html>
@@ -94,7 +127,7 @@ tailwind.config = {
 <div class="font-heading font-extrabold text-2xl text-accent tracking-tight">FlotaCtrl</div>
 <div class="bg-surface border border-border rounded-xl p-6 max-w-lg w-full mt-5">
   <h1 class="text-xl font-bold text-accent mb-1">✍️ Firma Digital</h1>
-  <h2 class="text-sm text-muted font-normal mb-4"><?= $folio ?> — <?= $asig['estado'] === 'Cerrada' ? 'Devolución' : 'Entrega' ?></h2>
+  <h2 class="text-sm text-muted font-normal mb-4"><?= $folio ?> — <?= $momento === 'entrega' ? 'Entrega' : 'Devolución' ?></h2>
   
   <div class="grid grid-cols-2 gap-2 mb-4 text-[13px]">
     <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">Vehículo</label><span class="text-white font-medium"><?= htmlspecialchars($asig['placa'] . ' ' . $asig['marca'] . ' ' . $asig['modelo']) ?></span></div>

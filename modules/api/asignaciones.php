@@ -105,7 +105,7 @@ try {
         if (!$from) $from = date('Y-m-01');
         if (!$to) $to = date('Y-m-t');
         $vid = (int)($_GET['vehiculo_id'] ?? 0);
-        $where = "WHERE a.deleted_at IS NULL AND a.start_at <= ? AND (a.end_at >= ? OR a.end_at IS NULL)";
+        $where = "WHERE a.start_at <= ? AND (a.end_at >= ? OR a.end_at IS NULL)";
         $params = [$to . ' 23:59:59', $from . ' 00:00:00'];
         if ($vid) { $where .= " AND a.vehiculo_id = ?"; $params[] = $vid; }
         $stmt = $db->prepare("SELECT a.id, a.vehiculo_id, a.operador_id, a.start_at, a.end_at, a.estado,
@@ -215,13 +215,40 @@ try {
         if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); exit; }
         $d = json_decode(file_get_contents('php://input'), true);
         $asigId = (int)($d['id'] ?? 0);
+        $momento = trim($d['momento'] ?? 'retorno');
         if ($asigId <= 0) { http_response_code(400); echo json_encode(['error' => 'ID inválido.']); exit; }
         $token = bin2hex(random_bytes(32));
-        $db->prepare("UPDATE asignaciones SET firma_token = ? WHERE id = ?")->execute([$token, $asigId]);
+        $col = $momento === 'entrega' ? 'firma_entrega_token' : 'firma_token';
+        $db->prepare("UPDATE asignaciones SET {$col} = ? WHERE id = ?")->execute([$token, $asigId]);
         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
                  . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $link = $baseUrl . '/firma.php?token=' . $token;
         echo json_encode(['ok' => true, 'link' => $link, 'token' => $token]);
+        exit;
+    }
+
+    // ─── Sub-endpoint: save custom item per vehicle ───
+    if ($subAction === 'save_vehicle_item' && $method === 'POST') {
+        if (!can('create')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos']); exit; }
+        $d = json_decode(file_get_contents('php://input'), true);
+        $vid = (int)($d['vehiculo_id'] ?? 0);
+        $label = trim($d['label'] ?? '');
+        $req = (int)($d['requerido'] ?? 0);
+        if (!$vid || !$label) { http_response_code(400); echo json_encode(['error' => 'vehiculo_id y label requeridos']); exit; }
+        $db->prepare("INSERT INTO vehicle_checklist_items (vehiculo_id, label, requerido) VALUES (?,?,?)")->execute([$vid, $label, $req]);
+        echo json_encode(['ok' => true, 'id' => (int)$db->lastInsertId()]);
+        exit;
+    }
+
+    // ─── Sub-endpoint: get custom items per vehicle ───
+    if ($subAction === 'vehicle_items' && $method === 'GET') {
+        $vid = (int)($_GET['vehiculo_id'] ?? 0);
+        if ($vid <= 0) { echo json_encode(['items' => []]); exit; }
+        try {
+            $stmt = $db->prepare("SELECT id, label, requerido FROM vehicle_checklist_items WHERE vehiculo_id = ? ORDER BY id ASC");
+            $stmt->execute([$vid]);
+            echo json_encode(['items' => $stmt->fetchAll()]);
+        } catch (Throwable $e) { echo json_encode(['items' => []]); }
         exit;
     }
 
@@ -341,8 +368,15 @@ try {
 
             $db->beginTransaction();
             try {
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles)
-                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $firmaEntregaTipoRaw = trim((string)($d['firma_entrega_tipo'] ?? 'ninguna'));
+                $firmaEntregaData = ($firmaEntregaTipoRaw === 'digital' && !empty($d['firma_entrega_data'])) ? $d['firma_entrega_data'] : null;
+                // Only mark as signed if we have actual data or it's physical
+                $firmaEntregaTipo = ($firmaEntregaData || $firmaEntregaTipoRaw === 'fisica') ? $firmaEntregaTipoRaw : 'ninguna';
+                $firmaEntregaFecha = ($firmaEntregaTipo !== 'ninguna') ? date('Y-m-d H:i:s') : null;
+                $firmaEntregaIp = ($firmaEntregaTipo !== 'ninguna') ? ($_SERVER['REMOTE_ADDR'] ?? null) : null;
+
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip)
+                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
@@ -364,6 +398,10 @@ try {
                     (int)($d['checklist_frenos'] ?? 0),
                     (int)($d['checklist_espejos'] ?? 0),
                     $d['checklist_detalles'] ?: null,
+                    $firmaEntregaTipo,
+                    $firmaEntregaData,
+                    $firmaEntregaFecha,
+                    $firmaEntregaIp,
                 ]);
 
                 $id = (int)$db->lastInsertId();
@@ -527,14 +565,8 @@ try {
             $prevStmt = $db->prepare("SELECT * FROM asignaciones WHERE id=? LIMIT 1");
             $prevStmt->execute([$id]);
             $prev = $prevStmt->fetch() ?: [];
-            // If active, close it properly with current timestamp
-            if (($prev['estado'] ?? '') === 'Activa') {
-                $db->prepare("UPDATE asignaciones SET estado = 'Cerrada', end_at = NOW(), closed_by = ?, deleted_at = NOW() WHERE id = ?")
-                   ->execute([(int)($_SESSION['user_id'] ?? 0), $id]);
-            } else {
-                $db->prepare("UPDATE asignaciones SET deleted_at = NOW() WHERE id = ?")->execute([$id]);
-            }
-            audit_log('asignaciones', 'soft_delete', $id, $prev, []);
+            $db->prepare("DELETE FROM asignaciones WHERE id = ?")->execute([$id]);
+            audit_log('asignaciones', 'delete', $id, $prev, []);
             cache_invalidate_prefix('dashboard');
             echo json_encode(['ok' => true]);
             break;

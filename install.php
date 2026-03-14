@@ -850,6 +850,7 @@ $asgExtraCols = [
   'firma_entrega_data'    => "LONGTEXT NULL",
   'firma_entrega_fecha'   => "DATETIME NULL",
   'firma_entrega_ip'      => "VARCHAR(45) NULL",
+  'firma_entrega_token'   => "VARCHAR(128) NULL",
 ];
 foreach ($asgExtraCols as $col => $def) {
   try {
@@ -968,6 +969,21 @@ try {
   step('Tabla: asignacion_checklist_respuestas', true);
 } catch (Throwable $e) {
   step('Tabla: asignacion_checklist_respuestas', false, $e->getMessage());
+}
+
+try {
+  $pdo->exec("CREATE TABLE IF NOT EXISTS vehicle_checklist_items (
+    id            INT AUTO_INCREMENT PRIMARY KEY,
+    vehiculo_id   INT NOT NULL,
+    label         VARCHAR(120) NOT NULL,
+    requerido     TINYINT(1) NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_vci_vehiculo (vehiculo_id),
+    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  step('Tabla: vehicle_checklist_items', true);
+} catch (Throwable $e) {
+  step('Tabla: vehicle_checklist_items', false, $e->getMessage());
 }
 
 // Insertar plantilla por defecto si la tabla está vacía

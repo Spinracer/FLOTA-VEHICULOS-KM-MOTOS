@@ -28,6 +28,7 @@ function render_layout(string $page_title, string $active_page, string $content)
 <?= csrf_meta() ?>
 <title><?= htmlspecialchars($page_title) ?> — <?= APP_NAME ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script>const _tw=console.warn;console.warn=function(...a){if(a[0]&&typeof a[0]==='string'&&a[0].includes('cdn.tailwindcss.com'))return;_tw.apply(console,a)};</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
