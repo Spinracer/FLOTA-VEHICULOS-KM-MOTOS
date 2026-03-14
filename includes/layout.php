@@ -89,7 +89,6 @@ tailwind.config = {
     <?= $nav('/incidentes.php', 'incidentes', '⚠️', 'Incidentes') ?>
     <?= $nav('/recordatorios.php', 'recordatorios', '🔔', 'Recordatorios') ?>
     <?= $nav('/reportes.php', 'reportes', '📈', 'Reportes') ?>
-    <?= $nav('/componentes.php', 'componentes', '🧰', 'Componentes') ?>
     <?= $nav('/preventivos.php', 'preventivos', '📅', 'Preventivos') ?>
     <?= $nav('/alertas.php', 'alertas', '🚨', 'Centro de Alertas') ?>
 
@@ -102,7 +101,6 @@ tailwind.config = {
 
     <?php if ($is_admin): ?>
     <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-4 pb-1.5 nav-section-label">Sistema</div>
-    <?= $nav('/catalogos.php', 'catalogos', '🗂️', 'Catálogos') ?>
     <?= $nav('/usuarios.php', 'usuarios', '🔑', 'Usuarios') ?>
     <?= $nav('/auditoria.php', 'auditoria', '📜', 'Auditoría') ?>
     <?= $nav('/permisos.php', 'permisos', '🔐', 'Permisos') ?>

@@ -382,6 +382,16 @@ $tables = [
   UNIQUE KEY uq_rmp (rol, modulo, permiso)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+"user_module_permissions" => "CREATE TABLE IF NOT EXISTS user_module_permissions (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT NOT NULL,
+  modulo      VARCHAR(60) NOT NULL,
+  permiso     VARCHAR(30) NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ump (user_id, modulo, permiso),
+  KEY idx_ump_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
 "attachments" => "CREATE TABLE IF NOT EXISTS attachments (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   entidad         VARCHAR(60) NOT NULL,

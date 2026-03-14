@@ -250,7 +250,19 @@ async function loadReport() {
 function exportReport(format) {
   format = format || 'csv';
   const type = document.getElementById('rtype').value;
-  const exportType = (type === 'vehiculos' || type === 'top_costosos' || type === 'talleres') ? 'combustible' : type;
+  // Mapear tipos de reporte a los tipos de exportación soportados por la API
+  const exportMap = {
+    combustible: 'combustible',
+    mantenimiento: 'mantenimiento',
+    vehiculos: 'vehiculos',
+    top_costosos: 'vehiculos',
+    talleres: 'mantenimiento',
+    overrides: 'asignaciones',
+    operador_360: 'asignaciones',
+    asignaciones: 'asignaciones',
+    incidentes: 'incidentes'
+  };
+  const exportType = exportMap[type] || type;
   const qs = buildQS({export: exportType, format: format});
   if (format === 'pdf') {
     window.open(`/api/reportes.php?${qs}`, '_blank');

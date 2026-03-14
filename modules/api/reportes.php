@@ -134,6 +134,28 @@ try {
                 );
                 break;
 
+            case 'vehiculos':
+                $where = "WHERE v.deleted_at IS NULL";
+                $params = [];
+                if ($vid) { $where .= " AND v.id = ?"; $params[] = $vid; }
+                $stmt = $db->prepare("SELECT v.placa, v.marca, v.modelo, v.anio, v.estado, v.km_actual,
+                    (SELECT COUNT(*) FROM asignaciones a WHERE a.vehiculo_id=v.id) AS asignaciones,
+                    (SELECT COUNT(*) FROM mantenimientos m WHERE m.vehiculo_id=v.id) AS mantenimientos,
+                    (SELECT COALESCE(SUM(c.litros),0) FROM combustible c WHERE c.vehiculo_id=v.id) AS litros,
+                    (SELECT COALESCE(SUM(c.total),0) FROM combustible c WHERE c.vehiculo_id=v.id) AS gasto_comb,
+                    (SELECT COALESCE(SUM(m2.costo),0) FROM mantenimientos m2 WHERE m2.vehiculo_id=v.id) AS gasto_mant,
+                    (SELECT COUNT(*) FROM incidentes i WHERE i.vehiculo_id=v.id) AS incidentes
+                    FROM vehiculos v $where ORDER BY v.placa");
+                $stmt->execute($params);
+                $rows = [];
+                while ($r = $stmt->fetch()) { $rows[] = array_values($r); }
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'vehiculos', 'formato' => $format]);
+                export_dispatch($format, 'reporte_vehiculos',
+                    ['Placa','Marca','Modelo','Año','Estado','KM','Asignaciones','Mantenimientos','Litros','Gasto Comb.','Gasto Mant.','Incidentes'],
+                    $rows, 'Reporte de Vehículos'
+                );
+                break;
+
             default:
                 http_response_code(400);
                 echo json_encode(['error' => 'Tipo de exportación inválido']);

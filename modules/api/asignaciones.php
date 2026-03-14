@@ -11,42 +11,10 @@ $db = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
 /**
- * Captura un snapshot de todos los componentes asignados al vehículo
+ * Captura un snapshot de componentes (deshabilitado — checklist integrado en vehículos)
  */
 function snapshot_componentes(PDO $db, int $asignacionId, int $vehiculoId, string $momento, int $userId, ?array $overrides = null): int {
-    $stmt = $db->prepare("
-        SELECT vc.component_id, c.nombre, c.tipo, vc.estado, vc.cantidad, vc.numero_serie
-        FROM vehicle_components vc
-        JOIN components c ON c.id = vc.component_id
-        WHERE vc.vehiculo_id = ?
-        ORDER BY c.tipo, c.nombre
-    ");
-    $stmt->execute([$vehiculoId]);
-    $items = $stmt->fetchAll();
-    $count = 0;
-
-    $ins = $db->prepare("INSERT INTO assignment_component_snapshots
-        (asignacion_id, vehiculo_id, momento, component_id, componente_nombre, componente_tipo, estado, cantidad, numero_serie, observaciones, created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-
-    foreach ($items as $item) {
-        $compId = (int)$item['component_id'];
-        // Si hay overrides del usuario (para retorno con observaciones), aplicar
-        $estado = $item['estado'];
-        $obs    = null;
-        if ($overrides && isset($overrides[$compId])) {
-            $estado = $overrides[$compId]['estado'] ?? $estado;
-            $obs    = $overrides[$compId]['observaciones'] ?? null;
-        }
-        $ins->execute([
-            $asignacionId, $vehiculoId, $momento,
-            $compId, $item['nombre'], $item['tipo'],
-            $estado, (int)$item['cantidad'], $item['numero_serie'],
-            $obs, $userId
-        ]);
-        $count++;
-    }
-    return $count;
+    return 0;
 }
 
 function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
@@ -284,21 +252,8 @@ try {
             $asig->execute([$asigId]);
             $asigRow = $asig->fetch();
             if (!$asigRow) { http_response_code(404); echo json_encode(['error' => 'Asignación no encontrada.']); exit; }
-            $overrides = $d['items'] ?? [];
-            $ovMap = [];
-            foreach ($overrides as $o) {
-                $cid = (int)($o['component_id'] ?? 0);
-                if ($cid > 0) $ovMap[$cid] = $o;
-            }
-            $cnt = snapshot_componentes($db, $asigId, (int)$asigRow['vehiculo_id'], 'retorno', (int)($_SESSION['user_id'] ?? 0), $ovMap);
-            // Actualizar vehicle_components con los nuevos estados reportados
-            foreach ($ovMap as $cid => $ov) {
-                if (!empty($ov['estado'])) {
-                    $db->prepare("UPDATE vehicle_components SET estado = ? WHERE vehiculo_id = ? AND component_id = ?")
-                       ->execute([$ov['estado'], (int)$asigRow['vehiculo_id'], $cid]);
-                }
-            }
-            audit_log('assignment_snapshots', 'retorno_manual', $asigId, [], ['items' => count($ovMap)]);
+            $cnt = snapshot_componentes($db, $asigId, (int)$asigRow['vehiculo_id'], 'retorno', (int)($_SESSION['user_id'] ?? 0));
+            audit_log('assignment_snapshots', 'retorno_manual', $asigId, [], []);
             echo json_encode(['ok' => true, 'snapshot_count' => $cnt]);
             exit;
         }
@@ -366,6 +321,40 @@ try {
             if (!$op || ($op['estado'] ?? '') !== 'Activo') {
                 http_response_code(400);
                 echo json_encode(['error' => 'El operador está inactivo/suspendido o no existe.']);
+                break;
+            }
+
+            // Si el mismo operador ya tiene este vehículo asignado, actualizar registro existente
+            $existingStmt = $db->prepare("SELECT id FROM asignaciones WHERE vehiculo_id=? AND operador_id=? AND estado='Activa' LIMIT 1");
+            $existingStmt->execute([$vehiculoId, $operadorId]);
+            $existingAsig = $existingStmt->fetch();
+            if ($existingAsig) {
+                // Actualizar la asignación existente (mismo operador, mismo vehículo)
+                $updStmt = $db->prepare("UPDATE asignaciones SET start_km=COALESCE(?,start_km), start_notes=COALESCE(?,start_notes),
+                    checklist_gata=?,checklist_herramientas=?,checklist_llanta=?,checklist_bac=?,checklist_revision=?,
+                    checklist_luces=?,checklist_liquidos=?,checklist_motor=?,checklist_parabrisas=?,checklist_documentacion=?,checklist_frenos=?,checklist_espejos=?,
+                    checklist_detalles=? WHERE id=?");
+                $updStmt->execute([
+                    $startKm, $d['start_notes'] ?: null,
+                    (int)($d['checklist_gata'] ?? 0), (int)($d['checklist_herramientas'] ?? 0),
+                    (int)($d['checklist_llanta'] ?? 0), (int)($d['checklist_bac'] ?? 0),
+                    (int)($d['checklist_revision'] ?? 0), (int)($d['checklist_luces'] ?? 0),
+                    (int)($d['checklist_liquidos'] ?? 0), (int)($d['checklist_motor'] ?? 0),
+                    (int)($d['checklist_parabrisas'] ?? 0), (int)($d['checklist_documentacion'] ?? 0),
+                    (int)($d['checklist_frenos'] ?? 0), (int)($d['checklist_espejos'] ?? 0),
+                    $d['checklist_detalles'] ?: null, (int)$existingAsig['id']
+                ]);
+                // Sync checklist back to vehicle
+                $db->prepare("UPDATE vehiculos SET tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,tiene_luces=?,tiene_liquidos=?,tiene_motor_ok=?,tiene_parabrisas=?,tiene_documentacion=?,tiene_frenos=?,tiene_espejos=?,detalles_checklist=? WHERE id=?")->execute([
+                    (int)($d['checklist_gata'] ?? 0), (int)($d['checklist_herramientas'] ?? 0),
+                    (int)($d['checklist_llanta'] ?? 0), (int)($d['checklist_bac'] ?? 0),
+                    (int)($d['checklist_revision'] ?? 0), (int)($d['checklist_luces'] ?? 0),
+                    (int)($d['checklist_liquidos'] ?? 0), (int)($d['checklist_motor'] ?? 0),
+                    (int)($d['checklist_parabrisas'] ?? 0), (int)($d['checklist_documentacion'] ?? 0),
+                    (int)($d['checklist_frenos'] ?? 0), (int)($d['checklist_espejos'] ?? 0),
+                    $d['checklist_detalles'] ?: null, $vehiculoId
+                ]);
+                echo json_encode(['ok' => true, 'id' => (int)$existingAsig['id'], 'updated' => true, 'message' => 'Asignación existente actualizada']);
                 break;
             }
 
@@ -551,22 +540,7 @@ try {
                 ]);
 
                 odometro_registrar($db, $vehiculoId, $endKm, 'assignment_end', (int)($_SESSION['user_id'] ?? 0));
-                // Snapshot de componentes al momento de retorno
-                $componentOverrides = [];
-                if (!empty($d['component_overrides']) && is_array($d['component_overrides'])) {
-                    foreach ($d['component_overrides'] as $o) {
-                        $cid = (int)($o['component_id'] ?? 0);
-                        if ($cid > 0) $componentOverrides[$cid] = $o;
-                    }
-                }
-                snapshot_componentes($db, $id, $vehiculoId, 'retorno', (int)($_SESSION['user_id'] ?? 0), $componentOverrides ?: null);
-                // Si hay overrides, actualizar vehicle_components
-                foreach ($componentOverrides as $cid => $ov) {
-                    if (!empty($ov['estado'])) {
-                        $db->prepare("UPDATE vehicle_components SET estado = ? WHERE vehiculo_id = ? AND component_id = ?")
-                           ->execute([$ov['estado'], $vehiculoId, $cid]);
-                    }
-                }
+                snapshot_componentes($db, $id, $vehiculoId, 'retorno', (int)($_SESSION['user_id'] ?? 0));
                 $db->commit();
             } catch (Throwable $txe) {
                 $db->rollBack();

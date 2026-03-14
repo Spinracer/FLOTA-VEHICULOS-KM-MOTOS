@@ -134,19 +134,32 @@ function can(string $action): bool {
 
 /**
  * Verifica permiso granular por módulo.
- * Primero consulta role_module_permissions; si no existe la tabla, cae al can() global.
+ * Primero consulta user_module_permissions (por usuario);
+ * si no existe, cae a role_module_permissions; después al can() global.
  */
 function can_module(string $modulo, string $permiso): bool {
     $rol = $_SESSION['user_rol'] ?? '';
+    $uid = (int)($_SESSION['user_id'] ?? 0);
     // coordinador_it y admin siempre tienen acceso total
     if (in_array($rol, ['coordinador_it', 'admin'])) return true;
     try {
         $db = getDB();
+        // 1) Permisos personalizados por usuario
         $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM user_module_permissions WHERE user_id = ? AND modulo = ? AND permiso = ?"
+        );
+        $stmt->execute([$uid, $modulo, $permiso]);
+        if ((int)$stmt->fetchColumn() > 0) return true;
+        // Si el usuario tiene ALGÚN registro personalizado, esos son sus permisos exclusivos
+        $anyStmt = $db->prepare("SELECT COUNT(*) FROM user_module_permissions WHERE user_id = ?");
+        $anyStmt->execute([$uid]);
+        if ((int)$anyStmt->fetchColumn() > 0) return false;
+        // 2) Fallback a permisos por rol
+        $stmt2 = $db->prepare(
             "SELECT COUNT(*) FROM role_module_permissions WHERE rol = ? AND modulo = ? AND permiso = ?"
         );
-        $stmt->execute([$rol, $modulo, $permiso]);
-        return (int)$stmt->fetchColumn() > 0;
+        $stmt2->execute([$rol, $modulo, $permiso]);
+        return (int)$stmt2->fetchColumn() > 0;
     } catch (Throwable $e) {
         // Tabla no existe → fallback a permisos globales
         return can($permiso);
