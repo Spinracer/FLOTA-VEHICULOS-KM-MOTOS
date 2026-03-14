@@ -1394,6 +1394,32 @@ foreach ($perf_indexes as [$tbl, $idx, $cols]) {
 }
 
 // 4. Usuarios iniciales del sistema
+
+// 3.20 Departamentos + campos operador
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS departamentos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(150) NOT NULL,
+        activo TINYINT(1) NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    step("Tabla 'departamentos'", true);
+} catch (Throwable $e) { step("Tabla 'departamentos'", false, $e->getMessage()); }
+
+foreach ([
+    ['operadores', 'departamento_id', "INT NULL AFTER notas"],
+    ['operadores', 'dni', "VARCHAR(30) NULL AFTER email"],
+] as [$tbl, $col, $def]) {
+    try {
+        if (!$existsColumn($tbl, $col)) {
+            $pdo->exec("ALTER TABLE `{$tbl}` ADD COLUMN {$col} {$def}");
+            step("Columna {$tbl}.{$col}", true);
+        } else {
+            step("Columna {$tbl}.{$col}", true, 'Ya existe');
+        }
+    } catch (Throwable $e) { step("Columna {$tbl}.{$col}", false, $e->getMessage()); }
+}
+
 $usuarios_iniciales = [
     [
         'nombre' => 'Coordinador IT',

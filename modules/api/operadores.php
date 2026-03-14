@@ -10,6 +10,26 @@ $user = current_user();
 try {
     $action = $_GET['action'] ?? '';
 
+    // ──── Departamentos CRUD ────
+    if ($action === 'departamentos') {
+        if ($method === 'GET') {
+            $rows = $db->query("SELECT * FROM departamentos WHERE activo=1 ORDER BY nombre")->fetchAll();
+            echo json_encode(['rows' => $rows]);
+        } elseif ($method === 'POST') {
+            if (!can('create')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $d = json_decode(file_get_contents('php://input'), true);
+            if (empty($d['nombre'])) { http_response_code(422); echo json_encode(['error'=>'Nombre requerido']); exit; }
+            $db->prepare("INSERT INTO departamentos (nombre) VALUES (?)")->execute([trim($d['nombre'])]);
+            echo json_encode(['id'=>(int)$db->lastInsertId(),'ok'=>true]);
+        } elseif ($method === 'DELETE') {
+            if (!can('delete')) { http_response_code(403); echo json_encode(['error'=>'Sin permisos']); exit; }
+            $id = (int)($_GET['id'] ?? 0);
+            $db->prepare("UPDATE departamentos SET activo=0 WHERE id=?")->execute([$id]);
+            echo json_encode(['ok'=>true]);
+        }
+        exit;
+    }
+
     // ──── Capacitaciones CRUD ────
     if ($action === 'capacitaciones') {
         $opId = (int)($_GET['operador_id'] ?? ($_POST['operador_id'] ?? 0));
@@ -196,8 +216,10 @@ try {
             $total=$db->prepare("SELECT COUNT(*) FROM operadores WHERE deleted_at IS NULL AND (nombre LIKE ? OR licencia LIKE ? OR telefono LIKE ?)");
             $total->execute([$q,$q,$q]);
             $stmt=$db->prepare("SELECT o.*, v.placa as vehiculo_placa, v.marca as vehiculo_marca,
-                DATEDIFF(o.venc_licencia, CURDATE()) as dias_licencia
+                DATEDIFF(o.venc_licencia, CURDATE()) as dias_licencia,
+                dep.nombre as departamento_nombre
                 FROM operadores o LEFT JOIN vehiculos v ON v.operador_id=o.id
+                LEFT JOIN departamentos dep ON dep.id=o.departamento_id
                 WHERE o.deleted_at IS NULL AND (o.nombre LIKE ? OR o.licencia LIKE ? OR o.telefono LIKE ?)
                 ORDER BY o.nombre ASC LIMIT ? OFFSET ?");
             $stmt->execute([$q,$q,$q,$per,$off]);
@@ -210,8 +232,9 @@ try {
                 break;
             }
             $d=json_decode(file_get_contents('php://input'),true);
-            $db->prepare("INSERT INTO operadores (nombre,licencia,categoria_lic,venc_licencia,telefono,email,estado,notas) VALUES (?,?,?,?,?,?,?,?)")
-               ->execute([$d['nombre'],$d['licencia']?:null,$d['categoria_lic']?:null,$d['venc_licencia']?:null,$d['telefono']?:null,$d['email']?:null,$d['estado'],$d['notas']?:null]);
+            if(empty($d['departamento_id'])){http_response_code(422);echo json_encode(['error'=>'El departamento es obligatorio']);break;}
+            $db->prepare("INSERT INTO operadores (nombre,licencia,categoria_lic,venc_licencia,telefono,email,dni,estado,notas,departamento_id) VALUES (?,?,?,?,?,?,?,?,?,?)")
+               ->execute([$d['nombre'],$d['licencia']?:null,$d['categoria_lic']?:null,$d['venc_licencia']?:null,$d['telefono']?:null,$d['email']?:null,$d['dni']?:null,$d['estado'],$d['notas']?:null,(int)$d['departamento_id']]);
                 $newId = (int)$db->lastInsertId();
                 audit_log('operadores', 'create', $newId, [], $d);
                 echo json_encode(['id'=>$newId,'ok'=>true]);
@@ -226,8 +249,9 @@ try {
                 $prevStmt = $db->prepare("SELECT * FROM operadores WHERE id=? LIMIT 1");
                 $prevStmt->execute([(int)$d['id']]);
                 $prev = $prevStmt->fetch() ?: [];
-            $db->prepare("UPDATE operadores SET nombre=?,licencia=?,categoria_lic=?,venc_licencia=?,telefono=?,email=?,estado=?,notas=? WHERE id=?")
-               ->execute([$d['nombre'],$d['licencia']?:null,$d['categoria_lic']?:null,$d['venc_licencia']?:null,$d['telefono']?:null,$d['email']?:null,$d['estado'],$d['notas']?:null,$d['id']]);
+            if(empty($d['departamento_id'])){http_response_code(422);echo json_encode(['error'=>'El departamento es obligatorio']);break;}
+            $db->prepare("UPDATE operadores SET nombre=?,licencia=?,categoria_lic=?,venc_licencia=?,telefono=?,email=?,dni=?,estado=?,notas=?,departamento_id=? WHERE id=?")
+               ->execute([$d['nombre'],$d['licencia']?:null,$d['categoria_lic']?:null,$d['venc_licencia']?:null,$d['telefono']?:null,$d['email']?:null,$d['dni']?:null,$d['estado'],$d['notas']?:null,(int)$d['departamento_id'],$d['id']]);
                 audit_log('operadores', 'update', (int)$d['id'], $prev, $d);
             echo json_encode(['ok'=>true]);
             break;

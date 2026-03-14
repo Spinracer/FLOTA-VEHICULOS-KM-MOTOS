@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../includes/layout.php';
 require_login();
 $db = getDB();
 $vehiculos = $db->query("SELECT id,placa,marca,modelo FROM vehiculos ORDER BY placa")->fetchAll();
-$operadores = $db->query("SELECT id,nombre,estado FROM operadores ORDER BY nombre")->fetchAll();
+$operadores = $db->query("SELECT o.id,o.nombre,o.estado,o.departamento_id,COALESCE(d.nombre,'') as departamento_nombre FROM operadores o LEFT JOIN departamentos d ON d.id=o.departamento_id ORDER BY o.nombre")->fetchAll();
 ob_start();
 ?>
 <div class="toolbar">
@@ -46,11 +46,12 @@ ob_start();
         </select>
       </div>
       <div class="form-group"><label>Operador *</label>
-        <select name="operador_id">
+        <select name="operador_id" onchange="autoFillDepto(this)">
           <option value="">— Seleccionar —</option>
-          <?php foreach($operadores as $o): ?><option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['nombre'].' ('.$o['estado'].')') ?></option><?php endforeach; ?>
+          <?php foreach($operadores as $o): ?><option value="<?= $o['id'] ?>" data-depto="<?= htmlspecialchars($o['departamento_nombre']) ?>"><?= htmlspecialchars($o['nombre'].' ('.$o['estado'].')') ?></option><?php endforeach; ?>
         </select>
       </div>
+      <div class="form-group"><label>Departamento</label><input id="depto-display" readonly style="background:var(--bg2);cursor:default" placeholder="Se llena al seleccionar operador"></div>
       <div class="form-group"><label>Inicio *</label><input name="start_at" type="datetime-local"></div>
       <div class="form-group"><label>KM Inicio</label><input name="start_km" type="number" step="0.1" placeholder="45000"></div>
       <div class="form-group full"><label>Notas</label><textarea name="start_notes" placeholder="Observaciones de entrega..."></textarea></div>
@@ -331,6 +332,12 @@ document.querySelectorAll('[name="firma_tipo"]').forEach(r => r.addEventListener
   document.getElementById('firma-digital-area').style.display = r.value === 'digital' && r.checked ? '' : 'none';
   document.getElementById('firma-fisica-area').style.display = r.value === 'fisica' && r.checked ? '' : 'none';
 }));
+
+// ── Auto-fill departamento from operator ──
+function autoFillDepto(sel){
+  const opt=sel.options[sel.selectedIndex];
+  document.getElementById('depto-display').value=opt&&opt.dataset.depto?opt.dataset.depto:'';
+}
 
 // ── Auto-fill checklist + km from vehicle ──
 async function autoFillChecklist() {

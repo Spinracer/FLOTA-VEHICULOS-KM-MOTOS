@@ -29,10 +29,12 @@ case 'asignacion':
     if ($id <= 0) die('ID de asignación requerido.');
     $stmt = $db->prepare("
         SELECT a.*, v.placa, v.marca, v.modelo, v.anio, v.color, v.km_actual, v.vin,
-               o.nombre AS operador_nombre, o.licencia, o.telefono, o.categoria_lic
+               o.nombre AS operador_nombre, o.licencia, o.telefono, o.categoria_lic, o.dni,
+               dep.nombre AS departamento_nombre
         FROM asignaciones a
         LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
         LEFT JOIN operadores o ON o.id = a.operador_id
+        LEFT JOIN departamentos dep ON dep.id = o.departamento_id
         WHERE a.id = ?
     ");
     $stmt->execute([$id]);
@@ -59,7 +61,8 @@ case 'asignacion':
     $content .= '<div class="section"><h3>Datos del Operador</h3>';
     $content .= '<table class="info-table"><tbody>';
     $content .= "<tr><td><strong>Nombre:</strong></td><td>{$a['operador_nombre']}</td><td><strong>Licencia:</strong></td><td>" . ($a['licencia'] ?? '—') . " ({$a['categoria_lic']})</td></tr>";
-    $content .= "<tr><td><strong>Teléfono:</strong></td><td>" . ($a['telefono'] ?? '—') . "</td><td></td><td></td></tr>";
+    $content .= "<tr><td><strong>Teléfono:</strong></td><td>" . ($a['telefono'] ?? '—') . "</td><td><strong>DNI:</strong></td><td>" . ($a['dni'] ?? '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Departamento:</strong></td><td colspan=\"3\">" . ($a['departamento_nombre'] ?? '—') . "</td></tr>";
     $content .= '</tbody></table></div>';
 
     $content .= '<div class="section"><h3>Datos de la Asignación</h3>';

@@ -101,10 +101,11 @@ try {
                 if ($from) { $where .= " AND a.start_at >= ?"; $params[] = $from; }
                 if ($to) { $where .= " AND a.start_at <= ?"; $params[] = $to; }
                 if ($vid) { $where .= " AND a.vehiculo_id = ?"; $params[] = $vid; }
-                $stmt = $db->prepare("SELECT a.start_at, a.end_at, v.placa, v.marca, o.nombre AS operador, a.start_km, a.end_km, a.estado, a.override_reason
+                $stmt = $db->prepare("SELECT a.start_at, a.end_at, v.placa, v.marca, o.nombre AS operador, o.dni, COALESCE(dep.nombre,'') AS departamento, a.start_km, a.end_km, a.estado, a.override_reason
                     FROM asignaciones a
                     JOIN vehiculos v ON v.id=a.vehiculo_id
                     JOIN operadores o ON o.id=a.operador_id
+                    LEFT JOIN departamentos dep ON dep.id=o.departamento_id
                     $where ORDER BY a.start_at DESC");
                 $stmt->execute($params);
                 $rows = [];
@@ -113,7 +114,7 @@ try {
                 }
                 audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'asignaciones', 'formato' => $format, 'filtros' => compact('from','to','vid')]);
                 export_dispatch($format, 'reporte_asignaciones',
-                    ['Inicio','Fin','Placa','Marca','Operador','KM Inicio','KM Fin','Estado','Override'],
+                    ['Inicio','Fin','Placa','Marca','Operador','DNI','Departamento','KM Inicio','KM Fin','Estado','Override'],
                     $rows, 'Reporte de Asignaciones'
                 );
                 break;
