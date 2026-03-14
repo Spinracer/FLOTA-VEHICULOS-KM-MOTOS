@@ -129,7 +129,7 @@ tailwind.config = {
   </div>
 </aside>
 
-<div id="main" class="ml-0 lg:ml-60 flex-1 min-h-screen flex flex-col">
+<div id="main" class="ml-0 lg:ml-60 flex-1 min-h-screen flex flex-col min-w-0 overflow-x-hidden">
   <!-- Topbar -->
   <header class="h-16 border-b border-border flex items-center justify-between px-4 sm:px-8 bg-surface sticky top-0 z-50">
     <h1 class="font-heading text-lg font-bold pl-10 lg:pl-0"><?= htmlspecialchars($page_title) ?></h1>
@@ -159,7 +159,7 @@ tailwind.config = {
   </header>
 
   <script src="/assets/app.js?v=<?= filemtime(__DIR__.'/../assets/app.js') ?>"></script>
-  <div class="page-content flex-1 p-4 sm:p-8">
+  <div class="page-content flex-1 p-4 sm:p-8 min-w-0 overflow-x-hidden">
     <?= $content ?>
   </div>
 </div>

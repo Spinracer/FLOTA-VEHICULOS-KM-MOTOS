@@ -37,6 +37,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow-x: hidden; width: 100%; }
 body { font-family: 'DM Sans', sans-serif; }
 
 /* ── SIDEBAR (compat for mobile) ── */
@@ -78,15 +79,18 @@ body { font-family: 'DM Sans', sans-serif; }
 .kpi-icon { position: absolute; right: 18px; top: 18px; font-size: 26px; opacity: .12; }
 
 /* ── TABLES ── */
-.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; }
 thead { background: var(--surface2); }
 th { padding: 11px 16px; text-align: left; font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; white-space: nowrap; }
 td { padding: 12px 16px; font-size: 14px; border-top: 1px solid var(--border); vertical-align: middle; color: var(--text); }
 tr:hover td { background: rgba(255,255,255,.02); }
 .light tr:hover td { background: rgba(0,0,0,.02); }
-.action-btns { display: flex; gap: 6px; }
+.action-btns { display: flex; gap: 6px; flex-wrap: nowrap; }
 .td-truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tables inside modals: ensure horizontal scroll */
+.modal [style*="overflow"] { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+.modal table { min-width: 500px; }
 
 /* ── BADGES ── */
 .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
@@ -131,6 +135,7 @@ select option { background: var(--surface2); color: var(--text); }
 
 /* ── SEARCH BAR ── */
 .toolbar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+.toolbar select, .toolbar input[type="date"] { min-width: 0; }
 .search-wrap { position: relative; flex: 1; min-width: 200px; }
 .search-wrap input { padding-left: 38px; }
 .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 15px; pointer-events: none; }
@@ -200,6 +205,7 @@ select option { background: var(--surface2); color: var(--text); }
 
 /* All screens: tables must scroll horizontally when content overflows */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap table { min-width: 700px; }
 
 /* ── Tablet (< 1024px) ── */
 @media(max-width:1023px) {
@@ -228,7 +234,8 @@ select option { background: var(--surface2); color: var(--text); }
   .toolbar > .search-wrap { min-width: 100%; }
   .toolbar > select,
   .toolbar > input[type="date"],
-  .toolbar > input[type="text"] { max-width: 100% !important; width: 100%; }
+  .toolbar > input[type="text"],
+  .toolbar > button { max-width: 100% !important; width: 100%; }
 
   /* Force ALL inline grids → single column */
   [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
@@ -291,7 +298,9 @@ select option { background: var(--surface2); color: var(--text); }
   .toast { min-width: auto; width: 100%; font-size: 12px; padding: 10px 14px; }
 
   /* Topbar compact */
-  header h1 { font-size: 15px; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header h1 { font-size: 15px; max-width: 55vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #topbar-actions { gap: 4px; }
+  #topbar-actions .badge { display: none; }
 
   /* Two-col, charts */
   .two-col { gap: 12px; }
