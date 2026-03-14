@@ -329,9 +329,9 @@ async function verPerfil(id) {
         <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_asignaciones}</div><div class="kpi-sub">Asignaciones</div></div>
         <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_mantenimientos}</div><div class="kpi-sub">Mantenimientos</div></div>
         <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${Number(t.total_litros).toFixed(0)} L</div><div class="kpi-sub">Litros total</div></div>
-        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">$${Number(t.gasto_total).toFixed(0)}</div><div class="kpi-sub">Gasto total</div></div>
+        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">L ${Number(t.gasto_total).toFixed(0)}</div><div class="kpi-sub">Gasto total</div></div>
         <div class="kpi-card" style="padding:10px;text-align:center;border:1px solid var(--accent)">
-          <div class="kpi-value" style="font-size:18px;color:var(--accent)">$${Number(t.costo_por_km).toFixed(2)}</div>
+          <div class="kpi-value" style="font-size:18px;color:var(--accent)">L ${Number(t.costo_por_km).toFixed(2)}</div>
           <div class="kpi-sub">Costo / km</div>
         </div>
       </div>`;
@@ -339,7 +339,7 @@ async function verPerfil(id) {
     // ── Datos adicionales del vehículo ──
     if (v.costo_adquisicion || v.aseguradora || v.poliza_numero) {
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;font-size:12px">';
-      if (v.costo_adquisicion) html += `<div><strong>Costo adquisición:</strong> $${Number(v.costo_adquisicion).toLocaleString()}</div>`;
+      if (v.costo_adquisicion) html += `<div><strong>Costo adquisición:</strong> L ${Number(v.costo_adquisicion).toLocaleString()}</div>`;
       if (v.aseguradora) html += `<div><strong>Aseguradora:</strong> ${v.aseguradora}</div>`;
       if (v.poliza_numero) html += `<div><strong>Póliza:</strong> ${v.poliza_numero}</div>`;
       html += '</div>';
@@ -365,7 +365,7 @@ async function verPerfil(id) {
     if (d.historial_mantenimientos.length) {
       html += '<div class="section-title" style="margin:12px 0 6px">🔧 Últimos mantenimientos</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Costo</th><th>Estado</th><th>Proveedor</th></tr></thead><tbody>';
       d.historial_mantenimientos.forEach(m => {
-        html += `<tr><td>${m.fecha}</td><td>${m.tipo}</td><td>$${Number(m.costo).toFixed(2)}</td><td><span class="badge">${m.estado}</span></td><td>${m.proveedor_nombre||'—'}</td></tr>`;
+        html += `<tr><td>${m.fecha}</td><td>${m.tipo}</td><td>L ${Number(m.costo).toFixed(2)}</td><td><span class="badge">${m.estado}</span></td><td>${m.proveedor_nombre||'—'}</td></tr>`;
       });
       html += '</tbody></table>';
     }
@@ -373,7 +373,7 @@ async function verPerfil(id) {
     if (d.historial_combustible.length) {
       html += '<div class="section-title" style="margin:12px 0 6px">⛽ Últimas cargas</div><table><thead><tr><th>Fecha</th><th>Litros</th><th>Total</th><th>KM</th></tr></thead><tbody>';
       d.historial_combustible.forEach(f => {
-        html += `<tr><td>${f.fecha}</td><td>${Number(f.litros).toFixed(1)} L</td><td>$${Number(f.total).toFixed(2)}</td><td>${f.km?Number(f.km).toLocaleString()+' km':'—'}</td></tr>`;
+        html += `<tr><td>${f.fecha}</td><td>${Number(f.litros).toFixed(1)} L</td><td>L ${Number(f.total).toFixed(2)}</td><td>${f.km?Number(f.km).toLocaleString()+' km':'—'}</td></tr>`;
       });
       html += '</tbody></table>';
     }

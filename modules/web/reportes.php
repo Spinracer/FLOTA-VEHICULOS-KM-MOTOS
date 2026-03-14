@@ -145,28 +145,28 @@ async function loadReport() {
     const t = data.totales;
     kpis.innerHTML = `
       <div class="kpi-card cyan"><div class="kpi-icon">⛽</div><div class="kpi-label">Total Litros</div><div class="kpi-value">${Number(t.total_litros).toFixed(0)}</div></div>
-      <div class="kpi-card green"><div class="kpi-icon">💰</div><div class="kpi-label">Gasto Total</div><div class="kpi-value">$${Number(t.total_gasto).toFixed(0)}</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">💰</div><div class="kpi-label">Gasto Total</div><div class="kpi-value">L ${Number(t.total_gasto).toFixed(0)}</div></div>
       <div class="kpi-card yellow"><div class="kpi-icon">📋</div><div class="kpi-label">Registros</div><div class="kpi-value">${t.registros}</div></div>
-      <div class="kpi-card blue"><div class="kpi-icon">📊</div><div class="kpi-label">Promedio/carga</div><div class="kpi-value">$${Number(t.avg_gasto).toFixed(0)}</div></div>`;
+      <div class="kpi-card blue"><div class="kpi-icon">📊</div><div class="kpi-label">Promedio/carga</div><div class="kpi-value">L ${Number(t.avg_gasto).toFixed(0)}</div></div>`;
     thead.innerHTML = '<tr><th>Placa</th><th>Marca</th><th>Litros</th><th>Gasto</th><th>Cargas</th><th>KM aprox.</th></tr>';
-    tbody.innerHTML = data.por_vehiculo.map(r => `<tr><td><strong style="color:var(--accent)">${r.placa}</strong></td><td>${r.marca}</td><td>${Number(r.litros).toFixed(1)} L</td><td><strong>$${Number(r.gasto).toFixed(2)}</strong></td><td>${r.cargas}</td><td>${r.km_recorridos?Number(r.km_recorridos).toLocaleString():'-'}</td></tr>`).join('');
+    tbody.innerHTML = data.por_vehiculo.map(r => `<tr><td><strong style="color:var(--accent)">${r.placa}</strong></td><td>${r.marca}</td><td>${Number(r.litros).toFixed(1)} L</td><td><strong>L ${Number(r.gasto).toFixed(2)}</strong></td><td>${r.cargas}</td><td>${r.km_recorridos?Number(r.km_recorridos).toLocaleString():'-'}</td></tr>`).join('');
     if (data.por_vehiculo.length) {
       chart.style.display='block';
       document.getElementById('chart-title').textContent='⛽ Gasto por vehículo';
-      renderBarChart('chart-bars', data.por_vehiculo.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto)})), {unit:'$',color:'#47ffe8'});
+      renderBarChart('chart-bars', data.por_vehiculo.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto)})), {unit:'L',color:'#47ffe8'});
     }
   } else if (type === 'mantenimiento') {
     const t = data.totales;
     kpis.innerHTML = `
       <div class="kpi-card orange"><div class="kpi-icon">🔧</div><div class="kpi-label">Total Servicios</div><div class="kpi-value">${t.registros}</div></div>
-      <div class="kpi-card green"><div class="kpi-icon">💰</div><div class="kpi-label">Gasto Total</div><div class="kpi-value">$${Number(t.total_costo).toFixed(0)}</div></div>
-      <div class="kpi-card blue"><div class="kpi-icon">📊</div><div class="kpi-label">Costo Promedio</div><div class="kpi-value">$${Number(t.avg_costo).toFixed(0)}</div></div>`;
+      <div class="kpi-card green"><div class="kpi-icon">💰</div><div class="kpi-label">Gasto Total</div><div class="kpi-value">L ${Number(t.total_costo).toFixed(0)}</div></div>
+      <div class="kpi-card blue"><div class="kpi-icon">📊</div><div class="kpi-label">Costo Promedio</div><div class="kpi-value">L ${Number(t.avg_costo).toFixed(0)}</div></div>`;
     thead.innerHTML = '<tr><th>Placa</th><th>Marca</th><th>Gasto</th><th>Servicios</th></tr>';
-    tbody.innerHTML = data.por_vehiculo.map(r => `<tr><td><strong style="color:var(--accent)">${r.placa}</strong></td><td>${r.marca}</td><td><strong>$${Number(r.gasto).toFixed(2)}</strong></td><td>${r.servicios}</td></tr>`).join('');
+    tbody.innerHTML = data.por_vehiculo.map(r => `<tr><td><strong style="color:var(--accent)">${r.placa}</strong></td><td>${r.marca}</td><td><strong>L ${Number(r.gasto).toFixed(2)}</strong></td><td>${r.servicios}</td></tr>`).join('');
     if (data.por_vehiculo.length) {
       chart.style.display='block';
       document.getElementById('chart-title').textContent='🔧 Gasto mantenimiento por vehículo';
-      renderBarChart('chart-bars', data.por_vehiculo.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto)})), {unit:'$',color:'#e8ff47'});
+      renderBarChart('chart-bars', data.por_vehiculo.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto)})), {unit:'L',color:'#e8ff47'});
     }
   } else if (type === 'vehiculos') {
     kpis.innerHTML = `<div class="kpi-card yellow"><div class="kpi-icon">🚗</div><div class="kpi-label">Vehículos</div><div class="kpi-value">${data.rows.length}</div></div>`;
@@ -180,8 +180,8 @@ async function loadReport() {
       <td>${r.total_asignaciones}</td>
       <td>${r.total_mantenimientos}</td>
       <td>${Number(r.total_litros).toFixed(0)} L</td>
-      <td>$${Number(r.gasto_combustible).toFixed(0)}</td>
-      <td>$${Number(r.gasto_mantenimiento).toFixed(0)}</td>
+      <td>L ${Number(r.gasto_combustible).toFixed(0)}</td>
+      <td>L ${Number(r.gasto_mantenimiento).toFixed(0)}</td>
       <td>${r.total_incidentes}</td>
     </tr>`).join('');
   } else if (type === 'top_costosos') {
@@ -190,14 +190,14 @@ async function loadReport() {
     tbody.innerHTML = data.rows.map(r => `<tr>
       <td><strong style="color:var(--accent)">${r.placa}</strong></td>
       <td>${r.marca} ${r.modelo}</td>
-      <td>$${Number(r.gasto_combustible).toFixed(2)}</td>
-      <td>$${Number(r.gasto_mantenimiento).toFixed(2)}</td>
-      <td><strong style="color:var(--red)">$${Number(r.gasto_total).toFixed(2)}</strong></td>
+      <td>L ${Number(r.gasto_combustible).toFixed(2)}</td>
+      <td>L ${Number(r.gasto_mantenimiento).toFixed(2)}</td>
+      <td><strong style="color:var(--red)">L ${Number(r.gasto_total).toFixed(2)}</strong></td>
     </tr>`).join('');
     if (data.rows.length) {
       chart.style.display='block';
       document.getElementById('chart-title').textContent='💸 Top vehículos más costosos';
-      renderBarChart('chart-bars', data.rows.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto_total)})), {unit:'$',color:'#ff4757'});
+      renderBarChart('chart-bars', data.rows.slice(0,8).map(r=>({label:r.placa,value:Number(r.gasto_total)})), {unit:'L',color:'#ff4757'});
     }
   } else if (type === 'talleres') {
     kpis.innerHTML = '';
@@ -205,8 +205,8 @@ async function loadReport() {
     tbody.innerHTML = data.rows.map(r => `<tr>
       <td><strong>${r.nombre}</strong></td>
       <td>${r.total_servicios}</td>
-      <td><strong>$${Number(r.gasto_total).toFixed(2)}</strong></td>
-      <td>$${Number(r.avg_costo).toFixed(2)}</td>
+      <td><strong>L ${Number(r.gasto_total).toFixed(2)}</strong></td>
+      <td>L ${Number(r.avg_costo).toFixed(2)}</td>
       <td><span class="badge badge-green">${r.completados}</span></td>
       <td><span class="badge badge-orange">${r.activos}</span></td>
     </tr>`).join('');
@@ -234,7 +234,7 @@ async function loadReport() {
     kpis.innerHTML = `
       <div class="kpi-card cyan"><div class="kpi-icon">👤</div><div class="kpi-label">${op.nombre}</div><div class="kpi-value"><span class="badge ${EB[op.estado]||'badge-gray'}">${op.estado}</span></div><div class="kpi-sub">Lic: ${op.licencia||'N/A'} · ${op.categoria_lic||''}</div></div>
       <div class="kpi-card yellow"><div class="kpi-icon">📝</div><div class="kpi-label">Asignaciones</div><div class="kpi-value">${t.asignaciones}</div></div>
-      <div class="kpi-card green"><div class="kpi-icon">⛽</div><div class="kpi-label">Litros Total</div><div class="kpi-value">${Number(t.litros_total).toFixed(0)}</div><div class="kpi-sub">$${Number(t.gasto_combustible).toFixed(0)}</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">⛽</div><div class="kpi-label">Litros Total</div><div class="kpi-value">${Number(t.litros_total).toFixed(0)}</div><div class="kpi-sub">L ${Number(t.gasto_combustible).toFixed(0)}</div></div>
       <div class="kpi-card blue"><div class="kpi-icon">🛣</div><div class="kpi-label">KM Total</div><div class="kpi-value">${Number(t.km_total).toLocaleString()}</div></div>
       <div class="kpi-card red"><div class="kpi-icon">⚠️</div><div class="kpi-label">Incidentes</div><div class="kpi-value">${t.incidentes}</div></div>`;
     thead.innerHTML = '<tr><th>Inicio</th><th>Fin</th><th>Placa</th><th>Marca</th><th>KM Inicio</th><th>KM Fin</th><th>Estado</th></tr>';

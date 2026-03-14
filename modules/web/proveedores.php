@@ -122,7 +122,7 @@ async function verContratos(id, nombre) {
     <td>${r.titulo}</td><td>${r.numero_contrato||'—'}</td>
     <td><span class="badge ${{'Servicio':'badge-blue','Suministro':'badge-cyan','Mantenimiento':'badge-orange','Otro':'badge-gray'}[r.tipo]||'badge-gray'}">${r.tipo}</span></td>
     <td>${r.fecha_inicio}</td><td>${r.fecha_fin||'Indefinido'}</td>
-    <td>$${Number(r.monto).toLocaleString()}</td>
+    <td>L ${Number(r.monto).toLocaleString()}</td>
     <td><span class="badge ${EB3[r.estado]||'badge-gray'}">${r.estado}</span></td>
     <td class="td-truncate">${r.notas||'—'}</td>
   </tr>`).join('') || '<tr><td colspan="8"><div class="empty"><div class="empty-title">Sin contratos</div></div></td></tr>';

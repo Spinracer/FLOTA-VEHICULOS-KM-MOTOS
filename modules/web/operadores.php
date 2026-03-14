@@ -129,7 +129,7 @@ async function verHistorial(id){
     : `<div class="empty" style="margin-top:8px"><div class="empty-title">Sin asignaciones</div></div>`;
 
   const htmlFuel = fuel.length
-    ? `<table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Litros</th><th>Total</th><th>Asignación</th></tr></thead><tbody>${fuel.map(c=>`<tr><td>${c.fecha}</td><td>${c.placa||'—'}</td><td>${Number(c.litros||0).toFixed(2)}</td><td>$${Number(c.total||0).toFixed(2)}</td><td>#${c.asignacion_id||'—'}</td></tr>`).join('')}</tbody></table>`
+    ? `<table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Litros</th><th>Total</th><th>Asignación</th></tr></thead><tbody>${fuel.map(c=>`<tr><td>${c.fecha}</td><td>${c.placa||'—'}</td><td>${Number(c.litros||0).toFixed(2)}</td><td>L ${Number(c.total||0).toFixed(2)}</td><td>#${c.asignacion_id||'—'}</td></tr>`).join('')}</tbody></table>`
     : `<div class="empty" style="margin-top:8px"><div class="empty-title">Sin combustible asociado</div></div>`;
 
   const htmlInc = inc.length
@@ -200,7 +200,7 @@ async function loadInfracciones() {
     <td>${r.fecha}</td>
     <td><span class="badge ${{Multa:'badge-orange',Accidente:'badge-red','Violación':'badge-red',Otro:'badge-gray'}[r.tipo]||'badge-gray'}">${r.tipo}</span></td>
     <td class="td-truncate">${r.descripcion||'—'}</td>
-    <td>$${Number(r.monto).toFixed(2)}</td>
+    <td>L ${Number(r.monto).toFixed(2)}</td>
     <td><span class="badge ${EB2[r.estado]||'badge-gray'}">${r.estado}</span></td>
     <td>${r.referencia||'—'}</td>
     <td><div class="action-btns">
@@ -239,7 +239,7 @@ async function verKPIs(id, nombre) {
         <div class="kpi-card"><div class="kpi-value">${k.eficiencia_kml!==null?k.eficiencia_kml:'—'}</div><div class="kpi-label">km/L Prom.</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:${k.incidentes>3?'#ff4757':'inherit'}">${k.incidentes}</div><div class="kpi-label">Incidentes</div></div>
         <div class="kpi-card"><div class="kpi-value" style="color:${k.infracciones>2?'#ff4757':'inherit'}">${k.infracciones}</div><div class="kpi-label">Infracciones</div></div>
-        <div class="kpi-card"><div class="kpi-value">$${k.infracciones_monto.toLocaleString()}</div><div class="kpi-label">Monto Infracciones</div></div>
+        <div class="kpi-card"><div class="kpi-value">L ${k.infracciones_monto.toLocaleString()}</div><div class="kpi-label">Monto Infracciones</div></div>
         <div class="kpi-card"><div class="kpi-value">${k.capacitaciones}</div><div class="kpi-label">Capacitaciones</div></div>
         <div class="kpi-card"><div class="kpi-value">${k.horas_capacitacion}h</div><div class="kpi-label">Horas Formación</div></div>
       </div>

@@ -139,7 +139,7 @@ async function load(){
     <td><strong style="color:var(--accent2)">${r.placa||''} ${r.marca||''}</strong></td>
     <td><span class="badge badge-yellow">${r.tipo}</span></td>
     <td class="td-truncate">${r.descripcion||'—'}</td>
-    <td><strong style="color:var(--green)">$${Number(r.costo).toFixed(2)}</strong></td>
+    <td><strong style="color:var(--green)">L ${Number(r.costo).toFixed(2)}</strong></td>
     <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
     <td>${r.proveedor_nombre||'—'}</td>
@@ -220,8 +220,8 @@ async function loadItems() {
     <td>${i.descripcion}</td>
     <td>${Number(i.cantidad).toFixed(2)}</td>
     <td>${i.unidad}</td>
-    <td>$${Number(i.precio_unitario).toFixed(2)}</td>
-    <td><strong style="color:var(--green)">$${Number(i.subtotal).toFixed(2)}</strong></td>
+    <td>L ${Number(i.precio_unitario).toFixed(2)}</td>
+    <td><strong style="color:var(--green)">L ${Number(i.subtotal).toFixed(2)}</strong></td>
     <td class="td-truncate">${i.notas||'—'}</td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       ${currentMantEstado !== 'Completado' ? `<button class="btn btn-ghost btn-sm" onclick='editarItem(${JSON.stringify(i)})'>✏️</button>` : ''}
@@ -267,7 +267,7 @@ function calcSubtotal() {
   const form = document.getElementById('modalItem');
   const cant = parseFloat(form.querySelector('[name="cantidad"]').value) || 0;
   const pu   = parseFloat(form.querySelector('[name="precio_unitario"]').value) || 0;
-  document.getElementById('previewSubtotal').value = '$' + (cant * pu).toFixed(2);
+  document.getElementById('previewSubtotal').value = 'L ' + (cant * pu).toFixed(2);
 }
 document.getElementById('modalItem').querySelector('[name="cantidad"]')?.addEventListener('input', calcSubtotal);
 document.getElementById('modalItem').querySelector('[name="precio_unitario"]')?.addEventListener('input', calcSubtotal);
@@ -291,7 +291,7 @@ async function verPendientes() {
     const data = await api('/api/mantenimientos.php?action=pending_approvals');
     const rows = data.rows || [];
     if (!rows.length) { toast('No hay aprobaciones pendientes'); return; }
-    const list = rows.map(r => `OT #${r.id} — ${r.placa} — ${r.tipo} — $${Number(r.costo).toFixed(2)}`).join('\n');
+    const list = rows.map(r => `OT #${r.id} — ${r.placa} — ${r.tipo} — L ${Number(r.costo).toFixed(2)}`).join('\n');
     alert('Aprobaciones pendientes:\n\n' + list);
   } catch(e) { toast('Error al cargar pendientes','error'); }
 }

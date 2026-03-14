@@ -99,8 +99,8 @@ function renderKPIs(k) {
   const items = [
     { icon: '🚗', label: 'Vehículos', value: k.vehiculos, sub: 'en flota', cls: 'yellow' },
     { icon: '👤', label: 'Operadores', value: k.operadores, sub: 'activos', cls: 'orange' },
-    { icon: '⛽', label: 'Combustible', value: '$' + Number(k.gasto_comb).toLocaleString('es', {maximumFractionDigits:0}), sub: k.litros.toLocaleString('es',{maximumFractionDigits:0}) + ' L', cls: 'cyan', trend: k.trend_comb },
-    { icon: '🔧', label: 'Mantenimiento', value: '$' + Number(k.gasto_mant).toLocaleString('es', {maximumFractionDigits:0}), sub: k.total_mant + ' OTs', cls: 'blue', trend: k.trend_mant },
+    { icon: '⛽', label: 'Combustible', value: 'L ' + Number(k.gasto_comb).toLocaleString('es', {maximumFractionDigits:0}), sub: k.litros.toLocaleString('es',{maximumFractionDigits:0}) + ' L', cls: 'cyan', trend: k.trend_comb },
+    { icon: '🔧', label: 'Mantenimiento', value: 'L ' + Number(k.gasto_mant).toLocaleString('es', {maximumFractionDigits:0}), sub: k.total_mant + ' OTs', cls: 'blue', trend: k.trend_mant },
     { icon: '⚠️', label: 'Incidentes', value: k.inc_abiertos, sub: 'abiertos', cls: 'red' },
     { icon: '🚨', label: 'Alertas', value: k.alertas_activas, sub: k.ots_pendientes + ' OTs pen.', cls: 'yellow' },
   ];
@@ -129,14 +129,14 @@ function renderCharts(data) {
     data: {
       labels: gm.map(r => r.mes),
       datasets: [
-        { label: 'Combustible $', data: gm.map(r => r.combustible), borderColor: CHART_COLORS.accent2, backgroundColor: 'rgba(71,255,232,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
-        { label: 'Mantenimiento $', data: gm.map(r => r.mantenimiento), borderColor: CHART_COLORS.accent, backgroundColor: 'rgba(232,255,71,0.1)', fill: true, tension: 0.3, pointRadius: 3 }
+        { label: 'Combustible L', data: gm.map(r => r.combustible), borderColor: CHART_COLORS.accent2, backgroundColor: 'rgba(71,255,232,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
+        { label: 'Mantenimiento L', data: gm.map(r => r.mantenimiento), borderColor: CHART_COLORS.accent, backgroundColor: 'rgba(232,255,71,0.1)', fill: true, tension: 0.3, pointRadius: 3 }
       ]
     },
     options: {
       responsive: true, interaction: { mode: 'index', intersect: false },
       scales: {
-        y: { grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => '$' + v.toLocaleString() } },
+        y: { grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => 'L ' + v.toLocaleString() } },
         x: { ticks: { color: cc.text, maxRotation: 45 } }
       },
       plugins: { legend: { labels: { color: cc.text } } }
@@ -157,7 +157,7 @@ function renderCharts(data) {
     options: {
       indexAxis: 'y', responsive: true,
       scales: {
-        x: { stacked: true, grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => '$' + v.toLocaleString() } },
+        x: { stacked: true, grid: { color: cc.grid }, ticks: { color: cc.text, callback: v => 'L ' + v.toLocaleString() } },
         y: { stacked: true, ticks: { color: cc.text } }
       },
       plugins: { legend: { labels: { color: cc.text } } }
@@ -179,7 +179,7 @@ function renderCharts(data) {
       responsive: true,
       plugins: {
         legend: { position: 'bottom', labels: { color: cc.text, padding: 12 } },
-        tooltip: { callbacks: { label: ctx => ctx.label + ': $' + Number(ctx.parsed).toLocaleString() } }
+        tooltip: { callbacks: { label: ctx => ctx.label + ': L ' + Number(ctx.parsed).toLocaleString() } }
       }
     }
   });
@@ -250,7 +250,7 @@ function renderLists(lists) {
       const cls = o.estado === 'En proceso' ? '' : 'info';
       return `<div class="alert-item ${cls}"><div class="alert-dot"></div>
         <div class="alert-text"><strong>${o.placa}</strong> — ${o.tipo} (${o.estado})</div>
-        <div class="alert-meta">$${Number(o.costo).toLocaleString()} · ${o.fecha}</div></div>`;
+        <div class="alert-meta">L ${Number(o.costo).toLocaleString()} · ${o.fecha}</div></div>`;
     }).join('');
   }
 

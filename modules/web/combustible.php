@@ -129,7 +129,7 @@ ob_start();
       <button class="btn btn-ghost btn-sm" onclick="loadEficiencia()">Filtrar</button>
     </div>
     <div class="table-wrap" style="max-height:450px;overflow-y:auto">
-      <table><thead><tr><th>#</th><th>Vehículo</th><th>Cargas</th><th>Litros</th><th>Gasto</th><th>KM recorridos</th><th>km/L</th><th>$/km</th></tr></thead>
+      <table><thead><tr><th>#</th><th>Vehículo</th><th>Cargas</th><th>Litros</th><th>Gasto</th><th>KM recorridos</th><th>km/L</th><th>L/km</th></tr></thead>
       <tbody id="tbody-eficiencia"></tbody></table>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-eficiencia')">Cerrar</button></div>
@@ -154,7 +154,7 @@ async function load() {
   // Pills
   document.getElementById('stat-pills').innerHTML = `
     <div class="stat-pill">⛽ Total litros: <strong>${Number(data.stats.litros).toFixed(1)}</strong></div>
-    <div class="stat-pill">💰 Gasto total: <strong>$${Number(data.stats.gasto).toFixed(2)}</strong></div>
+    <div class="stat-pill">💰 Gasto total: <strong>L ${Number(data.stats.gasto).toFixed(2)}</strong></div>
     <div class="stat-pill">📋 Registros: <strong>${data.total}</strong></div>`;
   const badges = {'Lleno':'badge-green','Parcial':'badge-yellow'};
   const tbody = document.getElementById('tbody-comb');
@@ -164,8 +164,8 @@ async function load() {
       <td>${r.fecha}</td>
       <td><strong style="color:var(--accent2)">${r.placa||''} ${r.marca||''}</strong></td>
       <td>${Number(r.litros).toFixed(1)} L</td>
-      <td>$${Number(r.costo_litro).toFixed(2)}</td>
-      <td><strong>$${Number(r.total).toFixed(2)}</strong></td>
+      <td>L ${Number(r.costo_litro).toFixed(2)}</td>
+      <td><strong>L ${Number(r.total).toFixed(2)}</strong></td>
       <td>${r.km ? Number(r.km).toLocaleString()+' km' : '—'}</td>
       <td><span class="badge ${r.rendimiento ? 'badge-cyan' : 'badge-gray'}">${r.rendimiento ? Number(r.rendimiento).toFixed(1)+' km/L' : '—'}</span></td>
       <td><span class="badge ${badges[r.tipo_carga]||'badge-gray'}">${r.tipo_carga}</span></td>
@@ -248,15 +248,15 @@ async function loadCharts() {
       data: {
         labels,
         datasets: [
-          { label: 'Gasto ($)', data: gastos, backgroundColor: 'rgba(232,255,71,0.7)', borderRadius: 4 },
-          { label: '$/L promedio', data: costos, type: 'line', borderColor: '#ff6b6b', pointRadius: 3, yAxisID: 'y1' }
+          { label: 'Gasto (L)', data: gastos, backgroundColor: 'rgba(232,255,71,0.7)', borderRadius: 4 },
+          { label: 'L/L promedio', data: costos, type: 'line', borderColor: '#ff6b6b', pointRadius: 3, yAxisID: 'y1' }
         ]
       },
       options: {
         responsive: true, interaction: { mode: 'index' },
         scales: {
-          y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '$' + v.toLocaleString() } },
-          y1: { position: 'right', grid: { display: false }, ticks: { color: '#ff6b6b', callback: v => '$' + v.toFixed(2) } },
+          y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => 'L ' + v.toLocaleString() } },
+          y1: { position: 'right', grid: { display: false }, ticks: { color: '#ff6b6b', callback: v => 'L ' + v.toFixed(2) } },
           x: { ticks: { color: textColor } }
         },
         plugins: { legend: { labels: { color: textColor } } }
@@ -287,7 +287,7 @@ async function loadCharts() {
     const diffLitros = prev.litros > 0 ? (((curLitros - prev.litros) / prev.litros) * 100).toFixed(1) : '—';
     document.getElementById('prev-compare').innerHTML = `
       <strong>vs período anterior:</strong>
-      Gasto: $${curGasto.toFixed(0)} ${typeof diffGasto === 'string' && diffGasto !== '—' ? (diffGasto > 0 ? `<span style="color:#ff4757">↑${diffGasto}%</span>` : `<span style="color:#2ed573">↓${Math.abs(diffGasto)}%</span>`) : '—'}
+      Gasto: L ${curGasto.toFixed(0)} ${typeof diffGasto === 'string' && diffGasto !== '—' ? (diffGasto > 0 ? `<span style="color:#ff4757">↑${diffGasto}%</span>` : `<span style="color:#2ed573">↓${Math.abs(diffGasto)}%</span>`) : '—'}
       &nbsp;|&nbsp; Litros: ${curLitros.toFixed(0)} ${typeof diffLitros === 'string' && diffLitros !== '—' ? (diffLitros > 0 ? `<span style="color:#ff4757">↑${diffLitros}%</span>` : `<span style="color:#2ed573">↓${Math.abs(diffLitros)}%</span>`) : '—'}
       &nbsp;|&nbsp; Cargas período anterior: ${prev.cargas || 0}
     `;
@@ -317,10 +317,10 @@ async function loadEficiencia() {
         <td><strong style="color:var(--accent2)">${r.placa} ${r.marca||''}</strong></td>
         <td>${r.cargas}</td>
         <td>${Number(r.total_litros).toFixed(1)} L</td>
-        <td>$${Number(r.total_gasto).toFixed(2)}</td>
+        <td>L ${Number(r.total_gasto).toFixed(2)}</td>
         <td>${Number(r.km_recorridos).toLocaleString()} km</td>
         <td><strong style="color:${kmlColor}">${r.rendimiento_kml ? r.rendimiento_kml + ' km/L' : '—'}</strong></td>
-        <td>${r.costo_por_km ? '$' + r.costo_por_km + '/km' : '—'}</td>
+        <td>${r.costo_por_km ? 'L ' + r.costo_por_km + '/km' : '—'}</td>
       </tr>`;
     }).join('');
   } catch(e) { toast('Error al cargar eficiencia','error'); }

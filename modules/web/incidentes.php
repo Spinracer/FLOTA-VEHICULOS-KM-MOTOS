@@ -131,8 +131,8 @@ async function load(){
     <div class="stat-card"><div class="stat-value">${data.total}</div><div class="stat-label">Total</div></div>
     <div class="stat-card"><div class="stat-value" style="color:#ff4757">${abiertos}</div><div class="stat-label">Abiertos</div></div>
     <div class="stat-card"><div class="stat-value" style="color:#ffa502">${conReclamo}</div><div class="stat-label">Con reclamo</div></div>
-    <div class="stat-card"><div class="stat-value">$${costoTotal.toFixed(0)}</div><div class="stat-label">Costo est.</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:#5effc1">$${reclamoTotal.toFixed(0)}</div><div class="stat-label">Reclamos</div></div>
+    <div class="stat-card"><div class="stat-value">L ${costoTotal.toFixed(0)}</div><div class="stat-label">Costo est.</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#5effc1">L ${reclamoTotal.toFixed(0)}</div><div class="stat-label">Reclamos</div></div>
   `;
 
   const tbody=document.getElementById('tbody');
@@ -142,7 +142,7 @@ async function load(){
     <td><strong style="color:var(--accent2)">${r.placa||''} ${r.marca||''}</strong></td>
     <td>${r.tipo}</td>
     <td><span class="badge ${SB[r.severidad]||'badge-gray'}">${r.severidad}</span></td>
-    <td>${Number(r.costo_est)>0?'$'+Number(r.costo_est).toFixed(2):'—'}</td>
+    <td>${Number(r.costo_est)>0?'L '+Number(r.costo_est).toFixed(2):'—'}</td>
     <td>${r.aseguradora||'—'}</td>
     <td>${Number(r.tiene_reclamo)?'<span class="badge '+RB[r.estado_reclamo]+'">'+r.estado_reclamo+'</span>':'—'}</td>
     <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
@@ -195,7 +195,7 @@ async function verDetalle(id){
     <tr><td style="color:#8892a4">Póliza</td><td>${r.poliza_numero||'—'}</td></tr>
     ${Number(r.tiene_reclamo)?`
     <tr><td style="color:#8892a4">Estado reclamo</td><td><span class="badge ${RB[r.estado_reclamo]||'badge-gray'}">${r.estado_reclamo}</span></td></tr>
-    <tr><td style="color:#8892a4">Monto reclamo</td><td>$${Number(r.monto_reclamo).toFixed(2)}</td></tr>
+    <tr><td style="color:#8892a4">Monto reclamo</td><td>L ${Number(r.monto_reclamo).toFixed(2)}</td></tr>
     <tr><td style="color:#8892a4">Fecha reclamo</td><td>${r.fecha_reclamo||'—'}</td></tr>
     <tr><td style="color:#8892a4">Ref. siniestro</td><td>${r.referencia_reclamo||'—'}</td></tr>
     <tr><td style="color:#8892a4">Notas seguro</td><td>${r.notas_seguro||'—'}</td></tr>
@@ -209,7 +209,7 @@ async function verDetalle(id){
       <tr><td style="color:#8892a4">Tipo</td><td>${r.tipo}</td></tr>
       <tr><td style="color:#8892a4">Severidad</td><td><span class="badge ${SB[r.severidad]}">${r.severidad}</span></td></tr>
       <tr><td style="color:#8892a4">Estado</td><td><span class="badge ${EB[r.estado]}">${r.estado}</span></td></tr>
-      <tr><td style="color:#8892a4">Costo estimado</td><td>$${Number(r.costo_est).toFixed(2)}</td></tr>
+      <tr><td style="color:#8892a4">Costo estimado</td><td>L ${Number(r.costo_est).toFixed(2)}</td></tr>
       <tr><td style="color:#8892a4">Descripción</td><td>${r.descripcion}</td></tr>
       <tr><td colspan="2" style="padding:12px 0 6px;border-top:1px solid var(--border);font-weight:600;color:var(--accent2)">🛡️ Seguro</td></tr>
       ${seguroHtml}
@@ -300,10 +300,10 @@ async function loadDashboard() {
     chartIncMonth = new Chart(document.getElementById('chart-inc-month'), {
       type: 'bar', data: { labels: months, datasets: [
         { label: 'Incidentes', data: monthData, backgroundColor: 'rgba(255,71,87,0.7)', borderRadius: 4 },
-        { label: 'Costo ($)', data: monthCost, type: 'line', borderColor: '#ffa502', pointRadius: 3, yAxisID: 'y1' }
+        { label: 'Costo (L)', data: monthCost, type: 'line', borderColor: '#ffa502', pointRadius: 3, yAxisID: 'y1' }
       ]}, options: { responsive: true, scales: {
         y: { grid: { color: gridColor }, ticks: { color: textColor } },
-        y1: { position: 'right', grid: { display: false }, ticks: { color: '#ffa502', callback: v => '$' + v.toLocaleString() } },
+        y1: { position: 'right', grid: { display: false }, ticks: { color: '#ffa502', callback: v => 'L ' + v.toLocaleString() } },
         x: { ticks: { color: textColor } }
       }, plugins: { legend: { labels: { color: textColor } } } }
     });
@@ -324,7 +324,7 @@ async function loadDashboard() {
     topTbody.innerHTML = topVeh.length ? topVeh.map(v => `<tr>
       <td><strong style="color:var(--accent2)">${v.placa} ${v.marca||''}</strong></td>
       <td>${v.total}</td>
-      <td>$${Number(v.costo_total).toFixed(2)}</td>
+      <td>L ${Number(v.costo_total).toFixed(2)}</td>
     </tr>`).join('') : '<tr><td colspan="3">Sin datos</td></tr>';
   } catch(e) { toast('Error al cargar dashboard','error'); }
 }
