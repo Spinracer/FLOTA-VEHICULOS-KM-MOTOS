@@ -214,6 +214,8 @@ try {
             if ($from) { $where .= " AND c.fecha >= ?"; $params[] = $from; }
             if ($to) { $where .= " AND c.fecha <= ?"; $params[] = $to; }
             if ($vid) { $where .= " AND c.vehiculo_id = ?"; $params[] = $vid; }
+            $opId = (int)($_GET['operador_id'] ?? 0);
+            if ($opId) { $where .= " AND c.operador_id = ?"; $params[] = $opId; }
 
             // Totales
             $stmt = $db->prepare("SELECT COUNT(*) as registros, COALESCE(SUM(c.litros),0) as total_litros, COALESCE(SUM(c.total),0) as total_gasto,
@@ -263,7 +265,29 @@ try {
                 $agrupado = $stmt->fetchAll();
             }
 
-            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_mes' => $porMes];
+            // Por operador
+            $stmt = $db->prepare("SELECT COALESCE(o.nombre,'Sin operador') AS operador, SUM(c.litros) as litros, SUM(c.total) as gasto, COUNT(*) as cargas
+                FROM combustible c LEFT JOIN operadores o ON o.id=c.operador_id
+                $where GROUP BY o.id, o.nombre ORDER BY gasto DESC");
+            $stmt->execute($params);
+            $porOperador = $stmt->fetchAll();
+
+            // Detalle individual
+            $stmt = $db->prepare("SELECT c.fecha, v.placa, COALESCE(o.nombre,'—') AS operador, c.litros, c.costo_litro, c.total, c.km,
+                COALESCE(p.nombre,'—') AS proveedor, c.metodo_pago
+                FROM combustible c
+                LEFT JOIN vehiculos v ON v.id=c.vehiculo_id
+                LEFT JOIN operadores o ON o.id=c.operador_id
+                LEFT JOIN proveedores p ON p.id=c.proveedor_id
+                $where ORDER BY c.fecha DESC, c.id DESC LIMIT 500");
+            $stmt->execute($params);
+            $detalle = $stmt->fetchAll();
+
+            $totales['vehiculos'] = count($porVehiculo);
+            $totales['operadores'] = count($porOperador);
+            $totales['avg_costo_litro'] = $totales['total_litros'] > 0 ? round($totales['total_gasto'] / $totales['total_litros'], 2) : 0;
+
+            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_operador' => $porOperador, 'por_mes' => $porMes, 'detalle' => $detalle];
             if ($agrupado !== null) $result['agrupado'] = $agrupado;
             echo json_encode($result);
             break;
@@ -274,6 +298,7 @@ try {
             if ($from) { $where .= " AND m.fecha >= ?"; $params[] = $from; }
             if ($to) { $where .= " AND m.fecha <= ?"; $params[] = $to; }
             if ($vid) { $where .= " AND m.vehiculo_id = ?"; $params[] = $vid; }
+            if ($provId) { $where .= " AND m.proveedor_id = ?"; $params[] = $provId; }
 
             $stmt = $db->prepare("SELECT COUNT(*) as registros, COALESCE(SUM(m.costo),0) as total_costo, COALESCE(AVG(m.costo),0) as avg_costo
                 FROM mantenimientos m $where");
@@ -317,7 +342,33 @@ try {
                 $agrupado = $stmt->fetchAll();
             }
 
-            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_tipo' => $porTipo];
+            // Por proveedor
+            $stmt = $db->prepare("SELECT COALESCE(p.nombre,'Sin proveedor') AS proveedor, SUM(m.costo) as gasto, COUNT(*) as servicios
+                FROM mantenimientos m LEFT JOIN proveedores p ON p.id=m.proveedor_id
+                $where GROUP BY p.id, p.nombre ORDER BY gasto DESC");
+            $stmt->execute($params);
+            $porProveedor = $stmt->fetchAll();
+
+            // Detalle individual
+            $stmt = $db->prepare("SELECT m.fecha, v.placa, v.marca, m.tipo, m.descripcion, m.costo, m.km, COALESCE(p.nombre,'—') AS proveedor, m.estado
+                FROM mantenimientos m
+                LEFT JOIN vehiculos v ON v.id=m.vehiculo_id
+                LEFT JOIN proveedores p ON p.id=m.proveedor_id
+                $where ORDER BY m.fecha DESC, m.id DESC LIMIT 500");
+            $stmt->execute($params);
+            $detalle = $stmt->fetchAll();
+
+            $completados = 0; $pendientes = 0;
+            foreach ($detalle as $d) {
+                if ($d['estado'] === 'Completado') $completados++;
+                else $pendientes++;
+            }
+            $totales['completados'] = $completados;
+            $totales['pendientes'] = $pendientes;
+            $totales['vehiculos'] = count($porVehiculo);
+            $totales['proveedores'] = count($porProveedor);
+
+            $result = ['totales' => $totales, 'por_vehiculo' => $porVehiculo, 'por_tipo' => $porTipo, 'por_proveedor' => $porProveedor, 'detalle' => $detalle];
             if ($agrupado !== null) $result['agrupado'] = $agrupado;
             echo json_encode($result);
             break;
@@ -333,7 +384,24 @@ try {
                 (SELECT COUNT(*) FROM incidentes i WHERE i.vehiculo_id=v.id) as total_incidentes
                 FROM vehiculos v WHERE v.deleted_at IS NULL ORDER BY v.placa");
             $stmt->execute();
-            echo json_encode(['rows' => $stmt->fetchAll()]);
+            $rows = $stmt->fetchAll();
+            $activos = 0; $totalKm = 0; $totalGC = 0; $totalGM = 0; $totalInc = 0;
+            $porEstado = [];
+            foreach ($rows as $r) {
+                if ($r['estado'] === 'Activo') $activos++;
+                $totalKm += (float)$r['km_actual'];
+                $totalGC += (float)$r['gasto_combustible'];
+                $totalGM += (float)$r['gasto_mantenimiento'];
+                $totalInc += (int)$r['total_incidentes'];
+                $porEstado[$r['estado']] = ($porEstado[$r['estado']] ?? 0) + 1;
+            }
+            $porEstadoArr = [];
+            foreach ($porEstado as $est => $cnt) { $porEstadoArr[] = ['estado' => $est, 'cantidad' => $cnt]; }
+            echo json_encode([
+                'rows' => $rows,
+                'totales' => ['total'=>count($rows),'activos'=>$activos,'km_total'=>$totalKm,'gasto_combustible'=>$totalGC,'gasto_mantenimiento'=>$totalGM,'incidentes'=>$totalInc],
+                'por_estado' => $porEstadoArr,
+            ]);
             break;
 
         case 'top_costosos':
@@ -355,7 +423,13 @@ try {
                 GROUP BY v.id, v.placa, v.marca, v.modelo
                 ORDER BY gasto_total DESC LIMIT 15");
             $stmt->execute($params);
-            echo json_encode(['rows' => $stmt->fetchAll()]);
+            $rows = $stmt->fetchAll();
+            $totalGC = 0; $totalGM = 0; $totalG = 0;
+            foreach ($rows as $r) { $totalGC += (float)$r['gasto_combustible']; $totalGM += (float)$r['gasto_mantenimiento']; $totalG += (float)$r['gasto_total']; }
+            echo json_encode([
+                'rows' => $rows,
+                'totales' => ['vehiculos'=>count($rows),'gasto_combustible'=>$totalGC,'gasto_mantenimiento'=>$totalGM,'gasto_total'=>$totalG],
+            ]);
             break;
 
         case 'talleres':
@@ -370,7 +444,13 @@ try {
                 GROUP BY p.id, p.nombre, p.es_taller_autorizado
                 ORDER BY gasto_total DESC");
             $stmt->execute();
-            echo json_encode(['rows' => $stmt->fetchAll()]);
+            $rows = $stmt->fetchAll();
+            $totalServ = 0; $totalGasto = 0; $totalComp = 0; $totalAct = 0;
+            foreach ($rows as $r) { $totalServ += (int)$r['total_servicios']; $totalGasto += (float)$r['gasto_total']; $totalComp += (int)$r['completados']; $totalAct += (int)$r['activos']; }
+            echo json_encode([
+                'rows' => $rows,
+                'totales' => ['talleres'=>count($rows),'total_servicios'=>$totalServ,'gasto_total'=>$totalGasto,'completados'=>$totalComp,'activos'=>$totalAct],
+            ]);
             break;
 
         case 'overrides':
@@ -405,11 +485,16 @@ try {
             }
             arsort($byUser); arsort($byEntity);
 
+            $porUsuarioArr = [];
+            foreach ($byUser as $email => $count) { $porUsuarioArr[] = ['usuario' => $email, 'overrides' => $count]; }
+            $porEntidadArr = [];
+            foreach ($byEntity as $ent => $count) { $porEntidadArr[] = ['entidad' => $ent, 'overrides' => $count]; }
+
             echo json_encode([
                 'total' => count($rows),
                 'rows' => $rows,
-                'por_usuario' => $byUser,
-                'por_entidad' => $byEntity,
+                'por_usuario' => $porUsuarioArr,
+                'por_entidad' => $porEntidadArr,
             ]);
             break;
 
