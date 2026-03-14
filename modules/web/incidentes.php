@@ -52,8 +52,7 @@ ob_start();
       <div class="form-group reclamo-field" style="display:none"><label>Fecha reclamo</label><input name="fecha_reclamo" type="date"></div>
       <div class="form-group reclamo-field" style="display:none"><label>Ref. reclamo</label><input name="referencia_reclamo" placeholder="No. siniestro"></div>
       <div class="form-group full reclamo-field" style="display:none"><label>Notas seguro</label><textarea name="notas_seguro" placeholder="Observaciones del reclamo..." style="min-height:60px"></textarea></div>
-    </div>
-    <div class="form-group full" id="att-inc-wrap"></div>
+      <div class="form-group full" id="att-inc-wrap"></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>

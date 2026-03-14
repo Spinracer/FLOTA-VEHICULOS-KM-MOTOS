@@ -176,8 +176,8 @@ try {
                 break;
             }
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
-            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id,tiene_gata,tiene_herramientas,tiene_llanta_repuesto,tiene_bac_flota,revision_ok,detalles_checklist,costo_adquisicion,aseguradora,poliza_numero)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id,tiene_gata,tiene_herramientas,tiene_llanta_repuesto,tiene_bac_flota,revision_ok,tiene_luces,tiene_liquidos,tiene_motor_ok,tiene_parabrisas,tiene_documentacion,tiene_frenos,tiene_espejos,detalles_checklist,costo_adquisicion,aseguradora,poliza_numero)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
@@ -187,7 +187,12 @@ try {
                 $d['sucursal_id'] ?: null,
                 (int)($d['tiene_gata'] ?? 0), (int)($d['tiene_herramientas'] ?? 0),
                 (int)($d['tiene_llanta_repuesto'] ?? 0), (int)($d['tiene_bac_flota'] ?? 0),
-                (int)($d['revision_ok'] ?? 0), $d['detalles_checklist'] ?: null,
+                (int)($d['revision_ok'] ?? 0),
+                (int)($d['tiene_luces'] ?? 0), (int)($d['tiene_liquidos'] ?? 0),
+                (int)($d['tiene_motor_ok'] ?? 0), (int)($d['tiene_parabrisas'] ?? 0),
+                (int)($d['tiene_documentacion'] ?? 0), (int)($d['tiene_frenos'] ?? 0),
+                (int)($d['tiene_espejos'] ?? 0),
+                $d['detalles_checklist'] ?: null,
                 isset($d['costo_adquisicion']) && $d['costo_adquisicion'] !== '' ? (float)$d['costo_adquisicion'] : null,
                 $d['aseguradora'] ?? null,
                 $d['poliza_numero'] ?? null
@@ -214,7 +219,7 @@ try {
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['id'], $kmNuevo, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=?,tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,detalles_checklist=?,costo_adquisicion=?,aseguradora=?,poliza_numero=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=?,tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,tiene_luces=?,tiene_liquidos=?,tiene_motor_ok=?,tiene_parabrisas=?,tiene_documentacion=?,tiene_frenos=?,tiene_espejos=?,detalles_checklist=?,costo_adquisicion=?,aseguradora=?,poliza_numero=? WHERE id=?");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
@@ -224,7 +229,12 @@ try {
                 $d['sucursal_id'] ?: null,
                 (int)($d['tiene_gata'] ?? 0), (int)($d['tiene_herramientas'] ?? 0),
                 (int)($d['tiene_llanta_repuesto'] ?? 0), (int)($d['tiene_bac_flota'] ?? 0),
-                (int)($d['revision_ok'] ?? 0), $d['detalles_checklist'] ?: null,
+                (int)($d['revision_ok'] ?? 0),
+                (int)($d['tiene_luces'] ?? 0), (int)($d['tiene_liquidos'] ?? 0),
+                (int)($d['tiene_motor_ok'] ?? 0), (int)($d['tiene_parabrisas'] ?? 0),
+                (int)($d['tiene_documentacion'] ?? 0), (int)($d['tiene_frenos'] ?? 0),
+                (int)($d['tiene_espejos'] ?? 0),
+                $d['detalles_checklist'] ?: null,
                 isset($d['costo_adquisicion']) && $d['costo_adquisicion'] !== '' ? (float)$d['costo_adquisicion'] : null,
                 $d['aseguradora'] ?? null,
                 $d['poliza_numero'] ?? null,

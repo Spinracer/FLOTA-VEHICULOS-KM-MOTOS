@@ -252,6 +252,18 @@ try {
         exit;
     }
 
+    // ─── Sub-endpoint: vehicle checklist state (for pre-fill) ───
+    if ($subAction === 'vehicle_checklist' && $method === 'GET') {
+        $vid = (int)($_GET['vehiculo_id'] ?? 0);
+        if ($vid <= 0) { echo json_encode(['checklist' => []]); exit; }
+        $stmt = $db->prepare("SELECT tiene_gata, tiene_herramientas, tiene_llanta_repuesto, tiene_bac_flota, revision_ok, tiene_luces, tiene_liquidos, tiene_motor_ok, tiene_parabrisas, tiene_documentacion, tiene_frenos, tiene_espejos, detalles_checklist, km_actual FROM vehiculos WHERE id=? LIMIT 1");
+        $stmt->execute([$vid]);
+        $v = $stmt->fetch();
+        if (!$v) { echo json_encode(['checklist' => []]); exit; }
+        echo json_encode(['checklist' => $v]);
+        exit;
+    }
+
     if ($subAction === 'snapshots') {
         $asigId = (int)($_GET['asignacion_id'] ?? 0);
         if ($method === 'GET' && $asigId > 0) {
@@ -410,6 +422,21 @@ try {
                 }
                 // Snapshot de componentes al momento de entrega
                 snapshot_componentes($db, $id, $vehiculoId, 'entrega', (int)($_SESSION['user_id'] ?? 0));
+
+                // Sync checklist back to vehicle
+                $db->prepare("UPDATE vehiculos SET tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,tiene_luces=?,tiene_liquidos=?,tiene_motor_ok=?,tiene_parabrisas=?,tiene_documentacion=?,tiene_frenos=?,tiene_espejos=?,detalles_checklist=? WHERE id=?")->execute([
+                    (int)($d['checklist_gata'] ?? 0), (int)($d['checklist_herramientas'] ?? 0),
+                    (int)($d['checklist_llanta'] ?? 0), (int)($d['checklist_bac'] ?? 0),
+                    (int)($d['checklist_revision'] ?? 0), (int)($d['checklist_luces'] ?? 0),
+                    (int)($d['checklist_liquidos'] ?? 0), (int)($d['checklist_motor'] ?? 0),
+                    (int)($d['checklist_parabrisas'] ?? 0), (int)($d['checklist_documentacion'] ?? 0),
+                    (int)($d['checklist_frenos'] ?? 0), (int)($d['checklist_espejos'] ?? 0),
+                    $d['checklist_detalles'] ?: null, $vehiculoId
+                ]);
+
+                // Auto-clear old vehicle photos on new assignment (will be replaced with new ones)
+                $db->prepare("UPDATE attachments SET deleted_at=NOW() WHERE entidad='vehiculos' AND entidad_id=? AND deleted_at IS NULL")->execute([$vehiculoId]);
+
                 $db->commit();
             } catch (Throwable $txe) {
                 $db->rollBack();

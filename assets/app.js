@@ -189,21 +189,41 @@ class AttachmentWidget {
 
     if (this.pendingFiles.length) {
       html += `<div style="margin-bottom:6px;font-size:11px;color:var(--accent)">⏳ Pendientes de subir: ${this.pendingFiles.length} archivo(s)</div>`;
-      html += this.pendingFiles.map((f,i) => `<div class="att-item pending" style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:rgba(232,255,71,.08);border-radius:6px;margin-bottom:4px">
-        <span style="font-size:12px">${isImg(f.type)?'🖼️':'📄'}</span>
-        <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
-        <span style="font-size:11px;color:var(--text2)">${fmtSize(f.size)}</span>
-        <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px" onclick="window._attWidget_${this.container.id}.removePending(${i})">✕</button>
-      </div>`).join('');
+      html += `<div class="att-pending-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:6px">`;
+      html += this.pendingFiles.map((f,i) => {
+        const preview = isImg(f.type) ? `<img src="${URL.createObjectURL(f)}" style="width:100%;height:60px;object-fit:cover;display:block;border-radius:4px 4px 0 0" alt="">` : `<div style="height:60px;display:flex;align-items:center;justify-content:center;font-size:24px">📄</div>`;
+        return `<div style="border-radius:6px;overflow:hidden;background:rgba(232,255,71,.08);border:1px solid var(--accent)">
+          ${preview}
+          <div style="display:flex;align-items:center;gap:4px;padding:2px 4px">
+            <span style="flex:1;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+            <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px" onclick="window._attWidget_${this.container.id}.removePending(${i})">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+      html += `</div>`;
     }
 
     if (this.attachments.length) {
-      html += this.attachments.map(a => `<div class="att-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;margin-bottom:4px;background:rgba(255,255,255,.04)">
-        <span style="font-size:12px">${isImg(a.mime_type)?'🖼️':'📄'}</span>
-        <a href="/api/attachments.php?action=download&id=${a.id}" target="_blank" style="flex:1;font-size:12px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.original_name}">${a.original_name}</a>
-        <span style="font-size:11px;color:var(--text2)">${fmtSize(a.size_bytes)}</span>
-        <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
-      </div>`).join('');
+      html += `<div class="att-gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-bottom:6px">`;
+      html += this.attachments.map(a => {
+        const url = `/api/attachments.php?action=download&id=${a.id}`;
+        if (isImg(a.mime_type)) {
+          return `<div style="position:relative;border-radius:6px;overflow:hidden;background:var(--bg2);border:1px solid var(--border)">
+            <a href="${url}" target="_blank"><img src="${url}" alt="${a.original_name}" style="width:100%;height:80px;object-fit:cover;display:block" loading="lazy"></a>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px">
+              <span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${a.original_name}</span>
+              <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
+            </div>
+          </div>`;
+        }
+        return `<div class="att-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px;margin-bottom:4px;background:rgba(255,255,255,.04)">
+          <span style="font-size:12px">📄</span>
+          <a href="${url}" target="_blank" style="flex:1;font-size:12px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.original_name}">${a.original_name}</a>
+          <span style="font-size:11px;color:var(--text2)">${fmtSize(a.size_bytes)}</span>
+          <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
+        </div>`;
+      }).join('');
+      html += `</div>`;
     } else if (!this.pendingFiles.length) {
       html += `<div style="font-size:12px;color:var(--text2);padding:8px;text-align:center">Sin adjuntos</div>`;
     }
@@ -244,12 +264,14 @@ class AttachmentWidget {
     fd.append('_csrf_token', getCsrfToken());
     try {
       const res = await fetch('/api/attachments.php', {method:'POST', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}, body: fd});
-      if (!res.ok) throw new Error('Error al subir');
-      const d = await res.json();
+      const text = await res.text();
+      let d;
+      try { d = JSON.parse(text); } catch(_) { throw new Error(text || 'Respuesta vacía del servidor'); }
+      if (!res.ok) throw new Error(d.error || 'Error al subir');
       this.pendingFiles = [];
       toast(`${d.uploaded.length} adjunto(s) subido(s)`);
-      await this.load(); // refresh from server
-    } catch(e) { toast('Error al subir adjuntos', 'error'); }
+      await this.load();
+    } catch(e) { toast('Error adjuntos: ' + e.message, 'error'); console.error('Upload error:', e); }
   }
 
   hasPending() { return this.pendingFiles.length > 0; }

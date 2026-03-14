@@ -103,22 +103,19 @@ ob_start();
       </div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist del Vehículo</label>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-            <input type="checkbox" name="tiene_gata" value="1" style="accent-color:#e8ff47"> Gata
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-            <input type="checkbox" name="tiene_herramientas" value="1" style="accent-color:#e8ff47"> Herramientas
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-            <input type="checkbox" name="tiene_llanta_repuesto" value="1" style="accent-color:#e8ff47"> Llanta de repuesto
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-            <input type="checkbox" name="tiene_bac_flota" value="1" style="accent-color:#e8ff47"> BAC Flota
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-            <input type="checkbox" name="revision_ok" value="1" style="accent-color:#e8ff47"> Revisión OK
-          </label>
+        <div id="veh-checklist-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px">
+          <label class="ck-item"><input type="checkbox" name="tiene_gata" value="1"> Gata</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_herramientas" value="1"> Herramientas</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_llanta_repuesto" value="1"> Llanta de repuesto</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_bac_flota" value="1"> BAC Flota</label>
+          <label class="ck-item"><input type="checkbox" name="revision_ok" value="1"> Revisión general</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_luces" value="1"> Luces</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_liquidos" value="1"> Nivel de líquidos</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_motor_ok" value="1"> Motor</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_parabrisas" value="1"> Parabrisas</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_documentacion" value="1"> Documentación</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_frenos" value="1"> Frenos</label>
+          <label class="ck-item"><input type="checkbox" name="tiene_espejos" value="1"> Espejos</label>
         </div>
         <div style="margin-top:8px"><label style="font-size:12px;color:var(--text2)">Detalles adicionales</label>
           <textarea name="detalles_checklist" placeholder="Detalle libre: estado de llantas, nivel de aceite, observaciones..." style="margin-top:4px"></textarea>
@@ -220,7 +217,7 @@ function editar(v) {
     aseguradora: v.aseguradora || '',
     poliza_numero: v.poliza_numero || ''
   });
-  ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok'].forEach(f => {
+  ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok','tiene_luces','tiene_liquidos','tiene_motor_ok','tiene_parabrisas','tiene_documentacion','tiene_frenos','tiene_espejos'].forEach(f => {
     const cb = document.querySelector(`#modal-veh [name="${f}"]`);
     if (cb) cb.checked = !!parseInt(v[f]);
   });
@@ -272,7 +269,7 @@ async function eliminarEtiqueta(tagId) {
 
 async function guardar() {
   const data = getForm('modal-veh');
-  const checkFields = ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok'];
+  const checkFields = ['tiene_gata','tiene_herramientas','tiene_llanta_repuesto','tiene_bac_flota','revision_ok','tiene_luces','tiene_liquidos','tiene_motor_ok','tiene_parabrisas','tiene_documentacion','tiene_frenos','tiene_espejos'];
   checkFields.forEach(f => {
     const cb = document.querySelector(`#modal-veh [name="${f}"]`);
     data[f] = cb && cb.checked ? 1 : 0;

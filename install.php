@@ -798,6 +798,13 @@ $checklistCols = [
   'tiene_llanta_repuesto' => "TINYINT(1) NOT NULL DEFAULT 0",
   'tiene_bac_flota'     => "TINYINT(1) NOT NULL DEFAULT 0",
   'revision_ok'         => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_luces'         => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_liquidos'      => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_motor_ok'      => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_parabrisas'    => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_documentacion' => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_frenos'        => "TINYINT(1) NOT NULL DEFAULT 0",
+  'tiene_espejos'       => "TINYINT(1) NOT NULL DEFAULT 0",
   'detalles_checklist'  => "TEXT NULL",
 ];
 foreach ($checklistCols as $col => $def) {

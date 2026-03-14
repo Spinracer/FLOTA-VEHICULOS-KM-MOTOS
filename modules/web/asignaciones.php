@@ -347,11 +347,19 @@ async function autoFillChecklist() {
     ]);
     const v = profileData.vehiculo;
     if (v) {
-      document.querySelector('#modal-new [name="checklist_gata"]').checked = !!parseInt(v.tiene_gata);
-      document.querySelector('#modal-new [name="checklist_herramientas"]').checked = !!parseInt(v.tiene_herramientas);
-      document.querySelector('#modal-new [name="checklist_llanta"]').checked = !!parseInt(v.tiene_llanta_repuesto);
-      document.querySelector('#modal-new [name="checklist_bac"]').checked = !!parseInt(v.tiene_bac_flota);
-      document.querySelector('#modal-new [name="checklist_revision"]').checked = !!parseInt(v.revision_ok);
+      // Map vehicle checklist to asignaciones checklist (bidirectional sync)
+      const map = {
+        'checklist_gata': 'tiene_gata', 'checklist_herramientas': 'tiene_herramientas',
+        'checklist_llanta': 'tiene_llanta_repuesto', 'checklist_bac': 'tiene_bac_flota',
+        'checklist_revision': 'revision_ok', 'checklist_luces': 'tiene_luces',
+        'checklist_liquidos': 'tiene_liquidos', 'checklist_motor': 'tiene_motor_ok',
+        'checklist_parabrisas': 'tiene_parabrisas', 'checklist_documentacion': 'tiene_documentacion',
+        'checklist_frenos': 'tiene_frenos', 'checklist_espejos': 'tiene_espejos'
+      };
+      Object.entries(map).forEach(([ckName, vehName]) => {
+        const cb = document.querySelector(`#modal-new [name="${ckName}"]`);
+        if (cb) cb.checked = !!parseInt(v[vehName]);
+      });
       if (v.detalles_checklist) document.querySelector('#modal-new [name="checklist_detalles"]').value = v.detalles_checklist;
     }
     // Auto-fill km: prefer last assignment end_km, fallback to vehicle km_actual
