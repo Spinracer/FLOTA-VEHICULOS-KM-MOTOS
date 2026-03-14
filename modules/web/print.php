@@ -264,7 +264,7 @@ case 'mantenimiento':
     if ($id <= 0) die('ID de mantenimiento requerido.');
     $stmt = $db->prepare("
         SELECT m.*, v.placa, v.marca, v.modelo, v.anio, v.vin, v.km_actual,
-               p.nombre AS proveedor_nombre, p.contacto AS proveedor_contacto, p.telefono AS proveedor_tel,
+               p.nombre AS proveedor_nombre, p.telefono AS proveedor_tel, p.email AS proveedor_email,
                uc.nombre AS completado_por_nombre
         FROM mantenimientos m
         LEFT JOIN vehiculos v ON v.id = m.vehiculo_id
