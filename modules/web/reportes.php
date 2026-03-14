@@ -16,6 +16,7 @@ ob_start();
     <option value="talleres">🏪 Desempeño Talleres</option>
     <option value="overrides">🔓 Overrides Admin</option>
     <option value="operador_360">👤 Perfil Operador 360</option>
+    <option value="historial_asignaciones">📋 Historial Asignaciones</option>
   </select>
   <select id="fv" onchange="loadReport()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
@@ -58,6 +59,7 @@ ob_start();
   <div style="font-size:13px;font-weight:600;color:#e8ff47;margin-bottom:8px;" id="group-table-title">Agrupado</div>
   <table><thead id="group-thead"></thead><tbody id="group-tbody"></tbody></table>
 </div>
+<div id="extra-tables"></div>
 
 <script>
 function getFilters() {
@@ -82,7 +84,7 @@ function switchReport() {
   const fv  = document.getElementById('fv');
   const grpToolbar = document.getElementById('group-toolbar');
   const grpSelect = document.getElementById('group-by');
-  fop.style.display = type === 'operador_360' ? '' : 'none';
+  fop.style.display = (type === 'operador_360' || type === 'historial_asignaciones') ? '' : 'none';
   fv.style.display  = type === 'operador_360' ? 'none' : '';
 
   // Populate grouping options based on report type
@@ -113,6 +115,9 @@ async function loadReport() {
       return;
     }
     qs = buildQS({report: type, operador_id: opId});
+  } else if (type === 'historial_asignaciones') {
+    const opId = document.getElementById('fop').value;
+    qs = buildQS({report: type, ...(opId ? {operador_id: opId} : {})});
   } else {
     qs = buildQS({report: type});
   }
@@ -124,6 +129,7 @@ async function loadReport() {
   const grpWrap = document.getElementById('group-table-wrap');
   chart.style.display = 'none';
   grpWrap.style.display = 'none';
+  document.getElementById('extra-tables').innerHTML = '';
 
   // Render grouped table if present
   if (data.agrupado && data.agrupado.length) {
@@ -244,6 +250,66 @@ async function loadReport() {
       <td>${r.start_km||'—'}</td><td>${r.end_km||'—'}</td>
       <td><span class="badge ${r.estado==='Activa'?'badge-green':'badge-gray'}">${r.estado}</span></td>
     </tr>`).join('');
+  } else if (type === 'historial_asignaciones') {
+    const t = data.totales;
+    const EB2 = {'Activa':'badge-green','Cerrada':'badge-gray'};
+    kpis.innerHTML = `
+      <div class="kpi-card yellow"><div class="kpi-icon">📋</div><div class="kpi-label">Asignaciones</div><div class="kpi-value">${t.asignaciones}</div></div>
+      <div class="kpi-card blue"><div class="kpi-icon">🛣</div><div class="kpi-label">KM Recorridos</div><div class="kpi-value">${Number(t.km_total).toLocaleString()}</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-label">Activas</div><div class="kpi-value">${t.activas}</div></div>
+      <div class="kpi-card gray"><div class="kpi-icon">🔒</div><div class="kpi-label">Cerradas</div><div class="kpi-value">${t.cerradas}</div></div>
+      <div class="kpi-card cyan"><div class="kpi-icon">🚗</div><div class="kpi-label">Vehículos</div><div class="kpi-value">${t.vehiculos}</div></div>
+      <div class="kpi-card orange"><div class="kpi-icon">👤</div><div class="kpi-label">Operadores</div><div class="kpi-value">${t.operadores}</div></div>`;
+
+    // Resumen por vehículo
+    if (data.por_vehiculo && data.por_vehiculo.length) {
+      grpWrap.style.display = '';
+      document.getElementById('group-table-title').textContent = '🚗 Resumen por Vehículo';
+      const gHead = document.getElementById('group-thead');
+      const gBody = document.getElementById('group-tbody');
+      gHead.innerHTML = '<tr><th>Placa</th><th>Vehículo</th><th>Asignaciones</th><th>KM Total</th><th>Activas</th><th>Cerradas</th><th>Operadores</th></tr>';
+      gBody.innerHTML = data.por_vehiculo.map(r => `<tr>
+        <td><strong style="color:var(--accent)">${r.placa}</strong></td>
+        <td>${r.vehiculo}</td>
+        <td>${r.asignaciones}</td>
+        <td>${Number(r.km_total).toLocaleString()} km</td>
+        <td><span class="badge badge-green">${r.activas}</span></td>
+        <td><span class="badge badge-gray">${r.cerradas}</span></td>
+        <td>${r.operadores.join(', ')}</td>
+      </tr>`).join('');
+    }
+
+    // Resumen por operador (tabla extra)
+    let extraHtml = '';
+    if (data.por_operador && data.por_operador.length) {
+      extraHtml = `<div class="table-wrap" style="margin-top:16px">
+        <div style="font-size:13px;font-weight:600;color:#e8ff47;margin-bottom:8px">👤 Resumen por Operador</div>
+        <table><thead><tr><th>Operador</th><th>DNI</th><th>Departamento</th><th>Asignaciones</th><th>KM Total</th><th>Activas</th><th>Cerradas</th><th>Vehículos</th></tr></thead>
+        <tbody>${data.por_operador.map(r => `<tr>
+          <td><strong>${r.operador}</strong></td>
+          <td>${r.dni||'—'}</td>
+          <td>${r.departamento||'—'}</td>
+          <td>${r.asignaciones}</td>
+          <td>${Number(r.km_total).toLocaleString()} km</td>
+          <td><span class="badge badge-green">${r.activas}</span></td>
+          <td><span class="badge badge-gray">${r.cerradas}</span></td>
+          <td>${r.vehiculos.join(', ')}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+    }
+    document.getElementById('extra-tables').innerHTML = extraHtml;
+
+    // Detalle
+    thead.innerHTML = '<tr><th>Inicio</th><th>Fin</th><th>Placa</th><th>Vehículo</th><th>Operador</th><th>Depto</th><th>KM Ini</th><th>KM Fin</th><th>KM Rec.</th><th>Estado</th></tr>';
+    tbody.innerHTML = (data.detalle||[]).map(r => `<tr>
+      <td>${r.start_at}</td><td>${r.end_at||'—'}</td>
+      <td><strong style="color:var(--accent)">${r.placa}</strong></td>
+      <td>${r.vehiculo}</td>
+      <td>${r.operador}</td>
+      <td>${r.departamento||'—'}</td>
+      <td>${r.start_km||'—'}</td><td>${r.end_km||'—'}</td>
+      <td>${r.km_recorridos!=null?Number(r.km_recorridos).toLocaleString()+' km':'—'}</td>
+      <td><span class="badge ${EB2[r.estado]||'badge-gray'}">${r.estado}</span></td>
+    </tr>`).join('');
   }
 }
 
@@ -260,14 +326,20 @@ function exportReport(format) {
     overrides: 'asignaciones',
     operador_360: 'asignaciones',
     asignaciones: 'asignaciones',
+    historial_asignaciones: 'historial_asignaciones',
     incidentes: 'incidentes'
   };
   const exportType = exportMap[type] || type;
   const qs = buildQS({export: exportType, format: format});
+  let exportQs = qs;
+  if (type === 'historial_asignaciones' || type === 'operador_360') {
+    const opId = document.getElementById('fop').value;
+    if (opId) exportQs += '&operador_id=' + opId;
+  }
   if (format === 'pdf') {
-    window.open(`/api/reportes.php?${qs}`, '_blank');
+    window.open(`/api/reportes.php?${exportQs}`, '_blank');
   } else {
-    window.location.href = `/api/reportes.php?${qs}`;
+    window.location.href = `/api/reportes.php?${exportQs}`;
   }
 }
 
