@@ -197,9 +197,121 @@ select option { background: var(--surface2); color: var(--text); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 /* ── RESPONSIVE ── */
+
+/* All screens: tables must scroll horizontally when content overflows */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Tablet (< 1024px) ── */
 @media(max-width:1023px) {
-  .chart-grid,.two-col { grid-template-columns: 1fr; }
+  .chart-grid, .two-col { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+
+  /* Inline grids with 4+ cols → 2 cols */
+  [style*="repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* KPIs */
+  .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .kpi-value { font-size: 26px; }
+
+  /* Modal on tablet */
+  .modal { width: 95%; max-width: 600px !important; padding: 24px; }
+}
+
+/* ── Mobile (< 768px) ── */
+@media(max-width:767px) {
+  /* Page content tighter padding */
+  .page-content { padding: 12px !important; }
+
+  /* Toolbar: stack vertically */
+  .toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .toolbar > .search-wrap { min-width: 100%; }
+  .toolbar > select,
+  .toolbar > input[type="date"],
+  .toolbar > input[type="text"] { max-width: 100% !important; width: 100%; }
+
+  /* Force ALL inline grids → single column */
+  [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+
+  /* KPIs compact */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .kpi-card { padding: 14px; }
+  .kpi-value { font-size: 22px; }
+  .kpi-label { font-size: 10px; letter-spacing: .5px; }
+  .kpi-icon { font-size: 20px; right: 12px; top: 12px; }
+  .kpi-sub { font-size: 11px; }
+
+  /* Charts */
+  .chart-grid { gap: 12px; margin-bottom: 16px; }
+  .chart-card { padding: 16px; }
+  .chart-title { font-size: 11px; margin-bottom: 12px; }
+  .bar-label { width: 70px; font-size: 11px; }
+  .bar-val { width: 50px; font-size: 11px; }
+
+  /* Tables: smaller cells */
+  th { padding: 8px 10px; font-size: 10px; letter-spacing: .5px; }
+  td { padding: 10px; font-size: 13px; }
+  .action-btns { gap: 4px; }
+  .action-btns .btn { padding: 4px 7px; font-size: 11px; }
+  .td-truncate { max-width: 140px; }
+
+  /* Modal full-width on mobile */
+  .modal { width: calc(100vw - 24px) !important; max-width: none !important; padding: 20px 16px; margin: 12px; border-radius: 12px; }
+  .modal-title { font-size: 17px; margin-bottom: 16px; }
+  .modal-actions { flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; }
+  .modal-actions .btn { flex: 1; min-width: 0; justify-content: center; }
+
+  /* Forms */
+  .form-grid { gap: 10px; }
+  .form-group label { font-size: 10px; }
+  input, select, textarea { font-size: 16px; padding: 10px 12px; }
+
+  /* Stat pills */
+  .stat-pills { gap: 6px; }
+  .stat-pill { padding: 6px 10px; font-size: 12px; }
+
+  /* Alerts */
+  .alert-item { padding: 10px 12px; gap: 8px; }
+  .alert-text { font-size: 12px; }
+  .alert-meta { font-size: 10px; }
+
+  /* Empty state */
+  .empty { padding: 30px 16px; }
+  .empty-icon { font-size: 36px; }
+
+  /* Section title */
+  .section-title { font-size: 14px; }
+
+  /* Login */
+  .login-card { padding: 28px 20px; margin: 16px; width: calc(100% - 32px); }
+  .login-logo { font-size: 24px; }
+
+  /* Toast container */
+  #toast-container { left: 12px; right: 12px; bottom: 12px; }
+  .toast { min-width: auto; width: 100%; font-size: 12px; padding: 10px 14px; }
+
+  /* Topbar compact */
+  header h1 { font-size: 15px; max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Two-col, charts */
+  .two-col { gap: 12px; }
+
+  /* Sidebar footer compact on mobile */
+  .btn-logout-link { font-size: 11px; }
+  .user-name { font-size: 12px; }
+}
+
+/* ── Small phones (< 400px) ── */
+@media(max-width:399px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .kpi-card { padding: 12px; }
+  .kpi-value { font-size: 20px; }
+
+  header h1 { font-size: 13px; }
+  .toolbar .btn { font-size: 12px; padding: 8px 12px; width: 100%; justify-content: center; }
+
+  th { padding: 6px 8px; font-size: 9px; }
+  td { padding: 8px; font-size: 12px; }
 }
 
 /* ── 4K+ wide screens ── */

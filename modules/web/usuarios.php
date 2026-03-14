@@ -44,8 +44,8 @@ ob_start();
       <div class="form-group"><label>Rol</label>
         <select name="rol">
           <option value="visitante">👤 Visitante (solo lectura)</option>
-          <option value="monitoreo">👁 Monitoreo (lectura operativa)</option>
-          <option value="soporte">🛠 Soporte (uso cotidiano)</option>
+          <option value="monitoreo">👁 Monitoreo (ver, crear, editar)</option>
+          <option value="soporte">🛠 Soporte (ver, crear, editar)</option>
           <option value="coordinador_it">🔑 Coordinador IT (admin total)</option>
         </select></div>
       <div class="form-group"><label>Estado</label>
@@ -55,7 +55,7 @@ ob_start();
       <strong style="color:var(--accent)">Roles del sistema:</strong><br>
       🔑 <strong>Coordinador IT</strong> — Acceso total, administra usuarios, permisos y todo el sistema<br>
       🛠️ <strong>Soporte</strong> — Uso cotidiano: puede ver, crear y editar registros<br>
-      👁️ <strong>Monitoreo</strong> — Lectura operativa con visibilidad de datos<br>
+      👁️ <strong>Monitoreo</strong> — Mismos permisos que Soporte: ver, crear y editar<br>
       👤 <strong>Visitante</strong> — Solo lectura básica, permisos asignables a gusto
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>

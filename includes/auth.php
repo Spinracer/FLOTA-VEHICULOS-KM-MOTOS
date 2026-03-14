@@ -10,7 +10,7 @@ require_once __DIR__ . '/totp.php';
 // ─────────────────────────────────────────────────────────
 // coordinador_it  → Administrador total: usuarios, permisos y todo el sistema
 // soporte         → Soporte/Coordinador: puede ver, crear y editar registros
-// monitoreo       → Solo visualización: lectura de datos sin modificar
+// monitoreo       → Monitoreo: puede ver, crear y editar registros (igual que soporte)
 // ─────────────────────────────────────────────────────────
 
 const ROLES = [
@@ -24,7 +24,7 @@ const ROLES = [
 const ROLE_PERMISSIONS = [
     'coordinador_it' => ['view', 'create', 'edit', 'delete', 'manage_users', 'manage_permissions'],
     'soporte'        => ['view', 'create', 'edit'],
-    'monitoreo'      => ['view'],
+    'monitoreo'      => ['view', 'create', 'edit'],
     'visitante'      => ['view'],
     // Compatibilidad con roles anteriores
     'admin'          => ['view', 'create', 'edit', 'delete', 'manage_users', 'manage_permissions'],

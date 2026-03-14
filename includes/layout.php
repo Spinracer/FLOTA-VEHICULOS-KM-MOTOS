@@ -64,8 +64,11 @@ tailwind.config = {
 </head>
 <body class="font-body bg-dark text-slate-100 min-h-screen flex dark:bg-dark light:bg-gray-50 light:text-gray-900">
 
+<!-- Sidebar backdrop (mobile) -->
+<div id="sidebar-backdrop" class="fixed inset-0 bg-black/50 z-[99] hidden lg:hidden" onclick="closeSidebar()"></div>
+
 <!-- Mobile sidebar toggle -->
-<button id="sidebar-toggle" class="fixed top-4 left-4 z-[110] lg:hidden bg-surface border border-border rounded-lg p-2 text-accent" onclick="document.getElementById('sidebar').classList.toggle('sidebar-open')">
+<button id="sidebar-toggle" class="fixed top-4 left-4 z-[110] lg:hidden bg-surface border border-border rounded-lg p-2 text-accent" onclick="toggleSidebar()">
   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
 </button>
 
@@ -142,15 +145,15 @@ tailwind.config = {
         <span id="notif-badge" class="hidden absolute -top-1 -right-1 bg-danger text-white text-[10px] rounded-full w-[18px] h-[18px] text-center leading-[18px] font-bold"></span>
       </div>
       <!-- Notifications Panel -->
-      <div id="notif-panel" class="hidden absolute right-3 top-14 w-[360px] max-h-[420px] bg-surface border border-border rounded-xl z-[999] overflow-y-auto shadow-2xl">
+      <div id="notif-panel" class="hidden absolute right-3 top-14 w-[calc(100vw-24px)] sm:w-[360px] max-h-[420px] bg-surface border border-border rounded-xl z-[999] overflow-y-auto shadow-2xl">
         <div class="px-4 py-3.5 border-b border-border flex justify-between items-center">
           <strong class="text-sm">Notificaciones</strong>
           <button class="btn btn-ghost btn-sm text-[11px]" onclick="markAllRead()">Marcar todas leídas</button>
         </div>
         <div id="notif-list" class="p-2"></div>
       </div>
-      <?php if ($rol === 'monitoreo'): ?>
-        <span class="badge badge-cyan px-3 py-1.5 text-[11px]">👁 Modo solo lectura</span>
+      <?php if ($rol === 'visitante'): ?>
+        <span class="badge badge-gray px-3 py-1.5 text-[11px]">👁 Solo lectura</span>
       <?php endif; ?>
     </div>
   </header>
@@ -268,12 +271,20 @@ document.addEventListener('click', e => {
     notifOpen = false; document.getElementById('notif-panel').classList.add('hidden');
   }
 });
-// Close sidebar on mobile when clicking outside
-document.addEventListener('click', e => {
+// Sidebar toggle helpers (mobile)
+function toggleSidebar() {
   const sb = document.getElementById('sidebar');
-  if (sb.classList.contains('sidebar-open') && !e.target.closest('#sidebar') && !e.target.closest('#sidebar-toggle')) {
-    sb.classList.remove('sidebar-open');
-  }
+  const bd = document.getElementById('sidebar-backdrop');
+  sb.classList.toggle('sidebar-open');
+  bd.classList.toggle('hidden');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('sidebar-open');
+  document.getElementById('sidebar-backdrop').classList.add('hidden');
+}
+// Close sidebar on nav click (mobile)
+document.querySelectorAll('#sidebar a.nav-item').forEach(a => {
+  a.addEventListener('click', () => { if (window.innerWidth < 1024) closeSidebar(); });
 });
 pollNotifs();
 setInterval(pollNotifs, 30000);
