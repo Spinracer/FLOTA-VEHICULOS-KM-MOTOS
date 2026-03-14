@@ -10,17 +10,19 @@ $db = getDB();
 try {
     switch ($method) {
         case 'GET':
-            $stmt = $db->query("SELECT id,nombre,email,rol,activo,proveedor_id,ultimo_acceso,created_at FROM usuarios ORDER BY nombre");
+            $stmt = $db->query("SELECT u.id,u.nombre,u.email,u.rol,u.activo,u.dni,u.departamento_id,
+                COALESCE(dep.nombre,'') AS departamento,u.ultimo_acceso,u.created_at
+                FROM usuarios u LEFT JOIN departamentos dep ON dep.id=u.departamento_id ORDER BY u.nombre");
             echo json_encode(['rows'=>$stmt->fetchAll()]);
             break;
         case 'POST':
             $d=json_decode(file_get_contents('php://input'),true);
             if (!$d['email']||!$d['password']) { http_response_code(400); echo json_encode(['error'=>'Email y contraseña requeridos']); break; }
-            $proveedorId = isset($d['proveedor_id']) && $d['proveedor_id'] !== '' ? (int)$d['proveedor_id'] : null;
-            if (($d['rol'] ?? '') === 'taller' && !$proveedorId) { http_response_code(400); echo json_encode(['error'=>'Para rol Taller debes seleccionar un proveedor autorizado.']); break; }
             $hash = password_hash($d['password'], PASSWORD_DEFAULT);
-            $db->prepare("INSERT INTO usuarios (nombre,email,password,rol,activo,proveedor_id) VALUES (?,?,?,?,?,?)")
-               ->execute([$d['nombre'],$d['email'],$hash,$d['rol'],(int)($d['activo']??1),$proveedorId]);
+            $depId = isset($d['departamento_id']) && $d['departamento_id'] !== '' ? (int)$d['departamento_id'] : null;
+            $dni = isset($d['dni']) && trim($d['dni']) !== '' ? trim($d['dni']) : null;
+            $db->prepare("INSERT INTO usuarios (nombre,email,password,rol,activo,departamento_id,dni) VALUES (?,?,?,?,?,?,?)")
+               ->execute([$d['nombre'],$d['email'],$hash,$d['rol'],(int)($d['activo']??1),$depId,$dni]);
             $newId = (int)$db->lastInsertId();
             $payload = $d;
             unset($payload['password']);
@@ -29,18 +31,18 @@ try {
             break;
         case 'PUT':
             $d=json_decode(file_get_contents('php://input'),true);
-                $prevStmt = $db->prepare("SELECT id,nombre,email,rol,activo,proveedor_id FROM usuarios WHERE id=? LIMIT 1");
+            $prevStmt = $db->prepare("SELECT id,nombre,email,rol,activo,departamento_id,dni FROM usuarios WHERE id=? LIMIT 1");
             $prevStmt->execute([(int)$d['id']]);
             $prev = $prevStmt->fetch() ?: [];
-                $proveedorId = isset($d['proveedor_id']) && $d['proveedor_id'] !== '' ? (int)$d['proveedor_id'] : null;
-                if (($d['rol'] ?? '') === 'taller' && !$proveedorId) { http_response_code(400); echo json_encode(['error'=>'Para rol Taller debes seleccionar un proveedor autorizado.']); break; }
+            $depId = isset($d['departamento_id']) && $d['departamento_id'] !== '' ? (int)$d['departamento_id'] : null;
+            $dni = isset($d['dni']) && trim($d['dni']) !== '' ? trim($d['dni']) : null;
             if ($d['password']) {
                 $hash = password_hash($d['password'], PASSWORD_DEFAULT);
-                     $db->prepare("UPDATE usuarios SET nombre=?,email=?,password=?,rol=?,activo=?,proveedor_id=? WHERE id=?")
-                         ->execute([$d['nombre'],$d['email'],$hash,$d['rol'],(int)$d['activo'],$proveedorId,$d['id']]);
+                $db->prepare("UPDATE usuarios SET nombre=?,email=?,password=?,rol=?,activo=?,departamento_id=?,dni=? WHERE id=?")
+                   ->execute([$d['nombre'],$d['email'],$hash,$d['rol'],(int)$d['activo'],$depId,$dni,$d['id']]);
             } else {
-                     $db->prepare("UPDATE usuarios SET nombre=?,email=?,rol=?,activo=?,proveedor_id=? WHERE id=?")
-                         ->execute([$d['nombre'],$d['email'],$d['rol'],(int)$d['activo'],$proveedorId,$d['id']]);
+                $db->prepare("UPDATE usuarios SET nombre=?,email=?,rol=?,activo=?,departamento_id=?,dni=? WHERE id=?")
+                   ->execute([$d['nombre'],$d['email'],$d['rol'],(int)$d['activo'],$depId,$dni,$d['id']]);
             }
             $after = $d;
             unset($after['password']);

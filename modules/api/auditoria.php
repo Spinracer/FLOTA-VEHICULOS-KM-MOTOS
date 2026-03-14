@@ -27,6 +27,7 @@ try {
     $entidad = trim($_GET['entidad'] ?? '');
     $accion  = trim($_GET['accion'] ?? '');
     $userId  = (int)($_GET['user_id'] ?? 0);
+    $userEmail = trim($_GET['user_email'] ?? '');
     $desde   = trim($_GET['desde'] ?? '');
     $hasta   = trim($_GET['hasta'] ?? '');
     $doExport = !empty($_GET['export']);
@@ -46,6 +47,10 @@ try {
     if ($userId > 0) {
         $where   .= " AND a.user_id = ?";
         $params[] = $userId;
+    }
+    if ($userEmail !== '') {
+        $where   .= " AND a.user_email = ?";
+        $params[] = $userEmail;
     }
     if ($desde !== '') {
         $where   .= " AND a.created_at >= ?";
@@ -108,15 +113,17 @@ try {
     }
     unset($row);
 
-    // Entidades y acciones únicas para filtros
+    // Entidades, acciones y usuarios únicos para filtros
     $entidades = $db->query("SELECT DISTINCT entidad FROM audit_logs ORDER BY entidad")->fetchAll(PDO::FETCH_COLUMN);
     $acciones  = $db->query("SELECT DISTINCT accion FROM audit_logs ORDER BY accion")->fetchAll(PDO::FETCH_COLUMN);
+    $usuarios  = $db->query("SELECT DISTINCT user_email FROM audit_logs WHERE user_email IS NOT NULL AND user_email != '' ORDER BY user_email")->fetchAll(PDO::FETCH_COLUMN);
 
     echo json_encode([
         'total'     => $total,
         'rows'      => $rows,
         'entidades' => $entidades,
         'acciones'  => $acciones,
+        'usuarios'  => $usuarios,
     ]);
 } catch (Throwable $e) {
     http_response_code(500);

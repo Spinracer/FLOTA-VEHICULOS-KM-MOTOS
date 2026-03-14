@@ -474,7 +474,7 @@ try {
 }
 
 try {
-  $pdo->exec("ALTER TABLE usuarios MODIFY COLUMN rol ENUM('coordinador_it','soporte','monitoreo','taller','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo'");
+  $pdo->exec("ALTER TABLE usuarios MODIFY COLUMN rol ENUM('coordinador_it','soporte','monitoreo','visitante','taller','admin','operador','lectura') NOT NULL DEFAULT 'monitoreo'");
   step('Compat: rol taller en usuarios', true);
 } catch (Throwable $e) {
   step('Compat: rol taller en usuarios', false, $e->getMessage());
@@ -1409,6 +1409,8 @@ try {
 foreach ([
     ['operadores', 'departamento_id', "INT NULL AFTER notas"],
     ['operadores', 'dni', "VARCHAR(30) NULL AFTER email"],
+    ['usuarios', 'departamento_id', "INT NULL AFTER activo"],
+    ['usuarios', 'dni', "VARCHAR(30) NULL AFTER activo"],
 ] as [$tbl, $col, $def]) {
     try {
         if (!$existsColumn($tbl, $col)) {

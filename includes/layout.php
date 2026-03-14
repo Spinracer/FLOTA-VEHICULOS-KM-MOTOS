@@ -73,7 +73,7 @@ tailwind.config = {
   <!-- Logo -->
   <div class="px-6 pt-7 pb-5 border-b border-border">
     <div class="font-heading font-extrabold text-[22px] text-accent tracking-tight">FlotaCtrl</div>
-    <div class="text-[11px] text-muted tracking-[2px] uppercase mt-0.5">Sistema de Flotas</div>
+    <div class="text-[11px] text-muted tracking-[2px] uppercase mt-0.5">IT y Seguridad</div>
   </div>
 
   <!-- Navigation -->

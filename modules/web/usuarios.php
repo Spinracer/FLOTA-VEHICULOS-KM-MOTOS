@@ -3,15 +3,26 @@ require_once __DIR__ . '/../../includes/layout.php';
 require_login();
 require_admin();
 $db = getDB();
-$proveedores_taller = $db->query("SELECT id,nombre FROM proveedores WHERE es_taller_autorizado=1 ORDER BY nombre")->fetchAll();
+$departamentos = $db->query("SELECT id,nombre FROM departamentos WHERE activo=1 ORDER BY nombre")->fetchAll();
 ob_start();
 ?>
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar usuario..." oninput="load()"></div>
+  <select id="fRol" onchange="load()" style="max-width:160px">
+    <option value="">Todos los roles</option>
+    <option value="coordinador_it">🔑 Coordinador IT</option>
+    <option value="soporte">🛠 Soporte</option>
+    <option value="monitoreo">👁 Monitoreo</option>
+    <option value="visitante">👤 Visitante</option>
+  </select>
+  <select id="fDep" onchange="load()" style="max-width:180px">
+    <option value="">Todos los departamentos</option>
+    <?php foreach($departamentos as $d): ?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['nombre'])?></option><?php endforeach; ?>
+  </select>
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Usuario</button>
 </div>
 <div class="table-wrap">
-  <table><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Creado</th><th>Acciones</th></tr></thead>
+  <table><thead><tr><th>Nombre</th><th>Email</th><th>DNI</th><th>Departamento</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
   <tbody id="tbody"></tbody></table>
 </div>
 <div class="modal-bg" id="modal">
@@ -23,27 +34,29 @@ ob_start();
       <div class="form-group"><label>Email *</label><input name="email" type="email" placeholder="usuario@empresa.com"></div>
       <div class="form-group"><label>Contraseña <span id="pass-note" style="color:var(--text2);font-size:10px">(requerida)</span></label>
         <input name="password" type="password" id="pass-input" placeholder="Mínimo 6 caracteres"></div>
+      <div class="form-group"><label>DNI <span style="color:var(--text2);font-size:10px">(opcional)</span></label>
+        <input name="dni" placeholder="Número de identidad"></div>
+      <div class="form-group"><label>Departamento</label>
+        <select name="departamento_id">
+          <option value="">— Sin departamento —</option>
+          <?php foreach($departamentos as $d): ?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['nombre'])?></option><?php endforeach; ?>
+        </select></div>
       <div class="form-group"><label>Rol</label>
         <select name="rol">
-          <option value="monitoreo">👁 Monitoreo (solo lectura)</option>
-          <option value="soporte">🛠 Soporte (crear/editar)</option>
-          <option value="taller">🏪 Taller (portal de mantenimientos)</option>
+          <option value="visitante">👤 Visitante (solo lectura)</option>
+          <option value="monitoreo">👁 Monitoreo (lectura operativa)</option>
+          <option value="soporte">🛠 Soporte (uso cotidiano)</option>
           <option value="coordinador_it">🔑 Coordinador IT (admin total)</option>
-        </select></div>
-      <div class="form-group"><label>Proveedor del taller</label>
-        <select name="proveedor_id">
-          <option value="">— Ninguno —</option>
-          <?php foreach($proveedores_taller as $p): ?><option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['nombre']) ?></option><?php endforeach; ?>
         </select></div>
       <div class="form-group"><label>Estado</label>
         <select name="activo"><option value="1">Activo</option><option value="0">Inactivo</option></select></div>
     </div>
     <div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--text2)">
       <strong style="color:var(--accent)">Roles del sistema:</strong><br>
-      🔑 <strong>Coordinador IT</strong> — Acceso total, administra usuarios y permisos<br>
-      🛠️ <strong>Soporte</strong> — Puede ver, crear y editar registros<br>
-      🏪 <strong>Taller</strong> — Portal acotado a mantenimientos y proveedor asignado<br>
-      👁️ <strong>Monitoreo</strong> — Solo puede visualizar información (lectura)
+      🔑 <strong>Coordinador IT</strong> — Acceso total, administra usuarios, permisos y todo el sistema<br>
+      🛠️ <strong>Soporte</strong> — Uso cotidiano: puede ver, crear y editar registros<br>
+      👁️ <strong>Monitoreo</strong> — Lectura operativa con visibilidad de datos<br>
+      👤 <strong>Visitante</strong> — Solo lectura básica, permisos asignables a gusto
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal')">Cancelar</button><button class="btn btn-primary" onclick="guardar()">Guardar</button></div>
   </div>
@@ -51,19 +64,25 @@ ob_start();
 <script>
 async function load(){
   const q=(document.getElementById('s').value||'').toLowerCase();
+  const fRol=document.getElementById('fRol').value;
+  const fDep=document.getElementById('fDep').value;
   const data=await api('/api/usuarios.php');
-  const rows=data.rows.filter(u=>!q||u.nombre.toLowerCase().includes(q)||u.email.toLowerCase().includes(q));
-  const EB={'coordinador_it':'badge-yellow','soporte':'badge-blue','monitoreo':'badge-cyan','taller':'badge-orange','admin':'badge-yellow','operador':'badge-blue','lectura':'badge-gray'};
-  const RL={'coordinador_it':'Coordinador IT','soporte':'Soporte','monitoreo':'Monitoreo','taller':'Taller','admin':'Admin','operador':'Operador','lectura':'Lectura'};
+  let rows=data.rows;
+  if(q) rows=rows.filter(u=>u.nombre.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.dni||'').toLowerCase().includes(q));
+  if(fRol) rows=rows.filter(u=>u.rol===fRol);
+  if(fDep) rows=rows.filter(u=>String(u.departamento_id)===fDep);
+  const EB={'coordinador_it':'badge-yellow','soporte':'badge-blue','monitoreo':'badge-cyan','visitante':'badge-gray','admin':'badge-yellow','taller':'badge-orange','operador':'badge-blue','lectura':'badge-gray'};
+  const RL={'coordinador_it':'Coordinador IT','soporte':'Soporte','monitoreo':'Monitoreo','visitante':'Visitante','admin':'Admin','taller':'Taller','operador':'Operador','lectura':'Lectura'};
   const tbody=document.getElementById('tbody');
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><div class="empty-icon">🔑</div><div class="empty-title">Sin usuarios</div></div></td></tr>`;return;}
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🔑</div><div class="empty-title">Sin usuarios</div></div></td></tr>`;return;}
   tbody.innerHTML=rows.map(u=>`<tr>
     <td><strong>${u.nombre}</strong></td>
     <td>${u.email}</td>
+    <td>${u.dni||'—'}</td>
+    <td>${u.departamento||'—'}</td>
     <td><span class="badge ${EB[u.rol]||'badge-gray'}">${RL[u.rol]||u.rol}</span></td>
     <td><span class="badge ${u.activo=='1'?'badge-green':'badge-red'}">${u.activo=='1'?'Activo':'Inactivo'}</span></td>
     <td>${u.ultimo_acceso||'—'}</td>
-    <td>${u.created_at?.split(' ')[0]||'—'}</td>
     <td><div class="action-btns">
       <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(u)})'>✏️</button>
       <button class="btn btn-danger btn-sm" onclick="del(${u.id})">🗑️</button>
@@ -80,7 +99,7 @@ function editar(u){
   document.getElementById('mtitle').textContent='✏️ Editar Usuario';
   document.getElementById('pass-note').textContent='(dejar vacío para no cambiar)';
   document.getElementById('pass-input').required=false;
-  fillForm('modal',{id:u.id,nombre:u.nombre,email:u.email,rol:u.rol,activo:u.activo,proveedor_id:u.proveedor_id});
+  fillForm('modal',{id:u.id,nombre:u.nombre,email:u.email,rol:u.rol,activo:u.activo,departamento_id:u.departamento_id||'',dni:u.dni||''});
   document.querySelector('#modal [name=password]').value='';
   openModal('modal');
 }
@@ -88,7 +107,6 @@ async function guardar(){
   const d=getForm('modal');
   if(!d.nombre||!d.email){toast('Nombre y email son obligatorios','error');return;}
   if(!d.id&&!d.password){toast('La contraseña es obligatoria para nuevos usuarios','error');return;}
-  if(d.rol==='taller'&&!d.proveedor_id){toast('Selecciona un proveedor autorizado para el rol Taller','error');return;}
   try{await api('/api/usuarios.php',d.id?'PUT':'POST',d);toast(d.id?'Usuario actualizado':'Usuario creado');closeModal('modal');load();}catch(e){}
 }
 async function del(id){confirmDelete('¿Eliminar este usuario?',async()=>{try{await api(`/api/usuarios.php?id=${id}`,'DELETE');toast('Usuario eliminado','warning');load();}catch(e){}});}

@@ -13,6 +13,9 @@ ob_start();
   <select id="fAccion" onchange="load()" style="max-width:160px">
     <option value="">Todas las acciones</option>
   </select>
+  <select id="fUsuario" onchange="load()" style="max-width:200px">
+    <option value="">Todos los usuarios</option>
+  </select>
   <input type="date" id="fDesde" onchange="load()" title="Desde" style="max-width:160px">
   <input type="date" id="fHasta" onchange="load()" title="Hasta" style="max-width:160px">
   <div class="export-group" style="display:inline-flex;gap:4px;margin-left:auto;">
@@ -45,9 +48,10 @@ async function load() {
   const q      = document.getElementById('s').value;
   const ent    = document.getElementById('fEntidad').value;
   const acc    = document.getElementById('fAccion').value;
+  const usr    = document.getElementById('fUsuario').value;
   const desde  = document.getElementById('fDesde').value;
   const hasta  = document.getElementById('fHasta').value;
-  const url    = `/api/auditoria.php?q=${encodeURIComponent(q)}&entidad=${encodeURIComponent(ent)}&accion=${encodeURIComponent(acc)}&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&page=${pager.page}&per=${pager.perPage}`;
+  const url    = `/api/auditoria.php?q=${encodeURIComponent(q)}&entidad=${encodeURIComponent(ent)}&accion=${encodeURIComponent(acc)}&user_email=${encodeURIComponent(usr)}&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&page=${pager.page}&per=${pager.perPage}`;
   const data   = await api(url);
   pager.setTotal(data.total);
 
@@ -59,6 +63,10 @@ async function load() {
   const selAcc = document.getElementById('fAccion');
   if (selAcc.options.length <= 1 && data.acciones) {
     data.acciones.forEach(a => { const o = new Option(a, a); selAcc.appendChild(o); });
+  }
+  const selUsr = document.getElementById('fUsuario');
+  if (selUsr.options.length <= 1 && data.usuarios) {
+    data.usuarios.forEach(u => { const o = new Option(u, u); selUsr.appendChild(o); });
   }
 
   const tbody = document.getElementById('tbody');
@@ -110,11 +118,13 @@ function exportAudit(format, all) {
     const q     = document.getElementById('s').value;
     const ent   = document.getElementById('fEntidad').value;
     const acc   = document.getElementById('fAccion').value;
+    const usr   = document.getElementById('fUsuario').value;
     const desde = document.getElementById('fDesde').value;
     const hasta = document.getElementById('fHasta').value;
     if (q)     qs += `&q=${encodeURIComponent(q)}`;
     if (ent)   qs += `&entidad=${encodeURIComponent(ent)}`;
     if (acc)   qs += `&accion=${encodeURIComponent(acc)}`;
+    if (usr)   qs += `&user_email=${encodeURIComponent(usr)}`;
     if (desde) qs += `&desde=${encodeURIComponent(desde)}`;
     if (hasta) qs += `&hasta=${encodeURIComponent(hasta)}`;
   }
