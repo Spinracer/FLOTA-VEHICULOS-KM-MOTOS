@@ -241,7 +241,7 @@ class AttachmentWidget {
     for (const f of this.pendingFiles) fd.append('archivo[]', f);
     fd.append('_csrf_token', getCsrfToken());
     try {
-      const res = await fetch('/api/attachments.php', {method:'POST', body: fd});
+      const res = await fetch('/api/attachments.php', {method:'POST', headers:{'X-CSRF-Token': getCsrfToken()}, body: fd});
       if (!res.ok) throw new Error('Error al subir');
       const d = await res.json();
       this.pendingFiles = [];
