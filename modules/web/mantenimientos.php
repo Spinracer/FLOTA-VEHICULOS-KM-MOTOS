@@ -315,19 +315,19 @@ async function aprobar(mantId) {
 }
 
 // ═══ Componentes para items ═══
+const TIPO_COMP = {tool:'🔧',safety:'🦺',document:'📄',card:'💳',accessory:'🔩',part:'⚙️',consumable:'🛢️',service:'🔨'};
 async function loadComponents(vehiculoId) {
   const sel = document.getElementById('selComponentItem');
   if (!sel) return;
   sel.innerHTML = '<option value="">— Sin componente —</option>';
-  if (!vehiculoId) return;
   try {
-    const data = await api(`/api/componentes.php?vehiculo_id=${vehiculoId}`);
+    const data = await api('/api/componentes.php?section=catalog&per=500&activo=1');
     (data.rows || []).forEach(c => {
-      sel.innerHTML += `<option value="${c.id}">${c.tipo}: ${c.marca||''} ${c.modelo||''} ${c.numero_serie||''}</option>`;
+      sel.innerHTML += `<option value="${c.id}">${TIPO_COMP[c.tipo]||'📦'} ${c.nombre}</option>`;
     });
   } catch(e) {}
 }
 
-document.addEventListener('DOMContentLoaded', () => { load(); checkPendingApprovals(); });
+document.addEventListener('DOMContentLoaded', () => { load(); checkPendingApprovals(); loadComponents(); });
 </script>
 <?php $content=ob_get_clean(); echo render_layout('Mantenimientos / OT','mantenimientos',$content); ?>

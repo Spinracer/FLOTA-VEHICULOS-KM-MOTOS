@@ -8,11 +8,14 @@ ob_start();
   <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar componente..." oninput="load()"></div>
   <select id="fTipo" onchange="load()" style="max-width:180px">
     <option value="">Todos los tipos</option>
+    <option value="part">⚙️ Refacción</option>
+    <option value="consumable">🛢️ Consumible</option>
+    <option value="service">🔨 Servicio</option>
     <option value="tool">🔧 Herramienta</option>
     <option value="safety">🦺 Seguridad</option>
+    <option value="accessory">🔩 Accesorio</option>
     <option value="document">📄 Documento</option>
     <option value="card">💳 Tarjeta</option>
-    <option value="accessory">🔩 Accesorio</option>
   </select>
   <!-- Tabs: Catálogo vs Por Vehículo -->
   <div style="display:flex;gap:8px;margin-left:auto">
@@ -74,11 +77,14 @@ ob_start();
       <div class="form-group"><label>Nombre *</label><input name="nombre" placeholder="Gato hidráulico"></div>
       <div class="form-group"><label>Tipo</label>
         <select name="tipo">
+          <option value="part">⚙️ Refacción</option>
+          <option value="consumable">🛢️ Consumible</option>
+          <option value="service">🔨 Servicio</option>
           <option value="tool">🔧 Herramienta</option>
           <option value="safety">🦺 Seguridad</option>
+          <option value="accessory">🔩 Accesorio</option>
           <option value="document">📄 Documento</option>
           <option value="card">💳 Tarjeta</option>
-          <option value="accessory">🔩 Accesorio</option>
         </select>
       </div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Descripción del componente..."></textarea></div>
@@ -128,8 +134,8 @@ ob_start();
 <script>
 /* ═══ Estado global ═══ */
 let currentTab = 'catalog';
-const TIPO_LABELS = {tool:'🔧 Herramienta',safety:'🦺 Seguridad',document:'📄 Documento',card:'💳 Tarjeta',accessory:'🔩 Accesorio'};
-const TIPO_BADGE  = {tool:'badge-blue',safety:'badge-orange',document:'badge-cyan',card:'badge-yellow',accessory:'badge-gray'};
+const TIPO_LABELS = {part:'⚙️ Refacción',consumable:'🛢️ Consumible',service:'🔨 Servicio',tool:'🔧 Herramienta',safety:'🦺 Seguridad',document:'📄 Documento',card:'💳 Tarjeta',accessory:'🔩 Accesorio'};
+const TIPO_BADGE  = {part:'badge-blue',consumable:'badge-cyan',service:'badge-green',tool:'badge-yellow',safety:'badge-orange',document:'badge-gray',card:'badge-gray',accessory:'badge-gray'};
 const EST_BADGE   = {Bueno:'badge-green',Regular:'badge-yellow',Malo:'badge-red',Faltante:'badge-gray'};
 
 const pagerCat = new Paginator('pgrCatalog', loadCatalog, 25);

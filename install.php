@@ -319,7 +319,7 @@ $tables = [
 "components" => "CREATE TABLE IF NOT EXISTS components (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   nombre       VARCHAR(150) NOT NULL,
-  tipo         ENUM('tool','safety','document','card','accessory') NOT NULL DEFAULT 'tool',
+  tipo         ENUM('tool','safety','document','card','accessory','part','consumable','service') NOT NULL DEFAULT 'part',
   descripcion  TEXT NULL,
   activo       TINYINT(1) NOT NULL DEFAULT 1,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1304,6 +1304,68 @@ try {
     step('Components: stock_minimo', true);
   } else { step('Components: stock_minimo', true, 'Ya existe'); }
 } catch (Throwable $e) { step('Components: stock_minimo', false, $e->getMessage()); }
+
+// -- Ampliar enum de tipos de componentes para mantenimiento vehicular
+try {
+  $pdo->exec("ALTER TABLE components MODIFY COLUMN tipo ENUM('tool','safety','document','card','accessory','part','consumable','service') NOT NULL DEFAULT 'part'");
+  step('Components: tipos ampliados (part/consumable/service)', true);
+} catch (Throwable $e) { step('Components: tipos ampliados', true, 'Ya actualizado o: ' . $e->getMessage()); }
+
+// -- Eliminar duplicados de components (conservar el id más bajo por nombre+tipo)
+try {
+  $dupCount = (int)$pdo->query("SELECT COUNT(*) FROM components c1 WHERE EXISTS (SELECT 1 FROM components c2 WHERE c2.nombre = c1.nombre AND c2.tipo = c1.tipo AND c2.id < c1.id)")->fetchColumn();
+  if ($dupCount > 0) {
+    $pdo->exec("DELETE c1 FROM components c1 INNER JOIN components c2 ON c1.nombre = c2.nombre AND c1.tipo = c2.tipo AND c1.id > c2.id");
+    step("Components: $dupCount duplicados eliminados", true);
+  } else {
+    step('Components: sin duplicados', true);
+  }
+} catch (Throwable $e) { step('Components: limpieza duplicados', false, $e->getMessage()); }
+
+// -- Agregar UNIQUE en nombre+tipo para evitar futuros duplicados
+try {
+  $idxExists = (int)$pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'components' AND INDEX_NAME = 'uq_components_nombre_tipo'")->fetchColumn();
+  if (!$idxExists) {
+    $pdo->exec("ALTER TABLE components ADD UNIQUE INDEX uq_components_nombre_tipo (nombre, tipo)");
+    step('Components: UNIQUE nombre+tipo', true);
+  } else { step('Components: UNIQUE nombre+tipo', true, 'Ya existe'); }
+} catch (Throwable $e) { step('Components: UNIQUE nombre+tipo', false, $e->getMessage()); }
+
+// -- Semilla de componentes de mantenimiento vehicular
+try {
+  $pdo->exec("INSERT IGNORE INTO components (nombre,tipo,descripcion) VALUES
+    ('Aceite de motor','consumable','Aceite lubricante para motor (5W-30, 10W-40, etc.)'),
+    ('Filtro de aceite','consumable','Filtro para aceite de motor'),
+    ('Filtro de aire','consumable','Filtro de aire del motor'),
+    ('Filtro de combustible','consumable','Filtro de gasolina/diésel'),
+    ('Filtro de cabina','consumable','Filtro de aire acondicionado/habitáculo'),
+    ('Pastillas de freno','part','Juego de pastillas/balatas de freno'),
+    ('Discos de freno','part','Discos de freno delanteros o traseros'),
+    ('Líquido de frenos','consumable','Líquido/fluido de frenos DOT3/DOT4'),
+    ('Anticongelante','consumable','Refrigerante/anticongelante del motor'),
+    ('Batería','part','Batería/acumulador del vehículo'),
+    ('Bujías','part','Juego de bujías de encendido'),
+    ('Banda serpentina','part','Banda/correa de accesorios'),
+    ('Banda de distribución','part','Kit de distribución (banda + tensores)'),
+    ('Amortiguadores','part','Amortiguador delantero o trasero'),
+    ('Llanta','part','Llanta/neumático'),
+    ('Alineación y balanceo','service','Servicio de alineación y balanceo'),
+    ('Rotación de llantas','service','Servicio de rotación de neumáticos'),
+    ('Líquido de transmisión','consumable','Aceite/fluido de transmisión automática o manual'),
+    ('Líquido dirección hidráulica','consumable','Fluido de dirección asistida'),
+    ('Limpiabrisas','accessory','Par de plumas/escobillas limpiaparabrisas'),
+    ('Focos/Faros','part','Foco o lámpara de faro delantero/trasero'),
+    ('Fusibles','part','Juego de fusibles de repuesto'),
+    ('Lavado general','service','Servicio de lavado exterior e interior'),
+    ('Diagnóstico computarizado','service','Escaneo electrónico OBD2/diagnóstico'),
+    ('Cambio de aceite completo','service','Servicio de cambio de aceite + filtro'),
+    ('Afinación mayor','service','Servicio de afinación completa (bujías, filtros, aceite)'),
+    ('Afinación menor','service','Servicio de afinación básica (filtro aire + aceite)'),
+    ('Reparación de frenos','service','Servicio de revisión y reparación de frenos'),
+    ('Clutch/Embrague','part','Kit de clutch (disco, plato, collarín)')
+  ");
+  step('Semilla componentes mantenimiento vehicular', true);
+} catch (Throwable $e) { step('Semilla componentes mantenimiento', true, 'Ya existen o: ' . $e->getMessage()); }
 
 // 3.17 Centro de Alertas Unificado (Objetivo 6)
 // ═══════════════════════════════════════════════════
