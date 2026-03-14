@@ -100,7 +100,7 @@ ob_start();
         </div>
         <div id="firma-entrega-digital-area" style="display:none">
           <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Dibuje la firma del operador en el recuadro o envíe un link:</p>
-          <canvas id="firma-entrega-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#1a1e27;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
+          <canvas id="firma-entrega-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#ffffff;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
           <div style="display:flex;gap:8px">
             <button class="btn btn-ghost btn-sm" onclick="clearFirmaEntrega()">Limpiar</button>
             <button class="btn btn-ghost btn-sm" id="btn-link-entrega" onclick="enviarLinkFirmaEntrega()" title="Guarda primero, luego genera el link">📲 Enviar link al operador</button>
@@ -153,7 +153,7 @@ ob_start();
         </div>
         <div id="firma-digital-area" style="display:none">
           <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Dibuje la firma en el recuadro o envíe un link al operador:</p>
-          <canvas id="firma-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#1a1e27;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
+          <canvas id="firma-canvas" width="400" height="150" style="border:1px solid var(--border);border-radius:6px;background:#ffffff;cursor:crosshair;display:block;margin-bottom:6px"></canvas>
           <div style="display:flex;gap:8px">
             <button class="btn btn-ghost btn-sm" onclick="clearFirma()">Limpiar</button>
             <button class="btn btn-ghost btn-sm" onclick="enviarLinkFirma()">📲 Enviar link al operador</button>
@@ -284,15 +284,26 @@ const firmaCanvas = document.getElementById('firma-canvas');
 const firmaCtx = firmaCanvas ? firmaCanvas.getContext('2d') : null;
 if (firmaCanvas) {
   firmaCanvas.addEventListener('mousedown', e => { firmaDrawing = true; firmaCtx.beginPath(); firmaCtx.moveTo(e.offsetX, e.offsetY); });
-  firmaCanvas.addEventListener('mousemove', e => { if (!firmaDrawing) return; firmaCtx.lineTo(e.offsetX, e.offsetY); firmaCtx.strokeStyle = '#e8ff47'; firmaCtx.lineWidth = 2; firmaCtx.stroke(); });
+  firmaCanvas.addEventListener('mousemove', e => { if (!firmaDrawing) return; firmaCtx.lineTo(e.offsetX, e.offsetY); firmaCtx.strokeStyle = '#1a1a1a'; firmaCtx.lineWidth = 2.5; firmaCtx.lineCap = 'round'; firmaCtx.stroke(); });
   firmaCanvas.addEventListener('mouseup', () => firmaDrawing = false);
   firmaCanvas.addEventListener('mouseleave', () => firmaDrawing = false);
   // Touch support
   firmaCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaDrawing = true; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.beginPath(); firmaCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
-  firmaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaDrawing) return; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaCtx.strokeStyle = '#e8ff47'; firmaCtx.lineWidth = 2; firmaCtx.stroke(); });
+  firmaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaDrawing) return; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaCtx.strokeStyle = '#1a1a1a'; firmaCtx.lineWidth = 2.5; firmaCtx.lineCap = 'round'; firmaCtx.stroke(); });
   firmaCanvas.addEventListener('touchend', () => firmaDrawing = false);
 }
 function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); } }
+
+// Export canvas with white background (CSS bg not included in toDataURL)
+function canvasToDataURL(canvas) {
+  const tmp = document.createElement('canvas');
+  tmp.width = canvas.width; tmp.height = canvas.height;
+  const tctx = tmp.getContext('2d');
+  tctx.fillStyle = '#ffffff';
+  tctx.fillRect(0, 0, tmp.width, tmp.height);
+  tctx.drawImage(canvas, 0, 0);
+  return tmp.toDataURL('image/png');
+}
 
 // ── Firma entrega canvas (modal-new) ──
 let firmaEntregaDrawing = false;
@@ -300,11 +311,11 @@ const firmaEntregaCanvas = document.getElementById('firma-entrega-canvas');
 const firmaEntregaCtx = firmaEntregaCanvas ? firmaEntregaCanvas.getContext('2d') : null;
 if (firmaEntregaCanvas) {
   firmaEntregaCanvas.addEventListener('mousedown', e => { firmaEntregaDrawing = true; firmaEntregaCtx.beginPath(); firmaEntregaCtx.moveTo(e.offsetX, e.offsetY); });
-  firmaEntregaCanvas.addEventListener('mousemove', e => { if (!firmaEntregaDrawing) return; firmaEntregaCtx.lineTo(e.offsetX, e.offsetY); firmaEntregaCtx.strokeStyle = '#e8ff47'; firmaEntregaCtx.lineWidth = 2; firmaEntregaCtx.stroke(); });
+  firmaEntregaCanvas.addEventListener('mousemove', e => { if (!firmaEntregaDrawing) return; firmaEntregaCtx.lineTo(e.offsetX, e.offsetY); firmaEntregaCtx.strokeStyle = '#1a1a1a'; firmaEntregaCtx.lineWidth = 2.5; firmaEntregaCtx.lineCap = 'round'; firmaEntregaCtx.stroke(); });
   firmaEntregaCanvas.addEventListener('mouseup', () => firmaEntregaDrawing = false);
   firmaEntregaCanvas.addEventListener('mouseleave', () => firmaEntregaDrawing = false);
   firmaEntregaCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaEntregaDrawing = true; const t = e.touches[0]; const r = firmaEntregaCanvas.getBoundingClientRect(); firmaEntregaCtx.beginPath(); firmaEntregaCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
-  firmaEntregaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaEntregaDrawing) return; const t = e.touches[0]; const r = firmaEntregaCanvas.getBoundingClientRect(); firmaEntregaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaEntregaCtx.strokeStyle = '#e8ff47'; firmaEntregaCtx.lineWidth = 2; firmaEntregaCtx.stroke(); });
+  firmaEntregaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaEntregaDrawing) return; const t = e.touches[0]; const r = firmaEntregaCanvas.getBoundingClientRect(); firmaEntregaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaEntregaCtx.strokeStyle = '#1a1a1a'; firmaEntregaCtx.lineWidth = 2.5; firmaEntregaCtx.lineCap = 'round'; firmaEntregaCtx.stroke(); });
   firmaEntregaCanvas.addEventListener('touchend', () => firmaEntregaDrawing = false);
 }
 function clearFirmaEntrega() { if (firmaEntregaCtx) { firmaEntregaCtx.clearRect(0, 0, firmaEntregaCanvas.width, firmaEntregaCanvas.height); } }
@@ -411,7 +422,7 @@ async function saveNewAndGetId() {
   const feRadio = document.querySelector('#modal-new [name="firma_entrega_tipo"]:checked');
   d.firma_entrega_tipo = feRadio ? feRadio.value : 'ninguna';
   if (d.firma_entrega_tipo === 'digital' && firmaEntregaCanvas) {
-    d.firma_entrega_data = firmaEntregaCanvas.toDataURL('image/png');
+    d.firma_entrega_data = canvasToDataURL(firmaEntregaCanvas);
   }
   const res = await api('/api/asignaciones.php', 'POST', d);
   _lastNewId = res.id;
@@ -541,7 +552,7 @@ async function saveClose(){
   const firmaRadio = document.querySelector('#modal-close [name="firma_tipo"]:checked');
   d.firma_tipo = firmaRadio ? firmaRadio.value : 'ninguna';
   if (d.firma_tipo === 'digital' && firmaCanvas) {
-    d.firma_data = firmaCanvas.toDataURL('image/png');
+    d.firma_data = canvasToDataURL(firmaCanvas);
   }
   await api('/api/asignaciones.php', 'PUT', { ...d, action: 'close' });
   toast('Asignación cerrada');

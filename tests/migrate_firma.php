@@ -2,27 +2,15 @@
 require_once __DIR__ . '/../includes/db.php';
 $db = getDB();
 
-// Add firma_entrega_token column
-try {
-    $db->exec("ALTER TABLE asignaciones ADD COLUMN firma_entrega_token VARCHAR(128) NULL");
-    echo "firma_entrega_token: ADDED\n";
-} catch (Throwable $e) {
-    echo "firma_entrega_token: " . $e->getMessage() . "\n";
-}
+// Clear corrupted transparent firma data for all assignments
+$s = $db->prepare("UPDATE asignaciones SET firma_data = NULL, firma_tipo = 'ninguna', firma_fecha = NULL, firma_ip = NULL WHERE firma_data IS NOT NULL");
+$s->execute();
+echo "Cleared " . $s->rowCount() . " corrupted firma(s)\n";
 
-// Create vehicle_checklist_items table
-try {
-    $db->exec("CREATE TABLE IF NOT EXISTS vehicle_checklist_items (
-        id            INT AUTO_INCREMENT PRIMARY KEY,
-        vehiculo_id   INT NOT NULL,
-        label         VARCHAR(120) NOT NULL,
-        requerido     TINYINT(1) NOT NULL DEFAULT 0,
-        created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_vci_vehiculo (vehiculo_id),
-        FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    echo "vehicle_checklist_items: OK\n";
-} catch (Throwable $e) {
-    echo "vehicle_checklist_items: " . $e->getMessage() . "\n";
+// Verify
+$s = $db->prepare("SELECT id, firma_tipo, firma_data IS NOT NULL as has_data, firma_token FROM asignaciones ORDER BY id DESC LIMIT 5");
+$s->execute();
+foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    echo "ID={$r['id']} tipo={$r['firma_tipo']} has_data={$r['has_data']} token=" . ($r['firma_token'] ? 'yes' : 'no') . "\n";
 }
-echo "DONE\n";
+echo "DONE - Users can now re-sign via their existing links\n";

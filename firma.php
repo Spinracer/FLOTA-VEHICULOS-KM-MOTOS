@@ -137,15 +137,19 @@ tailwind.config = {
   </div>
 
   <?php if ($yaFirmado): ?>
-    <div class="bg-success/10 border border-success text-success px-4 py-3.5 rounded-lg text-center text-sm mt-3">✅ Esta asignación ya fue firmada el <?= $asig['firma_fecha'] ?>.</div>
-    <?php if ($asig['firma_data']): ?>
+    <?php 
+      $fData = $momento === 'entrega' ? ($asig['firma_entrega_data'] ?? '') : ($asig['firma_data'] ?? '');
+      $fFecha = $momento === 'entrega' ? ($asig['firma_entrega_fecha'] ?? '') : ($asig['firma_fecha'] ?? '');
+    ?>
+    <div class="bg-success/10 border border-success text-success px-4 py-3.5 rounded-lg text-center text-sm mt-3">✅ Esta asignación ya fue firmada el <?= htmlspecialchars($fFecha) ?>.</div>
+    <?php if ($fData): ?>
       <div class="text-center mt-3">
-        <img src="<?= htmlspecialchars($asig['firma_data']) ?>" alt="Firma" class="max-w-[300px] mx-auto border border-border rounded-lg bg-white p-2">
+        <img src="<?= htmlspecialchars($fData) ?>" alt="Firma" class="max-w-[300px] mx-auto border border-border rounded-lg bg-white p-2">
       </div>
     <?php endif; ?>
   <?php else: ?>
     <p class="text-[13px] text-muted mb-1">Dibuje su firma en el recuadro:</p>
-    <canvas id="sig-canvas" width="460" height="180" class="block w-full border-2 border-dashed border-border rounded-lg bg-dark cursor-crosshair touch-none my-3"></canvas>
+    <canvas id="sig-canvas" width="460" height="180" class="block w-full border-2 border-dashed border-border rounded-lg bg-white cursor-crosshair touch-none my-3"></canvas>
     <div class="flex gap-3 mt-3">
       <button class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-transparent text-muted border border-border hover:bg-surface2 transition-colors" onclick="clearSig()">🗑 Limpiar</button>
       <button class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-dark hover:brightness-90 transition-all" onclick="submitSig()" id="btnSubmit">✅ Firmar</button>
