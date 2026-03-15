@@ -26,7 +26,10 @@ ob_start();
   </table>
 </div>
 
-<div class="section-title" style="margin-top:18px">⚙️ Configuración global</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px">
+  <div class="section-title" style="margin:0">⚙️ Configuración global</div>
+  <button class="btn btn-primary" onclick="newSetting()">+ Parámetro</button>
+</div>
 <div class="table-wrap">
   <table>
     <thead>
@@ -193,14 +196,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadCatalogs();
   await loadItems();
   await loadSettings();
-  const topbar = document.getElementById('topbar-actions');
-  if(topbar){
-    const b = document.createElement('button');
-    b.className = 'btn btn-primary';
-    b.textContent = '+ Parámetro';
-    b.onclick = newSetting;
-    topbar.appendChild(b);
-  }
 });
 </script>
 

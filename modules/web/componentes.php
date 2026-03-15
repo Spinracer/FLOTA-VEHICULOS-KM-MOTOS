@@ -172,7 +172,7 @@ async function loadCatalog() {
     <td class="td-truncate">${r.descripcion||'—'}</td>
     <td><span class="badge ${stkClass}">${stk}</span></td>
     <td>${min}</td>
-    <td><span class="badge ${r.activo==='1'?'badge-green':'badge-red'}">${r.activo==='1'?'Activo':'Inactivo'}</span></td>
+    <td><span class="badge ${Number(r.activo)?'badge-green':'badge-red'}">${Number(r.activo)?'Activo':'Inactivo'}</span></td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       <button class="btn btn-ghost btn-sm" onclick='editarCatalogo(${JSON.stringify(r)})'>✏️</button>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delCatalogo(${r.id})">🗑️</button><?php endif; ?>
