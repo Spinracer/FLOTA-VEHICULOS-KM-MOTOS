@@ -183,7 +183,7 @@ class AttachmentWidget {
       <div class="att-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:13px;font-weight:600;color:var(--accent2)">📎 Adjuntos (${this.attachments.length})</span>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0">
-          + Archivo <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="window._attWidget_${this.container.id}.onFiles(this.files)">
+          + Archivo <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="window['_attWidget_${this.container.id}'].onFiles(this.files)">
         </label>
       </div>`;
 
@@ -196,7 +196,7 @@ class AttachmentWidget {
           ${preview}
           <div style="display:flex;align-items:center;gap:4px;padding:2px 4px">
             <span style="flex:1;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
-            <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px" onclick="window._attWidget_${this.container.id}.removePending(${i})">✕</button>
+            <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px" onclick="window['_attWidget_${this.container.id}'].removePending(${i})">✕</button>
           </div>
         </div>`;
       }).join('');
@@ -212,7 +212,7 @@ class AttachmentWidget {
             <a href="${url}" target="_blank"><img src="${url}" alt="${a.original_name}" style="width:100%;height:80px;object-fit:cover;display:block" loading="lazy"></a>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px">
               <span style="font-size:9px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${a.original_name}</span>
-              <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
+              <button class="btn btn-ghost btn-sm" style="padding:1px 4px;font-size:10px;color:var(--danger)" onclick="window['_attWidget_${this.container.id}'].deleteAtt(${a.id})" title="Eliminar">🗑️</button>
             </div>
           </div>`;
         }
@@ -220,7 +220,7 @@ class AttachmentWidget {
           <span style="font-size:12px">📄</span>
           <a href="${url}" target="_blank" style="flex:1;font-size:12px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.original_name}">${a.original_name}</a>
           <span style="font-size:11px;color:var(--text2)">${fmtSize(a.size_bytes)}</span>
-          <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="window._attWidget_${this.container.id}.deleteAtt(${a.id})" title="Eliminar">🗑️</button>
+          <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="window['_attWidget_${this.container.id}'].deleteAtt(${a.id})" title="Eliminar">🗑️</button>
         </div>`;
       }).join('');
       html += `</div>`;

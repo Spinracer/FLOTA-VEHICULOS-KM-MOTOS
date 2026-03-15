@@ -1,5 +1,24 @@
 # Guía de Despliegue — FlotaControl
 
+## Instalación Rápida (Script Interactivo)
+
+La forma más rápida de desplegar es usar el script interactivo que te pide todos los datos:
+
+```bash
+# En el servidor Ubuntu:
+sudo bash deploy.sh
+```
+
+El script configura automáticamente: dependencias, BD, Nginx, PHP-FPM, SSL, cron de purga y backups. Solo rellena lo que te pida.
+
+> **Nota:** Si tienes discos ya montados con datos, el script **NO** formatea nada. Solo crea los subdirectorios necesarios y un symlink.
+
+---
+
+## Instalación Manual (paso a paso)
+
+Si prefieres configurar todo manualmente, sigue los pasos a continuación.
+
 ## Requisitos del Servidor
 
 | Componente | Mínimo | Recomendado |

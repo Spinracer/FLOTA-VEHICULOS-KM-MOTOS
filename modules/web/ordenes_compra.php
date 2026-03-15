@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../includes/layout.php';
 require_login();
 $db = getDB();
 $vehiculos = $db->query("SELECT id,placa,marca,modelo FROM vehiculos WHERE deleted_at IS NULL ORDER BY placa")->fetchAll();
-$proveedores = $db->query("SELECT id,nombre FROM proveedores WHERE activo=1 ORDER BY nombre")->fetchAll();
+$proveedores = $db->query("SELECT id,nombre FROM proveedores ORDER BY nombre")->fetchAll();
 $isAdmin = in_array(current_user()['rol'], ['coordinador_it','admin']);
 ob_start();
 ?>
