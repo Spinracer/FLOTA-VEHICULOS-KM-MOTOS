@@ -366,7 +366,13 @@ try {
                 break;
             }
 
-            odometro_validar_km($db, $vehiculoId, $startKm, $allowOverride, $overrideReason ?: null);
+            try {
+                odometro_validar_km($db, $vehiculoId, $startKm, $allowOverride, $overrideReason ?: null);
+            } catch (RuntimeException $re) {
+                http_response_code(400);
+                echo json_encode(['error' => $re->getMessage()]);
+                break;
+            }
 
             $db->beginTransaction();
             try {
@@ -481,7 +487,13 @@ try {
 
             $overrideReason = trim((string)($d['override_reason'] ?? ''));
             $allowOverride = can('manage_permissions') && $overrideReason !== '';
-            odometro_validar_km($db, $vehiculoId, $endKm, $allowOverride, $overrideReason ?: null);
+            try {
+                odometro_validar_km($db, $vehiculoId, $endKm, $allowOverride, $overrideReason ?: null);
+            } catch (RuntimeException $re) {
+                http_response_code(400);
+                echo json_encode(['error' => $re->getMessage()]);
+                break;
+            }
 
             $db->beginTransaction();
             try {

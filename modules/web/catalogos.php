@@ -27,16 +27,7 @@ ob_start();
 </div>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px">
-  <div class="section-title" style="margin:0">⚙️ Configuración global</div>
-  <button class="btn btn-primary" onclick="newSetting()">+ Parámetro</button>
-</div>
-<div class="table-wrap">
-  <table>
-    <thead>
-      <tr><th>Clave</th><th>Valor texto</th><th>Valor numérico</th><th>Descripción</th><th>Acciones</th></tr>
-    </thead>
-    <tbody id="tbody-settings"></tbody>
-  </table>
+  <div id="pgr"></div>
 </div>
 
 <div class="modal-bg" id="modal-cat">
@@ -50,20 +41,6 @@ ob_start();
       <div class="form-group"><label>Activo</label><select name="activo"><option value="1">Sí</option><option value="0">No</option></select></div>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-cat')">Cancelar</button><button class="btn btn-primary" onclick="saveItem()">Guardar</button></div>
-  </div>
-</div>
-
-<div class="modal-bg" id="modal-setting">
-  <div class="modal">
-    <div class="modal-title" id="mts">⚙️ Configuración</div>
-    <div class="form-grid">
-      <input type="hidden" name="id">
-      <div class="form-group"><label>Clave *</label><input name="key_name" placeholder="fuel.anomaly_threshold"></div>
-      <div class="form-group"><label>Valor texto</label><input name="value_text" placeholder="texto opcional"></div>
-      <div class="form-group"><label>Valor numérico</label><input name="value_num" type="number" step="0.01" placeholder="0"></div>
-      <div class="form-group full"><label>Descripción</label><textarea name="description" placeholder="Descripción del parámetro"></textarea></div>
-    </div>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-setting')">Cancelar</button><button class="btn btn-primary" onclick="saveSetting()">Guardar</button></div>
   </div>
 </div>
 
@@ -154,48 +131,9 @@ async function delItem(id){
   });
 }
 
-async function loadSettings(){
-  const data = await api('/api/catalogos.php?type=settings');
-  const tbody = document.getElementById('tbody-settings');
-  if(!data.rows.length){
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">⚙️</div><div class="empty-title">Sin parámetros</div></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = data.rows.map(r => `
-    <tr>
-      <td>${r.key_name}</td>
-      <td>${r.value_text || '—'}</td>
-      <td>${r.value_num ?? '—'}</td>
-      <td class="td-truncate">${r.description || '—'}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick='editSetting(${JSON.stringify(r)})'>✏️</button></td>
-    </tr>`).join('');
-}
-
-function newSetting(){
-  document.getElementById('mts').textContent = '⚙️ Nueva configuración';
-  resetForm('modal-setting');
-  openModal('modal-setting');
-}
-
-function editSetting(r){
-  document.getElementById('mts').textContent = '✏️ Editar configuración';
-  fillForm('modal-setting', r);
-  openModal('modal-setting');
-}
-
-async function saveSetting(){
-  const d = getForm('modal-setting');
-  if(!d.key_name){ toast('La clave es obligatoria','error'); return; }
-  await api('/api/catalogos.php', 'PUT', { ...d, type:'setting' });
-  toast('Configuración guardada');
-  closeModal('modal-setting');
-  loadSettings();
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
   await loadCatalogs();
   await loadItems();
-  await loadSettings();
 });
 </script>
 

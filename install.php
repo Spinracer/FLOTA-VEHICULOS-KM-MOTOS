@@ -1447,7 +1447,59 @@ try {
 } catch (Throwable $e) { step('Columna: usuarios.totp_enabled', false, $e->getMessage()); }
 
 // ─────────────────────────────────────────────────────────
-// 3.19 Rendimiento (Objetivo 9): Índices de optimización
+// 3.20 Órdenes de Compra
+// ─────────────────────────────────────────────────────────
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ordenes_compra (
+      id              INT AUTO_INCREMENT PRIMARY KEY,
+      solicitante_id  INT NOT NULL,
+      vehiculo_id     INT NULL,
+      proveedor_id    INT NULL,
+      descripcion     TEXT NOT NULL,
+      monto_estimado  DECIMAL(12,2) NULL,
+      urgencia        VARCHAR(30) NOT NULL DEFAULT 'Normal',
+      estado          VARCHAR(30) NOT NULL DEFAULT 'Pendiente',
+      aprobado_por    INT NULL,
+      fecha_aprobacion DATETIME NULL,
+      notas_aprobacion TEXT NULL,
+      notas           TEXT NULL,
+      created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      deleted_at      DATETIME NULL,
+      INDEX idx_oc_solicitante (solicitante_id),
+      INDEX idx_oc_estado (estado),
+      INDEX idx_oc_deleted (deleted_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    step("Tabla 'ordenes_compra'", true);
+} catch (Throwable $e) { step("Tabla 'ordenes_compra'", false, $e->getMessage()); }
+
+// ─────────────────────────────────────────────────────────
+// 3.21 Documentos Vehiculares
+// ─────────────────────────────────────────────────────────
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS vehiculo_documentos (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      vehiculo_id       INT NOT NULL,
+      tipo              VARCHAR(40) NOT NULL,
+      titulo            VARCHAR(255) NOT NULL,
+      numero_documento  VARCHAR(100) NULL,
+      fecha_emision     DATE NULL,
+      fecha_vencimiento DATE NULL,
+      notas             TEXT NULL,
+      created_by        INT NULL,
+      created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      deleted_at        DATETIME NULL,
+      INDEX idx_vd_vehiculo (vehiculo_id),
+      INDEX idx_vd_tipo (tipo),
+      INDEX idx_vd_vencimiento (fecha_vencimiento),
+      INDEX idx_vd_deleted (deleted_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    step("Tabla 'vehiculo_documentos'", true);
+} catch (Throwable $e) { step("Tabla 'vehiculo_documentos'", false, $e->getMessage()); }
+
+// ─────────────────────────────────────────────────────────
+// 3.22 Rendimiento (Objetivo 9): Índices de optimización
 // ─────────────────────────────────────────────────────────
 $perf_indexes = [
     // Dashboard: combustible por vehículo+fecha (KPIs, charts mensuales)

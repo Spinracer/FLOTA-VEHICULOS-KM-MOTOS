@@ -161,6 +161,39 @@ case 'asignacion':
         $content .= '</div></div>';
     }
 
+    // Documentos vehiculares vigentes
+    try {
+        $stDocs = $db->prepare("SELECT tipo, titulo, numero_documento, fecha_emision, fecha_vencimiento FROM vehiculo_documentos WHERE vehiculo_id = ? AND deleted_at IS NULL ORDER BY tipo, titulo");
+        $stDocs->execute([$a['vehiculo_id']]);
+        $docs = $stDocs->fetchAll();
+        if ($docs) {
+            $tipoLabels = ['revision'=>'Revisión','factura'=>'Factura','permiso'=>'Permiso','placa_digital'=>'Placa Digital','seguro'=>'Seguro','otro'=>'Otro'];
+            $content .= '<div class="section"><h3>Documentos del Vehículo</h3>';
+            $content .= '<table class="data-table"><thead><tr><th>Tipo</th><th>Título</th><th>Nº Documento</th><th>Emisión</th><th>Vencimiento</th><th>Estado</th></tr></thead><tbody>';
+            foreach ($docs as $doc) {
+                $vencLabel = '—';
+                $vencStyle = '';
+                if ($doc['fecha_vencimiento']) {
+                    $vencDate = new DateTime($doc['fecha_vencimiento']);
+                    $hoy = new DateTime('today');
+                    $diff = (int)$hoy->diff($vencDate)->format('%r%a');
+                    if ($diff < 0) { $vencLabel = 'VENCIDO'; $vencStyle = 'color:#ff4757;font-weight:700'; }
+                    elseif ($diff <= 30) { $vencLabel = "Vence en {$diff}d"; $vencStyle = 'color:#ffa502'; }
+                    else { $vencLabel = 'Vigente'; $vencStyle = 'color:#2ed573'; }
+                }
+                $content .= '<tr>';
+                $content .= '<td>' . ($tipoLabels[$doc['tipo']] ?? $doc['tipo']) . '</td>';
+                $content .= '<td>' . htmlspecialchars($doc['titulo']) . '</td>';
+                $content .= '<td>' . htmlspecialchars($doc['numero_documento'] ?? '—') . '</td>';
+                $content .= '<td>' . ($doc['fecha_emision'] ?? '—') . '</td>';
+                $content .= '<td>' . ($doc['fecha_vencimiento'] ?? '—') . '</td>';
+                $content .= '<td style="' . $vencStyle . '">' . $vencLabel . '</td>';
+                $content .= '</tr>';
+            }
+            $content .= '</tbody></table></div>';
+        }
+    } catch (Throwable $e) { /* table may not exist yet */ }
+
     // Signature block
     $responsable = htmlspecialchars(current_user()['nombre'] ?? 'Responsable de Flota');
     $content .= '<div class="signatures">';

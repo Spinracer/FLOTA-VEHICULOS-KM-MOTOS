@@ -17,6 +17,11 @@ ob_start();
     <option value="document">📄 Documento</option>
     <option value="card">💳 Tarjeta</option>
   </select>
+  <select id="fActivo" onchange="load()" style="max-width:160px">
+    <option value="1">✅ Activos</option>
+    <option value="0">❌ Inactivos</option>
+    <option value="">Todos</option>
+  </select>
   <!-- Tabs: Catálogo vs Por Vehículo -->
   <div style="display:flex;gap:8px;margin-left:auto">
     <button class="btn btn-ghost tab-btn active" id="tabCatalog" onclick="switchTab('catalog')">📦 Catálogo</button>
@@ -156,7 +161,8 @@ function switchTab(tab) {
 async function loadCatalog() {
   const q    = document.getElementById('s').value;
   const tipo = document.getElementById('fTipo').value;
-  const data = await api(`/api/componentes.php?section=catalog&q=${encodeURIComponent(q)}&tipo=${encodeURIComponent(tipo)}&page=${pagerCat.page}&per=${pagerCat.perPage}`);
+  const activo = document.getElementById('fActivo').value;
+  const data = await api(`/api/componentes.php?section=catalog&q=${encodeURIComponent(q)}&tipo=${encodeURIComponent(tipo)}&activo=${encodeURIComponent(activo)}&page=${pagerCat.page}&per=${pagerCat.perPage}`);
   pagerCat.setTotal(data.total);
   const tbody = document.getElementById('tbodyCatalog');
   if (!data.rows.length) {
@@ -174,6 +180,7 @@ async function loadCatalog() {
     <td>${min}</td>
     <td><span class="badge ${Number(r.activo)?'badge-green':'badge-red'}">${Number(r.activo)?'Activo':'Inactivo'}</span></td>
     <?php if(can('edit')): ?><td><div class="action-btns">
+      <button class="btn ${Number(r.activo)?'btn-danger':'btn-primary'} btn-sm" onclick="toggleActivo(${r.id},${Number(r.activo)})" title="${Number(r.activo)?'Desactivar':'Activar'}">${Number(r.activo)?'❌':'✅'}</button>
       <button class="btn btn-ghost btn-sm" onclick='editarCatalogo(${JSON.stringify(r)})'>✏️</button>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="delCatalogo(${r.id})">🗑️</button><?php endif; ?>
     </div></td><?php endif; ?>
@@ -208,6 +215,16 @@ async function delCatalogo(id) {
     toast('Componente desactivado', 'warning');
     loadCatalog();
   });
+}
+
+async function toggleActivo(id, currentState) {
+  const newState = currentState ? 0 : 1;
+  const label = newState ? 'activar' : 'desactivar';
+  if (!confirm(`¿Deseas ${label} este componente?`)) return;
+  await api('/api/componentes.php?section=catalog', 'PUT', {id, activo: newState, _toggle: true});
+  toast(`Componente ${newState ? 'activado' : 'desactivado'}`);
+  loadCatalog();
+  loadComponentSelect();
 }
 
 /* ═══ VEHÍCULO COMPONENTES ═══ */

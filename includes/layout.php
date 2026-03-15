@@ -96,6 +96,10 @@ tailwind.config = {
     <?= $nav('/preventivos.php', 'preventivos', '📅', 'Preventivos') ?>
     <?= $nav('/alertas.php', 'alertas', '🚨', 'Centro de Alertas') ?>
 
+    <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-4 pb-1.5 nav-section-label">Compras y Docs</div>
+    <?= $nav('/ordenes_compra.php', 'ordenes_compra', '🛒', 'Órdenes de Compra') ?>
+    <?= $nav('/vehiculo_documentos.php', 'vehiculo_documentos', '📄', 'Docs Vehiculares') ?>
+
     <?php if ($can_edit || $is_admin): ?>
     <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-4 pb-1.5 nav-section-label">Administración</div>
     <?= $nav('/operadores.php', 'operadores', '👤', 'Operadores') ?>

@@ -85,12 +85,18 @@ try {
             case 'GET':
                 $q    = '%' . trim($_GET['q'] ?? '') . '%';
                 $tipo = trim($_GET['tipo'] ?? '');
+                $activo = trim($_GET['activo'] ?? '');
                 $page = max(1, (int)($_GET['page'] ?? 1));
                 $per  = min(100, max(5, (int)($_GET['per'] ?? 25)));
                 $off  = ($page - 1) * $per;
 
-                $where  = "WHERE activo = 1 AND (nombre LIKE ? OR descripcion LIKE ?)";
+                $where  = "WHERE (nombre LIKE ? OR descripcion LIKE ?)";
                 $params = [$q, $q];
+
+                if ($activo !== '') {
+                    $where   .= " AND activo = ?";
+                    $params[] = (int)$activo;
+                }
 
                 if ($tipo !== '') {
                     $where   .= " AND tipo = ?";
@@ -136,6 +142,15 @@ try {
                 $prev = $db->prepare("SELECT * FROM components WHERE id = ?");
                 $prev->execute([(int)$d['id']]);
                 $prevData = $prev->fetch() ?: [];
+
+                // Toggle activo only
+                if (isset($d['_toggle'])) {
+                    $db->prepare("UPDATE components SET activo = ? WHERE id = ?")
+                       ->execute([(int)$d['activo'], (int)$d['id']]);
+                    audit_log('components', 'toggle_activo', (int)$d['id'], $prevData, ['activo' => (int)$d['activo']]);
+                    echo json_encode(['ok' => true]);
+                    break;
+                }
 
                 $db->prepare("UPDATE components SET nombre = ?, tipo = ?, descripcion = ?, stock_minimo = ? WHERE id = ?")
                    ->execute([$d['nombre'], $d['tipo'] ?? 'tool', $d['descripcion'] ?? null, (int)($d['stock_minimo'] ?? 0), (int)$d['id']]);
