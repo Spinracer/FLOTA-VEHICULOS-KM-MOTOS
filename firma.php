@@ -5,9 +5,16 @@
  * No requiere login — token-based auth.
  */
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/rate_limit.php';
 
 $token = trim($_GET['token'] ?? '');
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Rate limit firma requests (10 per minute per IP)
+if (!rate_limit_check('firma')) {
+    http_response_code(429);
+    die('Demasiadas solicitudes. Intente de nuevo en un momento.');
+}
 
 if (!$token || strlen($token) < 32) {
     http_response_code(400);

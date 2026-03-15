@@ -17,7 +17,6 @@ define('UPLOAD_ALLOWED_TYPES', [
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'text/html',
-    'application/octet-stream',
 ]);
 define('UPLOAD_ALLOWED_EXT', ['jpg','jpeg','png','gif','webp','pdf','doc','docx','xls','xlsx','html']);
 
@@ -49,23 +48,21 @@ function attachment_upload(string $entidad, int $entidadId, array $file): array 
     }
 
     $mime = mime_content_type($file['tmp_name']);
-    // Also accept the browser-reported type for common images
-    $browserMime = $file['type'] ?? '';
     if (!in_array($mime, UPLOAD_ALLOWED_TYPES)) {
-        // Fallback: if extension is allowed and browser MIME is accepted, trust it
-        if (in_array($browserMime, UPLOAD_ALLOWED_TYPES) && in_array($ext, UPLOAD_ALLOWED_EXT)) {
-            $mime = $browserMime;
-        } else {
-            throw new RuntimeException("Tipo de archivo no permitido: {$mime}");
-        }
+        throw new RuntimeException("Tipo de archivo no permitido: {$mime}");
     }
-    $dir = UPLOAD_BASE . '/' . $entidad . '/' . $entidadId;
+    $safeEntidad = preg_replace('/[^a-z0-9_]/', '', $entidad);
+    $dir = UPLOAD_BASE . '/' . $safeEntidad . '/' . $entidadId;
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
 
     $safeName = bin2hex(random_bytes(8)) . '_' . time() . '.' . $ext;
     $destPath = $dir . '/' . $safeName;
+    // Verify resolved path stays inside UPLOAD_BASE
+    if (strpos(realpath($dir), realpath(UPLOAD_BASE)) !== 0) {
+        throw new RuntimeException('Ruta de almacenamiento inválida.');
+    }
 
     if (!move_uploaded_file($file['tmp_name'], $destPath)) {
         throw new RuntimeException('Error al mover archivo al almacenamiento.');
@@ -74,7 +71,7 @@ function attachment_upload(string $entidad, int $entidadId, array $file): array 
     $db = getDB();
     $stmt = $db->prepare("INSERT INTO attachments (entidad, entidad_id, filename, original_name, mime_type, size_bytes, uploaded_by) VALUES (?,?,?,?,?,?,?)");
     $stmt->execute([
-        $entidad,
+        $safeEntidad,
         $entidadId,
         $entidad . '/' . $entidadId . '/' . $safeName,
         $file['name'],

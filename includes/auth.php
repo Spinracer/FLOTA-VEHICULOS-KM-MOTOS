@@ -6,6 +6,16 @@ require_once __DIR__ . '/rate_limit.php';
 require_once __DIR__ . '/totp.php';
 
 // ─────────────────────────────────────────────────────────
+// Security headers (sent on every include)
+// ─────────────────────────────────────────────────────────
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header_remove('X-Powered-By');
+}
+
+// ─────────────────────────────────────────────────────────
 // ROLES DEL SISTEMA
 // ─────────────────────────────────────────────────────────
 // coordinador_it  → Administrador total: usuarios, permisos y todo el sistema

@@ -7,7 +7,12 @@ function toast(msg, type = 'success') {
   const icons = { success: '✅', error: '❌', warning: '⚠️' };
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  const iconSpan = document.createElement('span');
+  iconSpan.textContent = icons[type]||'ℹ️';
+  const msgSpan = document.createElement('span');
+  msgSpan.textContent = msg;
+  el.appendChild(iconSpan);
+  el.appendChild(msgSpan);
   document.getElementById('toast-container').appendChild(el);
   setTimeout(() => el.remove(), 3500);
 }

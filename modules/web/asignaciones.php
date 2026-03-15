@@ -75,22 +75,21 @@ ob_start();
             <input type="checkbox" id="new-item-save-vehicle"> Guardar para futuras asignaciones de este vehículo
           </label>
         </div>
-        <div id="checklist-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px">
-          <label class="ck-item"><input type="checkbox" name="checklist_gata" value="1"> Gata</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_herramientas" value="1"> Herramientas</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_llanta" value="1"> Llanta de repuesto</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_bac" value="1"> BAC Flota</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_revision" value="1"> Revisión general</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_luces" value="1"> Luces</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_liquidos" value="1"> Nivel de líquidos</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_motor" value="1"> Motor</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_parabrisas" value="1"> Parabrisas</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_documentacion" value="1"> Documentación</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_frenos" value="1"> Frenos</label>
-          <label class="ck-item"><input type="checkbox" name="checklist_espejos" value="1"> Espejos</label>
+        <div id="checklist-grid" style="display:grid;grid-template-columns:1fr;gap:4px">
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_gata" value="1"> Gata disponible</label><input type="text" class="ck-obs" data-item="checklist_gata" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_herramientas" value="1"> Herramientas en buen estado</label><input type="text" class="ck-obs" data-item="checklist_herramientas" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_llanta" value="1"> Llanta de repuesto equipada</label><input type="text" class="ck-obs" data-item="checklist_llanta" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_bac" value="1"> BAC Flota</label><input type="text" class="ck-obs" data-item="checklist_bac" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_revision" value="1"> Revisión general OK</label><input type="text" class="ck-obs" data-item="checklist_revision" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_luces" value="1"> Luces en buen estado</label><input type="text" class="ck-obs" data-item="checklist_luces" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_liquidos" value="1"> Nivel de líquidos operativos</label><input type="text" class="ck-obs" data-item="checklist_liquidos" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_motor" value="1"> Motor en buen estado</label><input type="text" class="ck-obs" data-item="checklist_motor" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_parabrisas" value="1"> Parabrisas sin daños</label><input type="text" class="ck-obs" data-item="checklist_parabrisas" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_documentacion" value="1"> Documentación en regla</label><input type="text" class="ck-obs" data-item="checklist_documentacion" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_frenos" value="1"> Frenos operativos</label><input type="text" class="ck-obs" data-item="checklist_frenos" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="checklist_espejos" value="1"> Espejos completos</label><input type="text" class="ck-obs" data-item="checklist_espejos" placeholder="Observación..." style="display:none"></div>
         </div>
         <div id="custom-items-area"></div>
-        <div style="margin-top:6px"><textarea name="checklist_detalles" placeholder="Detalles adicionales del checklist de entrega..." style="font-size:12px"></textarea></div>
       </div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✍️ Firma de Entrega</label>
@@ -129,21 +128,20 @@ ob_start();
       <div class="form-group full"><label>Notas de cierre</label><textarea name="end_notes" placeholder="Observaciones de retorno..."></textarea></div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Retorno</label>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px 16px">
-          <label class="ck-item"><input type="checkbox" name="end_checklist_gata" value="1"> Gata</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_herramientas" value="1"> Herramientas</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_llanta" value="1"> Llanta de repuesto</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_bac" value="1"> BAC Flota</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_revision" value="1"> Revisión general</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_luces" value="1"> Luces</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_liquidos" value="1"> Nivel de líquidos</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_motor" value="1"> Motor</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_parabrisas" value="1"> Parabrisas</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_documentacion" value="1"> Documentación</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_frenos" value="1"> Frenos</label>
-          <label class="ck-item"><input type="checkbox" name="end_checklist_espejos" value="1"> Espejos</label>
+        <div id="end-checklist-grid" style="display:grid;grid-template-columns:1fr;gap:4px">
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_gata" value="1"> Gata disponible</label><input type="text" class="ck-obs" data-item="end_checklist_gata" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_herramientas" value="1"> Herramientas en buen estado</label><input type="text" class="ck-obs" data-item="end_checklist_herramientas" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_llanta" value="1"> Llanta de repuesto equipada</label><input type="text" class="ck-obs" data-item="end_checklist_llanta" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_bac" value="1"> BAC Flota</label><input type="text" class="ck-obs" data-item="end_checklist_bac" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_revision" value="1"> Revisión general OK</label><input type="text" class="ck-obs" data-item="end_checklist_revision" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_luces" value="1"> Luces en buen estado</label><input type="text" class="ck-obs" data-item="end_checklist_luces" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_liquidos" value="1"> Nivel de líquidos operativos</label><input type="text" class="ck-obs" data-item="end_checklist_liquidos" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_motor" value="1"> Motor en buen estado</label><input type="text" class="ck-obs" data-item="end_checklist_motor" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_parabrisas" value="1"> Parabrisas sin daños</label><input type="text" class="ck-obs" data-item="end_checklist_parabrisas" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_documentacion" value="1"> Documentación en regla</label><input type="text" class="ck-obs" data-item="end_checklist_documentacion" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_frenos" value="1"> Frenos operativos</label><input type="text" class="ck-obs" data-item="end_checklist_frenos" placeholder="Observación..." style="display:none"></div>
+          <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_espejos" value="1"> Espejos completos</label><input type="text" class="ck-obs" data-item="end_checklist_espejos" placeholder="Observación..." style="display:none"></div>
         </div>
-        <div style="margin-top:6px"><textarea name="end_checklist_detalles" placeholder="Detalles del checklist de retorno..." style="font-size:12px"></textarea></div>
       </div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✍️ Firma del Operador</label>
@@ -217,6 +215,32 @@ async function loadCalendar() {
 
 // ── Dynamic checklist plantillas ──
 const FIXED_CHECKLIST_HTML = document.getElementById('checklist-grid').innerHTML;
+
+// Toggle observation input when clicking a checklist row
+document.addEventListener('click', e => {
+  const row = e.target.closest('.ck-row');
+  if (!row) return;
+  // Only toggle if clicking on the label area, not the obs input itself
+  if (e.target.matches('.ck-obs') || e.target.matches('input[type="checkbox"]')) return;
+  const obs = row.querySelector('.ck-obs');
+  if (obs) {
+    const show = obs.style.display === 'none';
+    obs.style.display = show ? '' : 'none';
+    if (show) obs.focus();
+  }
+});
+
+// Collect per-item observations as JSON
+function collectObservations(containerId) {
+  const obs = {};
+  const inputs = document.querySelectorAll(`#${containerId} .ck-obs`);
+  inputs.forEach(inp => {
+    const val = inp.value.trim();
+    if (val) obs[inp.dataset.item] = val;
+  });
+  return Object.keys(obs).length ? JSON.stringify(obs) : null;
+}
+
 async function loadPlantillas() {
   try {
     const data = await api('/api/asignaciones.php?action=checklist_plantillas');
@@ -399,6 +423,7 @@ async function enviarLinkFirmaEntrega() {
     });
     const pSel = document.getElementById('plantilla-select');
     if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
+    d.checklist_detalles = collectObservations('checklist-grid') || null;
     // Don't set firma_entrega_tipo yet — let the link signing set it
     d.firma_entrega_tipo = 'ninguna';
     const res = await api('/api/asignaciones.php', 'POST', d);
@@ -434,6 +459,7 @@ async function saveNewAndGetId() {
   });
   const pSel = document.getElementById('plantilla-select');
   if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
+  d.checklist_detalles = collectObservations('checklist-grid') || d.checklist_detalles || null;
   const feRadio = document.querySelector('#modal-new [name="firma_entrega_tipo"]:checked');
   d.firma_entrega_tipo = feRadio ? feRadio.value : 'ninguna';
   if (d.firma_entrega_tipo === 'digital' && firmaEntregaCanvas) {
@@ -563,6 +589,7 @@ async function saveClose(){
     const cb = document.querySelector(`#modal-close [name="${f}"]`);
     d[f] = cb && cb.checked ? 1 : 0;
   });
+  d.end_checklist_detalles = collectObservations('end-checklist-grid') || null;
   // Firma
   const firmaRadio = document.querySelector('#modal-close [name="firma_tipo"]:checked');
   d.firma_tipo = firmaRadio ? firmaRadio.value : 'ninguna';

@@ -95,12 +95,15 @@ case 'asignacion':
     if (isset($a['checklist_gata'])) {
         $content .= '<div class="section"><h3>Lista de Verificación Pre-Salida</h3>';
         $content .= '<table class="data-table"><thead><tr><th style="width:40%">Ítem de Verificación</th><th style="width:15%;text-align:center">Estado</th><th>Observación</th></tr></thead><tbody>';
+        $obsMap = json_decode($a['checklist_detalles'] ?? '', true) ?: [];
         foreach ($checklistItems as [$col, $label]) {
             $val = $a[$col] ?? 0;
-            $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:16px;{$ckStyle($val)}\">{$ck($val)}</td><td></td></tr>";
+            $obs = htmlspecialchars($obsMap[$col] ?? '');
+            $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:16px;{$ckStyle($val)}\">{$ck($val)}</td><td style=\"font-size:11px\">{$obs}</td></tr>";
         }
         $content .= '</tbody></table>';
-        if ($a['checklist_detalles'] ?? '') {
+        // If checklist_detalles is plain text (legacy), show it
+        if (($a['checklist_detalles'] ?? '') && !$obsMap) {
             $content .= '<p style="margin-top:6px;font-size:11px"><strong>Observaciones:</strong> ' . htmlspecialchars($a['checklist_detalles']) . '</p>';
         }
         $content .= '</div>';
@@ -110,13 +113,15 @@ case 'asignacion':
     if ($a['end_at'] && isset($a['end_checklist_gata'])) {
         $content .= '<div class="section"><h3>Lista de Verificación Post-Retorno</h3>';
         $content .= '<table class="data-table"><thead><tr><th style="width:40%">Ítem de Verificación</th><th style="width:15%;text-align:center">Estado</th><th>Observación</th></tr></thead><tbody>';
+        $endObsMap = json_decode($a['end_checklist_detalles'] ?? '', true) ?: [];
         foreach ($checklistItems as [$col, $label]) {
             $endCol = 'end_' . $col;
             $val = $a[$endCol] ?? 0;
-            $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:16px;{$ckStyle($val)}\">{$ck($val)}</td><td></td></tr>";
+            $obs = htmlspecialchars($endObsMap[$endCol] ?? '');
+            $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:16px;{$ckStyle($val)}\">{$ck($val)}</td><td style=\"font-size:11px\">{$obs}</td></tr>";
         }
         $content .= '</tbody></table>';
-        if ($a['end_checklist_detalles'] ?? '') {
+        if (($a['end_checklist_detalles'] ?? '') && !$endObsMap) {
             $content .= '<p style="margin-top:6px;font-size:11px"><strong>Observaciones:</strong> ' . htmlspecialchars($a['end_checklist_detalles']) . '</p>';
         }
         $content .= '</div>';

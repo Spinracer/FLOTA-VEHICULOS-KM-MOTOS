@@ -2,6 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════
 # FlotaControl — Script Interactivo de Despliegue
 # Compatible con: Ubuntu 22.04 / 24.04 LTS
+# Uso: sudo bash deploy.sh
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
@@ -54,16 +55,46 @@ fi
 banner
 
 # ═══════════════════════════════════════════════════════════════════
-# PASO 1: Recopilar configuración
+# PASO 1: Modo de despliegue
 # ═══════════════════════════════════════════════════════════════════
-echo -e "${BOLD}── Paso 1/8: Configuración General ──${NC}"
+echo -e "${BOLD}── Paso 1/9: Modo de Despliegue ──${NC}"
 echo ""
+echo -e "  ${CYAN}1)${NC} Local sin dominio (acceso por IP, ej: http://192.168.1.100)"
+echo -e "  ${CYAN}2)${NC} Con dominio propio (ej: flota.miempresa.com + SSL)"
+echo -e "  ${CYAN}3)${NC} Local + Cloudflare Tunnel (acceso público sin abrir puertos)"
+echo ""
+DEPLOY_MODE=$(ask "Selecciona modo" "1")
 
-DOMAIN=$(ask "Dominio del servidor (ej: flota.miempresa.com)" "")
-while [[ -z "$DOMAIN" ]]; do
-    error "El dominio es obligatorio"
-    DOMAIN=$(ask "Dominio del servidor" "")
-done
+DOMAIN="_"
+USE_SSL=false
+USE_TUNNEL=false
+TUNNEL_NAME=""
+TUNNEL_HOSTNAME=""
+
+case "$DEPLOY_MODE" in
+    2)
+        DOMAIN=$(ask "Dominio del servidor (ej: flota.miempresa.com)" "")
+        while [[ -z "$DOMAIN" ]]; do
+            error "El dominio es obligatorio en modo 2"
+            DOMAIN=$(ask "Dominio del servidor" "")
+        done
+        USE_SSL=true
+        ;;
+    3)
+        USE_TUNNEL=true
+        TUNNEL_NAME=$(ask "Nombre del tunnel Cloudflare" "flotacontrol")
+        TUNNEL_HOSTNAME=$(ask "Hostname público (ej: flota.midominio.com)" "")
+        while [[ -z "$TUNNEL_HOSTNAME" ]]; do
+            error "El hostname público es obligatorio"
+            TUNNEL_HOSTNAME=$(ask "Hostname público" "")
+        done
+        DOMAIN="$TUNNEL_HOSTNAME"
+        ;;
+    *)
+        DEPLOY_MODE="1"
+        info "Se accederá por IP local"
+        ;;
+esac
 
 INSTALL_DIR=$(ask "Directorio de instalación" "/var/www/flotacontrol")
 GIT_REPO=$(ask "URL del repositorio Git" "https://github.com/Spinracer/FLOTA-VEHICULOS-KM-MOTOS.git")
@@ -82,23 +113,21 @@ done
 echo ""
 echo -e "${BOLD}── Almacenamiento de Uploads ──${NC}"
 echo -e "  ${CYAN}1)${NC} Disco único (uploads dentro de ${INSTALL_DIR})"
-echo -e "  ${CYAN}2)${NC} Disco secundario montado (symlink)"
+echo -e "  ${CYAN}2)${NC} Disco secundario ya montado (symlink, SIN formatear)"
 
 STORAGE_OPT=$(ask "Opción" "1")
 UPLOAD_PATH="${INSTALL_DIR}/uploads"
 MOUNT_POINT=""
 
 if [[ "$STORAGE_OPT" == "2" ]]; then
-    MOUNT_POINT=$(ask "Punto de montaje del disco de datos (ej: /mnt/data)" "/mnt/data")
+    MOUNT_POINT=$(ask "Punto de montaje del disco de datos (ya montado, ej: /mnt/data)" "/mnt/data")
     if [[ ! -d "$MOUNT_POINT" ]]; then
-        error "El punto de montaje $MOUNT_POINT no existe. Asegúrate de que el disco esté montado."
-        if confirm "¿Continuar de todas formas?"; then
-            warn "Se creará el directorio cuando sea necesario"
-        else
-            exit 1
-        fi
+        error "El punto de montaje $MOUNT_POINT no existe."
+        error "Monta el disco primero: sudo mount /dev/sdX1 $MOUNT_POINT"
+        exit 1
     fi
     UPLOAD_PATH="${MOUNT_POINT}/flotacontrol/uploads"
+    info "Los archivos existentes en el disco NO se tocarán"
 fi
 
 echo ""
@@ -111,7 +140,11 @@ TIMEZONE=$(ask "Zona horaria" "America/Tegucigalpa")
 
 echo ""
 echo -e "${BOLD}── Resumen de configuración ──${NC}"
-echo -e "  Dominio:        ${GREEN}${DOMAIN}${NC}"
+MODE_LABEL="Local (IP)"
+[[ "$DEPLOY_MODE" == "2" ]] && MODE_LABEL="Dominio + SSL"
+[[ "$DEPLOY_MODE" == "3" ]] && MODE_LABEL="Cloudflare Tunnel"
+echo -e "  Modo:           ${GREEN}${MODE_LABEL}${NC}"
+echo -e "  Dominio/Host:   ${GREEN}${DOMAIN}${NC}"
 echo -e "  Directorio:     ${GREEN}${INSTALL_DIR}${NC}"
 echo -e "  Repositorio:    ${GREEN}${GIT_REPO}${NC}"
 echo -e "  Rama:           ${GREEN}${GIT_BRANCH}${NC}"
@@ -119,6 +152,9 @@ echo -e "  BD:             ${GREEN}${DB_NAME}${NC} (user: ${DB_USER})"
 echo -e "  Uploads:        ${GREEN}${UPLOAD_PATH}${NC}"
 echo -e "  PHP:            ${GREEN}${PHP_VER}${NC}"
 echo -e "  Timezone:       ${GREEN}${TIMEZONE}${NC}"
+if [[ "$USE_TUNNEL" == true ]]; then
+    echo -e "  Tunnel:         ${GREEN}${TUNNEL_NAME} → ${TUNNEL_HOSTNAME}${NC}"
+fi
 echo ""
 
 if ! confirm "¿Proceder con la instalación?"; then
@@ -130,11 +166,16 @@ fi
 # PASO 2: Instalar dependencias
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 2/8: Instalando dependencias ──${NC}"
+echo -e "${BOLD}── Paso 2/9: Instalando dependencias ──${NC}"
 
 apt-get update -qq
-apt-get install -y -qq nginx git curl certbot python3-certbot-nginx mariadb-server > /dev/null 2>&1
-success "nginx, git, mariadb-server, certbot instalados"
+apt-get install -y -qq nginx git curl mariadb-server > /dev/null 2>&1
+
+if [[ "$USE_SSL" == true ]]; then
+    apt-get install -y -qq certbot python3-certbot-nginx > /dev/null 2>&1
+fi
+
+success "nginx, git, mariadb-server instalados"
 
 # PHP — intentar instalar directamente, si falla agregar PPA
 if ! apt-get install -y -qq "php${PHP_VER}-fpm" "php${PHP_VER}-mysql" "php${PHP_VER}-mbstring" "php${PHP_VER}-xml" "php${PHP_VER}-curl" "php${PHP_VER}-gd" "php${PHP_VER}-zip" > /dev/null 2>&1; then
@@ -149,7 +190,7 @@ success "PHP ${PHP_VER} + extensiones instalados"
 # PASO 3: Base de datos
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 3/8: Configurando base de datos ──${NC}"
+echo -e "${BOLD}── Paso 3/9: Configurando base de datos ──${NC}"
 
 # Usar heredoc con password escaping seguro
 mysql -u root <<EOSQL
@@ -164,7 +205,7 @@ success "Base de datos '${DB_NAME}' y usuario '${DB_USER}' creados"
 # PASO 4: Clonar proyecto
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 4/8: Clonando proyecto ──${NC}"
+echo -e "${BOLD}── Paso 4/9: Clonando proyecto ──${NC}"
 
 if [[ -d "${INSTALL_DIR}/.git" ]]; then
     warn "El directorio ya contiene un repositorio Git. Actualizando..."
@@ -182,7 +223,7 @@ success "Código clonado en ${INSTALL_DIR}"
 # PASO 5: Configurar almacenamiento
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 5/8: Configurando almacenamiento ──${NC}"
+echo -e "${BOLD}── Paso 5/9: Configurando almacenamiento ──${NC}"
 
 if [[ "$STORAGE_OPT" == "2" ]]; then
     # Disco secundario — NO formatear, solo crear directorios
@@ -224,7 +265,11 @@ success "Subdirectorios de uploads creados"
 # PASO 6: Archivo .env
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 6/8: Generando .env ──${NC}"
+echo -e "${BOLD}── Paso 6/9: Generando .env ──${NC}"
+
+APP_URL="http://localhost"
+[[ "$DEPLOY_MODE" == "2" ]] && APP_URL="https://${DOMAIN}"
+[[ "$DEPLOY_MODE" == "3" ]] && APP_URL="https://${TUNNEL_HOSTNAME}"
 
 ENV_FILE="${INSTALL_DIR}/.env"
 cat > "${ENV_FILE}" <<ENVEOF
@@ -235,7 +280,7 @@ DB_PASS=${DB_PASS}
 DB_NAME=${DB_NAME}
 APP_DEBUG=false
 APP_NAME=FlotaControl
-APP_URL=https://${DOMAIN}
+APP_URL=${APP_URL}
 UPLOAD_PATH=${UPLOAD_PATH}
 OC_PURGE_DAYS=180
 PHP_MAX_UPLOAD=${PHP_UPLOAD_MAX}
@@ -250,7 +295,7 @@ success ".env creado y protegido (chmod 600)"
 # PASO 7: Configurar PHP-FPM
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 7/8: Configurando PHP-FPM ──${NC}"
+echo -e "${BOLD}── Paso 7/9: Configurando PHP-FPM ──${NC}"
 
 PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
 if [[ -f "$PHP_INI" ]]; then
@@ -268,13 +313,15 @@ success "PHP-FPM reiniciado"
 # PASO 8: Configurar Nginx
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Paso 8/8: Configurando Nginx ──${NC}"
+echo -e "${BOLD}── Paso 8/9: Configurando Nginx ──${NC}"
+
+NGINX_SERVER_NAME="${DOMAIN}"
 
 NGINX_CONF="/etc/nginx/sites-available/flotacontrol"
 cat > "${NGINX_CONF}" <<NGINXEOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${NGINX_SERVER_NAME};
     root ${INSTALL_DIR};
     index index.php;
 
@@ -287,6 +334,7 @@ server {
     location ^~ /modules/ { deny all; return 404; }
     location ^~ /tests/ { deny all; return 404; }
     location ~ /deploy\.sh { deny all; return 404; }
+    location ~ /\.vscode { deny all; return 404; }
 
     # Archivos estáticos
     location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
@@ -302,8 +350,9 @@ server {
         fastcgi_read_timeout 60;
     }
 
-    # Denegar acceso a archivos ocultos
+    # Denegar archivos ocultos y markdown
     location ~ /\. { deny all; }
+    location ~* \.(md|sh|lock|example)$ { deny all; return 404; }
 }
 NGINXEOF
 
@@ -315,17 +364,56 @@ systemctl restart nginx
 success "Nginx reiniciado"
 
 # ═══════════════════════════════════════════════════════════════════
-# POST-INSTALACIÓN
+# PASO 9: Post-instalación
 # ═══════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${BOLD}── Post-instalación ──${NC}"
+echo -e "${BOLD}── Paso 9/9: Post-instalación ──${NC}"
 
-# Configurar cron de purga
-CRON_LINE="0 3 * * 0 mysql -u ${DB_USER} -p'${DB_PASS}' ${DB_NAME} -e \"DELETE FROM ordenes_compra WHERE estado IN ('Completada','Cancelada') AND updated_at < DATE_SUB(NOW(), INTERVAL 180 DAY) AND deleted_at IS NOT NULL;\" 2>/dev/null"
-(crontab -u www-data -l 2>/dev/null | grep -v 'ordenes_compra'; echo "$CRON_LINE") | crontab -u www-data -
-success "Cron de purga configurado (domingos 3AM)"
+# ── SSL (solo modo 2: dominio propio) ──
+if [[ "$USE_SSL" == true ]]; then
+    info "Configurando SSL con Let's Encrypt..."
+    certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --redirect \
+        -m "admin@${DOMAIN}" || warn "Certbot falló. Ejecuta: sudo certbot --nginx -d ${DOMAIN}"
+    systemctl enable certbot.timer 2>/dev/null || true
+    success "SSL configurado"
+fi
 
-# Configurar backup diario
+# ── Cloudflare Tunnel (solo modo 3) ──
+if [[ "$USE_TUNNEL" == true ]]; then
+    info "Configurando Cloudflare Tunnel..."
+    if ! command -v cloudflared &> /dev/null; then
+        warn "cloudflared no instalado. Instalando..."
+        curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+            -o /tmp/cloudflared.deb
+        dpkg -i /tmp/cloudflared.deb > /dev/null 2>&1 || apt-get install -f -y -qq > /dev/null 2>&1
+        rm -f /tmp/cloudflared.deb
+    fi
+    if command -v cloudflared &> /dev/null; then
+        success "cloudflared instalado"
+        echo ""
+        echo -e "${YELLOW}Para configurar el tunnel, ejecuta como tu usuario normal (no root):${NC}"
+        echo ""
+        echo -e "  ${BOLD}cloudflared tunnel login${NC}"
+        echo -e "  ${BOLD}cloudflared tunnel create ${TUNNEL_NAME}${NC}"
+        echo -e "  ${BOLD}cloudflared tunnel route dns ${TUNNEL_NAME} ${TUNNEL_HOSTNAME}${NC}"
+        echo ""
+        echo -e "Luego crea ${BOLD}/etc/cloudflared/config.yml${NC}:"
+        echo ""
+        echo -e "  tunnel: ${TUNNEL_NAME}"
+        echo -e "  credentials-file: /root/.cloudflared/<TUNNEL_ID>.json"
+        echo -e "  ingress:"
+        echo -e "    - hostname: ${TUNNEL_HOSTNAME}"
+        echo -e "      service: http://localhost:80"
+        echo -e "    - service: http_status:404"
+        echo ""
+        echo -e "Finalmente: ${BOLD}cloudflared service install && systemctl start cloudflared${NC}"
+        echo ""
+    else
+        error "No se pudo instalar cloudflared. Instálalo manualmente."
+    fi
+fi
+
+# ── Backup diario de BD (conservar últimos 30) ──
 BACKUP_DIR="${MOUNT_POINT:-/var}/backups/flotacontrol"
 mkdir -p "$BACKUP_DIR"
 cat > /etc/cron.daily/flotacontrol-backup <<BAKEOF
@@ -336,24 +424,86 @@ mysqldump -u ${DB_USER} -p'${DB_PASS}' ${DB_NAME} | gzip > "\$BACKUP_DIR/db_\$DA
 ls -t "\$BACKUP_DIR"/db_*.sql.gz | tail -n +31 | xargs -r rm
 BAKEOF
 chmod +x /etc/cron.daily/flotacontrol-backup
-success "Backup diario configurado en ${BACKUP_DIR}"
+success "Backup diario de BD configurado en ${BACKUP_DIR}"
 
-# SSL
-echo ""
-if confirm "¿Configurar SSL con Let's Encrypt ahora?"; then
-    certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --redirect -m "admin@${DOMAIN}" || warn "Certbot falló. Puedes ejecutarlo manualmente: certbot --nginx -d ${DOMAIN}"
-    systemctl enable certbot.timer 2>/dev/null || true
-    success "SSL configurado"
-else
-    warn "Puedes configurar SSL después: sudo certbot --nginx -d ${DOMAIN}"
+# ── Purga semestral de archivos (>180 días) ──
+# Elimina TODOS los archivos de uploads mayores a 6 meses
+# EXCEPTO los adjuntos de la última asignación activa por vehículo
+PURGE_SCRIPT="/etc/cron.monthly/flotacontrol-purge"
+cat > "${PURGE_SCRIPT}" <<'PURGE_INNER'
+#!/bin/bash
+# FlotaControl — Purga semestral de archivos >180 días
+# Conserva los archivos de la última asignación activa por vehículo
+DAYS=180
+PURGE_INNER
+
+# Inyectar variables (fuera del heredoc con comillas simples)
+sed -i "2a UPLOAD_PATH=\"${UPLOAD_PATH}\"" "${PURGE_SCRIPT}"
+sed -i "3a DB_USER=\"${DB_USER}\"" "${PURGE_SCRIPT}"
+sed -i "4a DB_PASS=\"${DB_PASS}\"" "${PURGE_SCRIPT}"
+sed -i "5a DB_NAME=\"${DB_NAME}\"" "${PURGE_SCRIPT}"
+
+cat >> "${PURGE_SCRIPT}" <<'PURGE_BODY'
+
+# Solo ejecutar realmente en Feb y Ago (cada ~6 meses)
+MONTH=$(date +%-m)
+if (( MONTH != 2 && MONTH != 8 )); then
+    exit 0
 fi
 
-# Ejecutar instalador de FlotaControl
+LOG="/var/log/flotacontrol-purge.log"
+echo "=== Purga iniciada: $(date) ===" >> "$LOG"
+
+# Obtener IDs de última asignación activa por vehículo
+KEEP_IDS=$(mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -sN -e "
+    SELECT GROUP_CONCAT(id) FROM (
+        SELECT MAX(id) AS id FROM asignaciones
+        WHERE deleted_at IS NULL GROUP BY vehiculo_id
+    ) t;
+" 2>/dev/null)
+
+TOTAL_DELETED=0
+
+# Recorrer cada subdirectorio de uploads
+for ENTIDAD_DIR in "$UPLOAD_PATH"/*/; do
+    [ -d "$ENTIDAD_DIR" ] || continue
+    ENTIDAD=$(basename "$ENTIDAD_DIR")
+
+    for ID_DIR in "$ENTIDAD_DIR"*/; do
+        [ -d "$ID_DIR" ] || continue
+        ID=$(basename "$ID_DIR")
+
+        # Si es directorio de vehículos, verificar si pertenece a última asignación
+        if [[ "$ENTIDAD" == "vehiculos" ]] && echo ",$KEEP_IDS," | grep -q ",$ID,"; then
+            echo "  CONSERVADO: $ENTIDAD/$ID (última asignación activa)" >> "$LOG"
+            continue
+        fi
+
+        # Borrar archivos con más de 180 días de antigüedad
+        COUNT=$(find "$ID_DIR" -type f -mtime +$DAYS 2>/dev/null | wc -l)
+        if (( COUNT > 0 )); then
+            find "$ID_DIR" -type f -mtime +$DAYS -delete 2>/dev/null
+            TOTAL_DELETED=$((TOTAL_DELETED + COUNT))
+            echo "  PURGADO: $ENTIDAD/$ID ($COUNT archivos)" >> "$LOG"
+        fi
+
+        # Borrar directorio si quedó vacío
+        rmdir "$ID_DIR" 2>/dev/null || true
+    done
+done
+
+echo "Total archivos eliminados: $TOTAL_DELETED" >> "$LOG"
+echo "=== Purga finalizada: $(date) ===" >> "$LOG"
+PURGE_BODY
+chmod +x "${PURGE_SCRIPT}"
+success "Purga semestral configurada (archivos >6 meses, conserva última asignación)"
+
+# ── Ejecutar instalador ──
 echo ""
 info "Ejecutando instalador de FlotaControl..."
 rm -f "${INSTALL_DIR}/.installed.lock"
 cd "${INSTALL_DIR}"
-sudo -u www-data php${PHP_VER} install.php 2>&1 | tail -5
+sudo -u www-data "php${PHP_VER}" install.php 2>&1 | tail -10
 success "Instalador ejecutado"
 
 # ═══════════════════════════════════════════════════════════════════
@@ -361,19 +511,30 @@ success "Instalador ejecutado"
 # ═══════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║${NC}  ${GREEN}${BOLD}✅ FlotaControl instalado correctamente${NC}               ${CYAN}║${NC}"
+echo -e "${CYAN}║${NC}  ${GREEN}${BOLD}✅ FlotaControl instalado correctamente${NC}                   ${CYAN}║${NC}"
 echo -e "${CYAN}╠═══════════════════════════════════════════════════════════╣${NC}"
-echo -e "${CYAN}║${NC}  URL:        ${BOLD}https://${DOMAIN}${NC}"
+
+if [[ "$DEPLOY_MODE" == "1" ]]; then
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    echo -e "${CYAN}║${NC}  URL:        ${BOLD}http://${LOCAL_IP}${NC}"
+elif [[ "$DEPLOY_MODE" == "3" ]]; then
+    echo -e "${CYAN}║${NC}  URL:        ${BOLD}https://${TUNNEL_HOSTNAME}${NC} (via Tunnel)"
+    echo -e "${CYAN}║${NC}  Local:      ${BOLD}http://$(hostname -I | awk '{print $1}')${NC}"
+else
+    echo -e "${CYAN}║${NC}  URL:        ${BOLD}https://${DOMAIN}${NC}"
+fi
+
 echo -e "${CYAN}║${NC}  Directorio: ${INSTALL_DIR}"
 echo -e "${CYAN}║${NC}  Base datos: ${DB_NAME}"
 echo -e "${CYAN}║${NC}  Uploads:    ${UPLOAD_PATH}"
-echo -e "${CYAN}║${NC}  Backups:    ${BACKUP_DIR}"
+echo -e "${CYAN}║${NC}  Backups:    ${BACKUP_DIR} (diario, 30 últimos)"
+echo -e "${CYAN}║${NC}  Purga:      Semestral (archivos >6 meses, Feb/Ago)"
 echo -e "${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}  ${YELLOW}Anota las credenciales mostradas arriba por${NC}"
-echo -e "${CYAN}║${NC}  ${YELLOW}el instalador (usuario y contraseña inicial).${NC}"
+echo -e "${CYAN}║${NC}  ${YELLOW}¡IMPORTANTE! Anota las credenciales del instalador.${NC}"
 echo -e "${CYAN}║${NC}"
-echo -e "${CYAN}║${NC}  Para actualizar:  cd ${INSTALL_DIR} && git pull"
-echo -e "${CYAN}║${NC}  Logs Nginx:       tail -f /var/log/nginx/error.log"
-echo -e "${CYAN}║${NC}  Logs PHP:         tail -f /var/log/php${PHP_VER}-fpm.log"
+echo -e "${CYAN}║${NC}  Actualizar: cd ${INSTALL_DIR} && sudo -u www-data git pull"
+echo -e "${CYAN}║${NC}  Logs:       tail -f /var/log/nginx/error.log"
+echo -e "${CYAN}║${NC}              tail -f /var/log/php${PHP_VER}-fpm.log"
+echo -e "${CYAN}║${NC}  Log purga:  /var/log/flotacontrol-purge.log"
 echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
 echo ""

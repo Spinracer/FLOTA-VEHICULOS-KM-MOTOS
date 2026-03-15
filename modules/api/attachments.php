@@ -10,7 +10,6 @@ require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/attachments.php';
 require_login();
 
-header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 
 try {
@@ -19,19 +18,21 @@ try {
     // ─── Download ───
     if ($method === 'GET' && $action === 'download') {
         $id = (int)($_GET['id'] ?? 0);
-        if ($id <= 0) { http_response_code(400); echo json_encode(['error' => 'ID requerido.']); exit; }
+        if ($id <= 0) { http_response_code(400); header('Content-Type: application/json'); echo json_encode(['error' => 'ID requerido.']); exit; }
         $att = attachment_get($id);
-        if (!$att) { http_response_code(404); echo json_encode(['error' => 'Adjunto no encontrado.']); exit; }
+        if (!$att) { http_response_code(404); header('Content-Type: application/json'); echo json_encode(['error' => 'Adjunto no encontrado.']); exit; }
         $path = attachment_path($id);
-        if (!$path) { http_response_code(404); echo json_encode(['error' => 'Archivo no encontrado en disco.']); exit; }
+        if (!$path) { http_response_code(404); header('Content-Type: application/json'); echo json_encode(['error' => 'Archivo no encontrado en disco.']); exit; }
 
         header('Content-Type: ' . $att['mime_type']);
-        header('Content-Disposition: inline; filename="' . $att['original_name'] . '"');
+        header('Content-Disposition: inline; filename="' . basename($att['original_name']) . '"');
         header('Content-Length: ' . filesize($path));
         header_remove('X-Powered-By');
         readfile($path);
         exit;
     }
+
+    header('Content-Type: application/json');
 
     switch ($method) {
         case 'GET':

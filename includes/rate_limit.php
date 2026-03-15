@@ -11,6 +11,7 @@ const RATE_LIMITS = [
     'login'     => [5, 60],      // 5 attempts per minute
     'api_write' => [60, 60],     // 60 writes per minute
     'api_read'  => [120, 60],    // 120 reads per minute
+    'firma'     => [10, 60],     // 10 requests per minute
 ];
 
 /**

@@ -34,10 +34,16 @@ function cache_get(string $key, string $category = 'stats') {
     $data = @file_get_contents($file);
     if ($data === false) return null;
 
-    $entry = @unserialize($data);
+    $entry = @json_decode($data, true);
     if (!is_array($entry) || !isset($entry['expires'], $entry['value'])) {
-        @unlink($file);
-        return null;
+        // Try legacy unserialize for migration, then delete
+        $entry = @unserialize($data);
+        if (!is_array($entry) || !isset($entry['expires'], $entry['value'])) {
+            @unlink($file);
+            return null;
+        }
+        // Re-save as JSON
+        @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_UNICODE), LOCK_EX);
     }
 
     if (time() > $entry['expires']) {
@@ -72,7 +78,7 @@ function cache_set(string $key, $value, string $category = 'stats', ?int $ttl = 
     ];
 
     $file = cache_path($key);
-    @file_put_contents($file, serialize($entry), LOCK_EX);
+    @file_put_contents($file, json_encode($entry, JSON_UNESCAPED_UNICODE), LOCK_EX);
 }
 
 /**
@@ -148,7 +154,7 @@ function cache_stats(): array {
         if (!is_file($file)) continue;
         $size += filesize($file);
         $data = @file_get_contents($file);
-        $entry = @unserialize($data);
+        $entry = @json_decode($data, true) ?: @unserialize($data);
         if (is_array($entry) && isset($entry['expires']) && $now > $entry['expires']) {
             $expired++;
         }
@@ -175,7 +181,7 @@ function cache_cleanup(): int {
     foreach (glob($dir . '/*') as $file) {
         if (!is_file($file)) continue;
         $data = @file_get_contents($file);
-        $entry = @unserialize($data);
+        $entry = @json_decode($data, true) ?: @unserialize($data);
         if (!is_array($entry) || !isset($entry['expires']) || $now > $entry['expires']) {
             if (@unlink($file)) $count++;
         }
