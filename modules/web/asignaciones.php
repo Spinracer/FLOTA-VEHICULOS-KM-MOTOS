@@ -110,6 +110,15 @@ ob_start();
           <p style="font-size:11px;color:var(--text2)">Imprima el acta, obtenga la firma física y luego suba una foto del documento firmado como adjunto.</p>
         </div>
       </div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">🚗 Pase de Salida</label>
+        <div class="form-grid" style="margin:0">
+          <div class="form-group"><label>Destino</label><input name="destino" type="text" placeholder="Ciudad, dirección o ruta..."></div>
+          <div class="form-group"><label>Hora de Salida</label><input name="hora_salida" type="time"></div>
+          <div class="form-group"><label>Hora de Regreso (est.)</label><input name="hora_regreso" type="time"></div>
+          <div class="form-group full"><label>Observaciones del Pase</label><textarea name="observaciones_pase" placeholder="Notas adicionales para el pase de salida..." rows="2"></textarea></div>
+        </div>
+      </div>
       <?php if(can('manage_permissions')): ?>
       <div class="form-group full"><label>Justificación override (solo admin)</label><textarea name="override_reason" placeholder="Solo si necesitas saltar un bloqueo."></textarea></div>
       <?php endif; ?>
@@ -141,6 +150,18 @@ ob_start();
           <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_documentacion" value="1"> Documentación en regla</label><input type="text" class="ck-obs" data-item="end_checklist_documentacion" placeholder="Observación..." style="display:none"></div>
           <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_frenos" value="1"> Frenos operativos</label><input type="text" class="ck-obs" data-item="end_checklist_frenos" placeholder="Observación..." style="display:none"></div>
           <div class="ck-row"><label class="ck-item"><input type="checkbox" name="end_checklist_espejos" value="1"> Espejos completos</label><input type="text" class="ck-obs" data-item="end_checklist_espejos" placeholder="Observación..." style="display:none"></div>
+        </div>
+      </div>
+      <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
+        <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">🚗 Pase de Salida / Regreso</label>
+        <div class="form-grid" style="margin:0">
+          <div class="form-group"><label>Destino</label><input name="destino" type="text" placeholder="Ciudad, dirección o ruta..."></div>
+          <div class="form-group"><label>Hora de Regreso</label><input name="hora_regreso" type="time"></div>
+          <div class="form-group full"><label>Observaciones del Pase</label><textarea name="observaciones_pase" placeholder="Notas adicionales..." rows="2"></textarea></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="enviarLinkFirmaGuardia()" title="Generar link de firma para el guardia de seguridad">🛡️ Link firma Guardia</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="enviarLinkFirmaResponsable()" title="Generar link de firma para el responsable del vehículo">👤 Link firma Responsable</button>
         </div>
       </div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
@@ -305,19 +326,20 @@ async function addCustomItem() {
 
 // ── Firma canvas ──
 let firmaDrawing = false;
+let firmaHasStrokes = false;
 const firmaCanvas = document.getElementById('firma-canvas');
 const firmaCtx = firmaCanvas ? firmaCanvas.getContext('2d') : null;
 if (firmaCanvas) {
-  firmaCanvas.addEventListener('mousedown', e => { firmaDrawing = true; firmaCtx.beginPath(); firmaCtx.moveTo(e.offsetX, e.offsetY); });
+  firmaCanvas.addEventListener('mousedown', e => { firmaDrawing = true; firmaHasStrokes = true; firmaCtx.beginPath(); firmaCtx.moveTo(e.offsetX, e.offsetY); });
   firmaCanvas.addEventListener('mousemove', e => { if (!firmaDrawing) return; firmaCtx.lineTo(e.offsetX, e.offsetY); firmaCtx.strokeStyle = '#1a1a1a'; firmaCtx.lineWidth = 2.5; firmaCtx.lineCap = 'round'; firmaCtx.stroke(); });
   firmaCanvas.addEventListener('mouseup', () => firmaDrawing = false);
   firmaCanvas.addEventListener('mouseleave', () => firmaDrawing = false);
   // Touch support
-  firmaCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaDrawing = true; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.beginPath(); firmaCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
+  firmaCanvas.addEventListener('touchstart', e => { e.preventDefault(); firmaDrawing = true; firmaHasStrokes = true; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.beginPath(); firmaCtx.moveTo(t.clientX - r.left, t.clientY - r.top); });
   firmaCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (!firmaDrawing) return; const t = e.touches[0]; const r = firmaCanvas.getBoundingClientRect(); firmaCtx.lineTo(t.clientX - r.left, t.clientY - r.top); firmaCtx.strokeStyle = '#1a1a1a'; firmaCtx.lineWidth = 2.5; firmaCtx.lineCap = 'round'; firmaCtx.stroke(); });
   firmaCanvas.addEventListener('touchend', () => firmaDrawing = false);
 }
-function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); } }
+function clearFirma() { if (firmaCtx) { firmaCtx.clearRect(0, 0, firmaCanvas.width, firmaCanvas.height); firmaHasStrokes = false; } }
 
 // Export canvas with white background (CSS bg not included in toDataURL)
 function canvasToDataURL(canvas) {
@@ -460,11 +482,20 @@ async function saveNewAndGetId() {
   const pSel = document.getElementById('plantilla-select');
   if (pSel && pSel.value) d.plantilla_id = parseInt(pSel.value);
   d.checklist_detalles = collectObservations('checklist-grid') || d.checklist_detalles || null;
+  // Pase de salida fields
+  const destNew = document.querySelector('#modal-new [name="destino"]');
+  if (destNew) d.destino = destNew.value || null;
+  const hSalidaNew = document.querySelector('#modal-new [name="hora_salida"]');
+  if (hSalidaNew) d.hora_salida = hSalidaNew.value || null;
+  const hRegresoNew = document.querySelector('#modal-new [name="hora_regreso"]');
+  if (hRegresoNew) d.hora_regreso = hRegresoNew.value || null;
+  const obsPaseNew = document.querySelector('#modal-new [name="observaciones_pase"]');
+  if (obsPaseNew) d.observaciones_pase = obsPaseNew.value || null;
   const feRadio = document.querySelector('#modal-new [name="firma_entrega_tipo"]:checked');
-  d.firma_entrega_tipo = feRadio ? feRadio.value : 'ninguna';
-  if (d.firma_entrega_tipo === 'digital' && firmaEntregaCanvas) {
-    d.firma_entrega_data = canvasToDataURL(firmaEntregaCanvas);
-  }
+  const feOriginal = feRadio ? feRadio.value : 'ninguna';
+  // For digital: don't send data in POST — use token/link flow so operator signs externally
+  d.firma_entrega_tipo = (feOriginal === 'digital') ? 'ninguna' : feOriginal;
+  if (feOriginal === 'fisica') d.firma_entrega_tipo = 'fisica';
   const res = await api('/api/asignaciones.php', 'POST', d);
   _lastNewId = res.id;
   // Save dynamic checklist responses
@@ -476,8 +507,8 @@ async function saveNewAndGetId() {
       try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) {}
     }
   }
-  // Generate firma link if digital
-  if (res.id && d.firma_entrega_tipo === 'digital') {
+  // Generate firma link if digital — operator will sign via external link
+  if (res.id && feOriginal === 'digital') {
     try {
       const lr = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: res.id, momento: 'entrega' });
       if (lr.token) {
@@ -495,14 +526,66 @@ async function saveNewAndGetId() {
 async function enviarLinkFirma() {
   const asigId = document.querySelector('#modal-close [name="id"]').value;
   if (!asigId) { toast('Primero guarda la asignación','error'); return; }
+  // Validate required close fields
+  const d = getForm('modal-close');
+  if(!d.end_at || !d.end_km){ toast('Fin y KM fin son obligatorios para cerrar','error'); return; }
+  d.end_at = d.end_at.replace('T',' ')+':00';
+  // Collect end checklist
+  ['end_checklist_gata','end_checklist_herramientas','end_checklist_llanta','end_checklist_bac','end_checklist_revision','end_checklist_luces','end_checklist_liquidos','end_checklist_motor','end_checklist_parabrisas','end_checklist_documentacion','end_checklist_frenos','end_checklist_espejos'].forEach(f => {
+    const cb = document.querySelector(`#modal-close [name="${f}"]`);
+    d[f] = cb && cb.checked ? 1 : 0;
+  });
+  d.end_checklist_detalles = collectObservations('end-checklist-grid') || null;
+  // Collect pase de salida fields
+  const destInput = document.querySelector('#modal-close [name="destino"]');
+  if (destInput) d.destino = destInput.value;
+  const hSalida = document.querySelector('#modal-close [name="hora_salida"]');
+  if (hSalida) d.hora_salida = hSalida.value || null;
+  const hRegreso = document.querySelector('#modal-close [name="hora_regreso"]');
+  if (hRegreso) d.hora_regreso = hRegreso.value || null;
+  const obsPase = document.querySelector('#modal-close [name="observaciones_pase"]');
+  if (obsPase) d.observaciones_pase = obsPase.value || null;
+  // Close with firma_tipo=ninguna — operator will sign via link
+  d.firma_tipo = 'ninguna';
   try {
+    toast('Cerrando asignación y generando link de firma...', 'info');
+    await api('/api/asignaciones.php', 'PUT', { ...d, action: 'close' });
+    // Generate retorno firma link
     const res = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: parseInt(asigId), momento: 'retorno' });
     if (res.token) {
       const link = window.location.origin + '/firma.php?token=' + res.token;
       await navigator.clipboard.writeText(link);
-      toast('Link de firma copiado al portapapeles');
+      toast('Asignación cerrada. Link de firma copiado al portapapeles ✅');
     }
-  } catch(e) { toast('Error al generar link de firma','error'); }
+    closeModal('modal-close');
+    load();
+  } catch(e) { toast('Error: ' + e.message,'error'); }
+}
+
+async function enviarLinkFirmaGuardia() {
+  const asigId = document.querySelector('#modal-close [name="id"]').value;
+  if (!asigId) { toast('ID de asignación no encontrado','error'); return; }
+  try {
+    const res = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: parseInt(asigId), momento: 'guardia' });
+    if (res.token) {
+      const link = window.location.origin + '/firma.php?token=' + res.token;
+      await navigator.clipboard.writeText(link);
+      toast('Link de firma para Guardia copiado al portapapeles ✅');
+    }
+  } catch(e) { toast('Error al generar link','error'); }
+}
+
+async function enviarLinkFirmaResponsable() {
+  const asigId = document.querySelector('#modal-close [name="id"]').value;
+  if (!asigId) { toast('ID de asignación no encontrado','error'); return; }
+  try {
+    const res = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: parseInt(asigId), momento: 'responsable' });
+    if (res.token) {
+      const link = window.location.origin + '/firma.php?token=' + res.token;
+      await navigator.clipboard.writeText(link);
+      toast('Link de firma para Responsable copiado al portapapeles ✅');
+    }
+  } catch(e) { toast('Error al generar link','error'); }
 }
 
 async function load(){
@@ -542,7 +625,8 @@ async function load(){
       <?php if(can('edit')): ?>
       <td>
         <div class="action-btns">
-          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=asignacion&id=${r.id}','_blank')" title="Imprimir PDF">🖨️</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=asignacion&id=${r.id}','_blank')" title="Imprimir Acta">🖨️</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=pase_salida&id=${r.id}','_blank')" title="Pase de Salida">🚗</button>
           ${r.estado==='Activa' ? `<button class="btn btn-primary btn-sm" onclick='openClose(${JSON.stringify(r)})'>Cerrar</button>` : ''}
           <?php if(can('delete')): ?>
           <button class="btn btn-danger btn-sm" onclick="delItem(${r.id})">🗑️</button>
@@ -590,11 +674,21 @@ async function saveClose(){
     d[f] = cb && cb.checked ? 1 : 0;
   });
   d.end_checklist_detalles = collectObservations('end-checklist-grid') || null;
-  // Firma
+  // Pase de salida fields
+  const destClose = document.querySelector('#modal-close [name="destino"]');
+  if (destClose) d.destino = destClose.value || null;
+  const hrClose = document.querySelector('#modal-close [name="hora_regreso"]');
+  if (hrClose) d.hora_regreso = hrClose.value || null;
+  const obsPaseClose = document.querySelector('#modal-close [name="observaciones_pase"]');
+  if (obsPaseClose) d.observaciones_pase = obsPaseClose.value || null;
+  // Firma — only send data if canvas actually has strokes drawn
   const firmaRadio = document.querySelector('#modal-close [name="firma_tipo"]:checked');
   d.firma_tipo = firmaRadio ? firmaRadio.value : 'ninguna';
-  if (d.firma_tipo === 'digital' && firmaCanvas) {
+  if (d.firma_tipo === 'digital' && firmaCanvas && firmaHasStrokes) {
     d.firma_data = canvasToDataURL(firmaCanvas);
+  } else if (d.firma_tipo === 'digital' && !firmaHasStrokes) {
+    // Digital selected but nothing drawn — send as 'ninguna' to preserve any existing external signature
+    d.firma_tipo = 'ninguna';
   }
   await api('/api/asignaciones.php', 'PUT', { ...d, action: 'close' });
   toast('Asignación cerrada');

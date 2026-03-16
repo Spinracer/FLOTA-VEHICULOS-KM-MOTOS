@@ -31,23 +31,35 @@ Este paso crea tablas base, catálogos semilla, auditoría y odómetro.
 
 ## 4) Levantar en local (desarrollo)
 
-### Opción A: MySQL en Docker + PHP embebido
+### Opción A: Docker Compose (recomendado)
+
+```bash
+cp .env.example .env
+# Editar .env con tus credenciales
+docker compose up -d
+```
+
+App disponible en: `http://localhost:8080`
+
+Ver `INSTRUCCIONES_DOCKER.md` para la guia completa.
+
+### Opción B: MySQL en Docker + PHP embebido
 
 ```bash
 docker run -d --name flotacontrol-db \
-  -e MYSQL_ROOT_PASSWORD=FlotaCtrl2024x \
+  -e MYSQL_ROOT_PASSWORD=YOUR_SECURE_PASSWORD \
   -e MYSQL_DATABASE=flotacontrol \
   -p 3306:3306 mysql:8
 
-php8.3 -S 0.0.0.0:8000
+php8.3 -S 0.0.0.0:8080
 ```
 
-App disponible en: `http://127.0.0.1:8000`
+App disponible en: `http://127.0.0.1:8080`
 
-### Opción B: Servicios locales instalados
+### Opción C: Servicios locales instalados
 
 - Asegura MySQL escuchando en `DB_HOST:DB_PORT`
-- Ejecuta `php8.3 -S 0.0.0.0:8000`
+- Ejecuta `php8.3 -S 0.0.0.0:8080`
 
 ## 5) Producción (recomendaciones)
 

@@ -105,7 +105,7 @@ DB_PASS=
 En este entorno usa `php8.3` para ejecutar el servidor local (incluye `pdo_mysql`):
 
 ```bash
-php8.3 -S 0.0.0.0:8000
+php8.3 -S 0.0.0.0:8080
 ```
 
 ---

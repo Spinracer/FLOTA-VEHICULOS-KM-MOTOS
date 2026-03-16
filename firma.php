@@ -33,16 +33,28 @@ if ($method === 'POST') {
         echo json_encode(['error' => 'Firma inválida.']);
         exit;
     }
-    // Try retorno token first, then entrega token
-    $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_token = ? AND (firma_token_created_at IS NULL OR firma_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
+    // Try retorno token first, then entrega token, then guardia, then responsable
+    $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data, firma_guardia_data, firma_responsable_data FROM asignaciones WHERE firma_token = ? AND (firma_token_created_at IS NULL OR firma_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
     $stmt->execute([$token]);
     $asig = $stmt->fetch();
     $momento = 'retorno';
     if (!$asig) {
-        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data FROM asignaciones WHERE firma_entrega_token = ? AND (firma_entrega_token_created_at IS NULL OR firma_entrega_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
+        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data, firma_guardia_data, firma_responsable_data FROM asignaciones WHERE firma_entrega_token = ? AND (firma_entrega_token_created_at IS NULL OR firma_entrega_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
         $stmt->execute([$token]);
         $asig = $stmt->fetch();
         $momento = 'entrega';
+    }
+    if (!$asig) {
+        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data, firma_guardia_data, firma_responsable_data FROM asignaciones WHERE firma_guardia_token = ? AND (firma_guardia_token_created_at IS NULL OR firma_guardia_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
+        $stmt->execute([$token]);
+        $asig = $stmt->fetch();
+        $momento = 'guardia';
+    }
+    if (!$asig) {
+        $stmt = $db->prepare("SELECT id, estado, firma_data, firma_entrega_data, firma_guardia_data, firma_responsable_data FROM asignaciones WHERE firma_responsable_token = ? AND (firma_responsable_token_created_at IS NULL OR firma_responsable_token_created_at > NOW() - INTERVAL 48 HOUR) LIMIT 1");
+        $stmt->execute([$token]);
+        $asig = $stmt->fetch();
+        $momento = 'responsable';
     }
     if (!$asig) {
         http_response_code(404);
@@ -56,6 +68,22 @@ if ($method === 'POST') {
             exit;
         }
         $db->prepare("UPDATE asignaciones SET firma_entrega_data = ?, firma_entrega_tipo = 'digital', firma_entrega_fecha = NOW(), firma_entrega_ip = ? WHERE firma_entrega_token = ?")
+           ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
+    } elseif ($momento === 'guardia') {
+        if ($asig['firma_guardia_data']) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Esta asignación ya tiene firma de guardia registrada.']);
+            exit;
+        }
+        $db->prepare("UPDATE asignaciones SET firma_guardia_data = ?, firma_guardia_tipo = 'digital', firma_guardia_fecha = NOW(), firma_guardia_ip = ? WHERE firma_guardia_token = ?")
+           ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
+    } elseif ($momento === 'responsable') {
+        if ($asig['firma_responsable_data']) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Esta asignación ya tiene firma del responsable registrada.']);
+            exit;
+        }
+        $db->prepare("UPDATE asignaciones SET firma_responsable_data = ?, firma_responsable_tipo = 'digital', firma_responsable_fecha = NOW(), firma_responsable_ip = ? WHERE firma_responsable_token = ?")
            ->execute([$firma, $_SERVER['REMOTE_ADDR'] ?? 'unknown', $token]);
     } else {
         if ($asig['firma_data']) {
@@ -97,14 +125,47 @@ if (!$asig) {
     $asig = $stmt->fetch();
     $momento = 'entrega';
 }
+if (!$asig) {
+    $stmt = $db->prepare("
+        SELECT a.*, v.placa, v.marca, v.modelo,
+               o.nombre AS operador_nombre
+        FROM asignaciones a
+        LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
+        LEFT JOIN operadores o ON o.id = a.operador_id
+        WHERE a.firma_guardia_token = ? AND (a.firma_guardia_token_created_at IS NULL OR a.firma_guardia_token_created_at > NOW() - INTERVAL 48 HOUR)
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $asig = $stmt->fetch();
+    $momento = 'guardia';
+}
+if (!$asig) {
+    $stmt = $db->prepare("
+        SELECT a.*, v.placa, v.marca, v.modelo,
+               o.nombre AS operador_nombre
+        FROM asignaciones a
+        LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
+        LEFT JOIN operadores o ON o.id = a.operador_id
+        WHERE a.firma_responsable_token = ? AND (a.firma_responsable_token_created_at IS NULL OR a.firma_responsable_token_created_at > NOW() - INTERVAL 48 HOUR)
+        LIMIT 1
+    ");
+    $stmt->execute([$token]);
+    $asig = $stmt->fetch();
+    $momento = 'responsable';
+}
 
 if (!$asig) {
     http_response_code(404);
     die('Asignación no encontrada o token expirado.');
 }
 
-$yaFirmado = $momento === 'entrega' ? !empty($asig['firma_entrega_data']) : !empty($asig['firma_data']);
+$yaFirmado = false;
+if ($momento === 'entrega') $yaFirmado = !empty($asig['firma_entrega_data']);
+elseif ($momento === 'guardia') $yaFirmado = !empty($asig['firma_guardia_data']);
+elseif ($momento === 'responsable') $yaFirmado = !empty($asig['firma_responsable_data']);
+else $yaFirmado = !empty($asig['firma_data']);
 $folio = 'ASG-' . str_pad($asig['id'], 6, '0', STR_PAD_LEFT);
+$momentoLabels = ['entrega'=>'Entrega','retorno'=>'Devolución','guardia'=>'Guardia de Seguridad','responsable'=>'Responsable del Vehículo'];
 ?>
 <!DOCTYPE html>
 <html lang="es" class="dark">
@@ -134,7 +195,7 @@ tailwind.config = {
 <div class="font-heading font-extrabold text-2xl text-accent tracking-tight">FlotaCtrl</div>
 <div class="bg-surface border border-border rounded-xl p-6 max-w-lg w-full mt-5">
   <h1 class="text-xl font-bold text-accent mb-1">✍️ Firma Digital</h1>
-  <h2 class="text-sm text-muted font-normal mb-4"><?= $folio ?> — <?= $momento === 'entrega' ? 'Entrega' : 'Devolución' ?></h2>
+  <h2 class="text-sm text-muted font-normal mb-4"><?= $folio ?> — <?= $momentoLabels[$momento] ?? 'Firma' ?></h2>
   
   <div class="grid grid-cols-2 gap-2 mb-4 text-[13px]">
     <div class="bg-dark rounded-md px-3 py-2"><label class="text-muted text-[11px] block mb-0.5">Vehículo</label><span class="text-white font-medium"><?= htmlspecialchars($asig['placa'] . ' ' . $asig['marca'] . ' ' . $asig['modelo']) ?></span></div>
@@ -144,9 +205,11 @@ tailwind.config = {
   </div>
 
   <?php if ($yaFirmado): ?>
-    <?php 
-      $fData = $momento === 'entrega' ? ($asig['firma_entrega_data'] ?? '') : ($asig['firma_data'] ?? '');
-      $fFecha = $momento === 'entrega' ? ($asig['firma_entrega_fecha'] ?? '') : ($asig['firma_fecha'] ?? '');
+    <?php
+      $fDataMap = ['entrega'=>'firma_entrega_data','retorno'=>'firma_data','guardia'=>'firma_guardia_data','responsable'=>'firma_responsable_data'];
+      $fFechaMap = ['entrega'=>'firma_entrega_fecha','retorno'=>'firma_fecha','guardia'=>'firma_guardia_fecha','responsable'=>'firma_responsable_fecha'];
+      $fData = $asig[$fDataMap[$momento] ?? 'firma_data'] ?? '';
+      $fFecha = $asig[$fFechaMap[$momento] ?? 'firma_fecha'] ?? '';
     ?>
     <div class="bg-success/10 border border-success text-success px-4 py-3.5 rounded-lg text-center text-sm mt-3">✅ Esta asignación ya fue firmada el <?= htmlspecialchars($fFecha) ?>.</div>
     <?php if ($fData): ?>

@@ -62,12 +62,14 @@ echo ""
 echo -e "  ${CYAN}1)${NC} Local sin dominio (acceso por IP, ej: http://192.168.1.100)"
 echo -e "  ${CYAN}2)${NC} Con dominio propio (ej: flota.miempresa.com + SSL)"
 echo -e "  ${CYAN}3)${NC} Local + Cloudflare Tunnel (acceso público sin abrir puertos)"
+echo -e "  ${CYAN}4)${NC} Docker (docker-compose con PHP-FPM + Nginx + MySQL)"
 echo ""
 DEPLOY_MODE=$(ask "Selecciona modo" "1")
 
 DOMAIN="_"
 USE_SSL=false
 USE_TUNNEL=false
+USE_DOCKER=false
 TUNNEL_NAME=""
 TUNNEL_HOSTNAME=""
 
@@ -89,6 +91,10 @@ case "$DEPLOY_MODE" in
             TUNNEL_HOSTNAME=$(ask "Hostname público" "")
         done
         DOMAIN="$TUNNEL_HOSTNAME"
+        ;;
+    4)
+        USE_DOCKER=true
+        info "Modo Docker seleccionado"
         ;;
     *)
         DEPLOY_MODE="1"
@@ -159,6 +165,106 @@ echo ""
 
 if ! confirm "¿Proceder con la instalación?"; then
     info "Cancelado."
+    exit 0
+fi
+
+# ═══════════════════════════════════════════════════════════════════
+# MODO DOCKER: Flujo independiente
+# ═══════════════════════════════════════════════════════════════════
+if [[ "$USE_DOCKER" == true ]]; then
+    echo ""
+    echo -e "${BOLD}── Modo Docker: Configuración ──${NC}"
+
+    # Verificar Docker
+    if ! command -v docker &> /dev/null; then
+        error "Docker no está instalado. Instálalo primero: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+    if ! docker compose version &> /dev/null; then
+        error "Docker Compose no está disponible. Instálalo: https://docs.docker.com/compose/install/"
+        exit 1
+    fi
+    success "Docker y Docker Compose detectados"
+
+    APP_PORT=$(ask "Puerto HTTP en el host" "8080")
+    DB_EXTERNAL_PORT=$(ask "Puerto MySQL externo en el host" "3307")
+    MYSQL_ROOT_PASSWORD=$(ask_password "Contraseña root de MySQL (Docker)")
+    while [[ -z "$MYSQL_ROOT_PASSWORD" ]]; do
+        error "La contraseña root de MySQL es obligatoria"
+        MYSQL_ROOT_PASSWORD=$(ask_password "Contraseña root de MySQL")
+    done
+
+    echo ""
+    echo -e "${BOLD}── Primer usuario administrador ──${NC}"
+    ADMIN_EMAIL=""
+    ADMIN_PASSWORD=""
+    ADMIN_NAME=""
+    if confirm "¿Crear usuario administrador en la primera ejecución?"; then
+        ADMIN_EMAIL=$(ask "Email del administrador" "")
+        while [[ -z "$ADMIN_EMAIL" ]]; do
+            error "El email es obligatorio"
+            ADMIN_EMAIL=$(ask "Email del administrador" "")
+        done
+        ADMIN_NAME=$(ask "Nombre del administrador" "Administrador")
+        ADMIN_PASSWORD=$(ask_password "Contraseña del administrador (mínimo 8 caracteres)")
+        while [[ -z "$ADMIN_PASSWORD" || ${#ADMIN_PASSWORD} -lt 8 ]]; do
+            error "La contraseña debe tener al menos 8 caracteres"
+            ADMIN_PASSWORD=$(ask_password "Contraseña del administrador")
+        done
+    fi
+
+    APP_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n')
+
+    APP_URL="http://localhost:${APP_PORT}"
+
+    ENV_FILE="${INSTALL_DIR}/.env"
+    cat > "${ENV_FILE}" <<DOCKERENV
+# FlotaControl — Docker .env (generado por deploy.sh el $(date '+%Y-%m-%d %H:%M'))
+DB_HOST=mysql
+DB_PORT=3306
+DB_NAME=${DB_NAME}
+DB_USER=${DB_USER}
+DB_PASS=${DB_PASS}
+DB_CHARSET=utf8mb4
+
+APP_NAME=FlotaControl
+APP_ENV=production
+APP_URL=${APP_URL}
+APP_DEBUG=false
+APP_SECRET=${APP_SECRET}
+
+SESSION_NAME=FLOTACONTROL
+SESSION_LIFETIME=7200
+
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+APP_PORT=${APP_PORT}
+DB_EXTERNAL_PORT=${DB_EXTERNAL_PORT}
+TZ=${TIMEZONE}
+
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+ADMIN_NAME=${ADMIN_NAME}
+DOCKERENV
+    chmod 600 "${ENV_FILE}"
+    success ".env generado para Docker"
+
+    echo ""
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║${NC}  ${GREEN}${BOLD}✅ Configuración Docker lista${NC}                            ${CYAN}║${NC}"
+    echo -e "${CYAN}╠═══════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${CYAN}║${NC}  Para iniciar:                                            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}    ${BOLD}cd ${INSTALL_DIR}${NC}"
+    echo -e "${CYAN}║${NC}    ${BOLD}docker compose up -d${NC}"
+    echo -e "${CYAN}║${NC}                                                            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}  Ver logs:                                                 ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}    ${BOLD}docker compose logs -f${NC}"
+    echo -e "${CYAN}║${NC}                                                            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}  URL: ${BOLD}http://localhost:${APP_PORT}${NC}"
+    echo -e "${CYAN}║${NC}                                                            ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}  ${YELLOW}Lee INSTRUCCIONES_DOCKER.md para más detalles${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
     exit 0
 fi
 
@@ -290,6 +396,51 @@ ENVEOF
 chown www-data:www-data "${ENV_FILE}"
 chmod 600 "${ENV_FILE}"
 success ".env creado y protegido (chmod 600)"
+
+# ═══════════════════════════════════════════════════════════════════
+# PASO 6b: Primer usuario administrador
+# ═══════════════════════════════════════════════════════════════════
+echo ""
+echo -e "${BOLD}── Paso 6b: Primer usuario administrador ──${NC}"
+echo ""
+info "Configura el primer usuario admin del sistema."
+info "Si omites este paso, deberás crear usuarios manualmente en la BD."
+echo ""
+
+if confirm "¿Crear usuario administrador ahora?"; then
+    ADMIN_EMAIL=$(ask "Email del administrador" "")
+    while [[ -z "$ADMIN_EMAIL" ]]; do
+        error "El email es obligatorio"
+        ADMIN_EMAIL=$(ask "Email del administrador" "")
+    done
+
+    ADMIN_NAME=$(ask "Nombre del administrador" "Administrador")
+
+    ADMIN_PASSWORD=$(ask_password "Contraseña del administrador (mínimo 8 caracteres)")
+    while [[ -z "$ADMIN_PASSWORD" || ${#ADMIN_PASSWORD} -lt 8 ]]; do
+        error "La contraseña debe tener al menos 8 caracteres"
+        ADMIN_PASSWORD=$(ask_password "Contraseña del administrador")
+    done
+
+    APP_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n')
+
+    cat >> "${ENV_FILE}" <<ADMINEOF
+
+APP_SECRET=${APP_SECRET}
+ADMIN_EMAIL=${ADMIN_EMAIL}
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
+ADMIN_NAME=${ADMIN_NAME}
+ADMINEOF
+
+    export ADMIN_EMAIL ADMIN_PASSWORD ADMIN_NAME
+
+    success "Credenciales de administrador configuradas"
+else
+    APP_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    echo "" >> "${ENV_FILE}"
+    echo "APP_SECRET=${APP_SECRET}" >> "${ENV_FILE}"
+    info "Omitido. Crea usuarios manualmente después de la instalación."
+fi
 
 # ═══════════════════════════════════════════════════════════════════
 # PASO 7: Configurar PHP-FPM

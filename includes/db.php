@@ -29,8 +29,18 @@ loadEnv(dirname(__DIR__) . '/.env');
 define('DB_HOST',    getenv('DB_HOST')    ?: '127.0.0.1');
 define('DB_PORT',    getenv('DB_PORT')    ?: '3306');
 define('DB_NAME',    getenv('DB_NAME')    ?: 'flotacontrol');
-define('DB_USER',    getenv('DB_USER')    ?: 'root');
-define('DB_PASS',    getenv('DB_PASS')    ?: '');
+$_dbUser = getenv('DB_USER');
+$_dbPass = getenv('DB_PASS');
+if (!$_dbUser || $_dbUser === '') {
+    http_response_code(500);
+    die('FATAL: DB_USER no está configurado. Crea un archivo .env o exporta la variable.');
+}
+if ($_dbPass === false || $_dbPass === '') {
+    http_response_code(500);
+    die('FATAL: DB_PASS no está configurado. Crea un archivo .env o exporta la variable.');
+}
+define('DB_USER', $_dbUser);
+define('DB_PASS', $_dbPass);
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 define('DB_SOCKET', getenv('DB_SOCKET') ?: '');
 

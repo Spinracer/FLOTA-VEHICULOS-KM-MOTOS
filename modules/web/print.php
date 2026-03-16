@@ -371,6 +371,102 @@ case 'mantenimiento':
     $content .= '</div>';
     break;
 
+// ─── PDF PASE DE SALIDA DE VEHÍCULO ──────────────────
+case 'pase_salida':
+    if ($id <= 0) die('ID de asignación requerido.');
+    $stmt = $db->prepare("
+        SELECT a.*, v.placa, v.marca, v.modelo, v.anio, v.color, v.vin, v.km_actual,
+               o.nombre AS operador_nombre, o.licencia, o.telefono, o.categoria_lic, o.dni,
+               dep.nombre AS departamento_nombre,
+               uc.nombre AS creado_por_nombre
+        FROM asignaciones a
+        LEFT JOIN vehiculos v ON v.id = a.vehiculo_id
+        LEFT JOIN operadores o ON o.id = a.operador_id
+        LEFT JOIN departamentos dep ON dep.id = o.departamento_id
+        LEFT JOIN usuarios uc ON uc.id = a.created_by
+        WHERE a.id = ?
+    ");
+    $stmt->execute([$id]);
+    $a = $stmt->fetch();
+    if (!$a) die('Asignación no encontrada.');
+
+    $title = 'Pase de Salida de Vehículo';
+    $subtitle = 'Control de Flota Vehicular';
+    $folio = 'PS-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+
+    // Header del pase
+    $content .= '<div class="section" style="text-align:center;border:2px solid #1a1a1a;border-radius:8px;padding:16px;margin-bottom:16px">';
+    $content .= '<h3 style="background:transparent;color:#1a1a1a;margin:0;padding:0;font-size:18px;text-transform:uppercase;letter-spacing:2px">PASE DE SALIDA DE VEHÍCULO</h3>';
+    $content .= '<p style="font-size:12px;color:#555;margin-top:4px">Folio: <strong>' . $folio . '</strong> | Fecha: <strong>' . date('d/m/Y', strtotime($a['start_at'])) . '</strong></p>';
+    $content .= '</div>';
+
+    // Datos del vehículo
+    $content .= '<div class="section"><h3>Datos del Vehículo</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Placa:</strong></td><td style=\"font-size:14px;font-weight:700\">{$a['placa']}</td><td><strong>Marca/Modelo:</strong></td><td>{$a['marca']} {$a['modelo']} {$a['anio']}</td></tr>";
+    $content .= "<tr><td><strong>Color:</strong></td><td>" . ($a['color'] ?? '—') . "</td><td><strong>VIN:</strong></td><td>" . ($a['vin'] ?? '—') . "</td></tr>";
+    $content .= "<tr><td><strong>KM Salida:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td><td><strong>Estado:</strong></td><td>" . ($a['estado'] ?? '—') . "</td></tr>";
+    $content .= '</tbody></table></div>';
+
+    // Datos del personal
+    $content .= '<div class="section"><h3>Personal</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Conductor:</strong></td><td>{$a['operador_nombre']}</td><td><strong>DNI:</strong></td><td>" . ($a['dni'] ?? '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Licencia:</strong></td><td>" . ($a['licencia'] ?? '—') . " (" . ($a['categoria_lic'] ?? '') . ")</td><td><strong>Teléfono:</strong></td><td>" . ($a['telefono'] ?? '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Departamento:</strong></td><td>" . ($a['departamento_nombre'] ?? '—') . "</td><td><strong>Asignado por:</strong></td><td>" . htmlspecialchars($a['creado_por_nombre'] ?? '—') . "</td></tr>";
+    $content .= '</tbody></table></div>';
+
+    // Detalles del viaje
+    $content .= '<div class="section"><h3>Detalles del Viaje</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Destino:</strong></td><td colspan=\"3\" style=\"font-weight:600\">" . htmlspecialchars($a['destino'] ?? '(No especificado)') . "</td></tr>";
+    $horaSalida = $a['hora_salida'] ? date('H:i', strtotime($a['hora_salida'])) : date('H:i', strtotime($a['start_at']));
+    $horaRegreso = $a['hora_regreso'] ? date('H:i', strtotime($a['hora_regreso'])) : '—';
+    $content .= "<tr><td><strong>Fecha:</strong></td><td>" . date('d/m/Y', strtotime($a['start_at'])) . "</td><td><strong>Hora de Salida:</strong></td><td>{$horaSalida}</td></tr>";
+    $content .= "<tr><td><strong>Hora de Regreso:</strong></td><td>{$horaRegreso}</td><td><strong>KM Regreso:</strong></td><td>" . ($a['end_km'] ? number_format((float)$a['end_km'], 0) . ' km' : '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Observaciones:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['observaciones_pase'] ?? ($a['start_notes'] ?? '—')) . "</td></tr>";
+    $content .= '</tbody></table></div>';
+
+    // Sección de firmas digitales (si existen)
+    $hasFirmaDigital = !empty($a['firma_entrega_data']) || !empty($a['firma_responsable_data']) || !empty($a['firma_guardia_data']);
+    if ($hasFirmaDigital) {
+        $content .= '<div class="section"><h3>Firmas Digitales</h3>';
+        $content .= '<div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:12px;text-align:center">';
+        if (!empty($a['firma_entrega_data'])) {
+            $content .= '<div style="flex:1;min-width:180px">';
+            $content .= '<img src="' . htmlspecialchars($a['firma_entrega_data']) . '" alt="Firma Autorización" style="max-width:200px;border:1px solid #ccc;padding:4px;background:#fff;display:block;margin:0 auto">';
+            $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Autorizado por<br>' . htmlspecialchars($a['creado_por_nombre'] ?? 'Encargado') . '</p>';
+            $content .= '</div>';
+        }
+        if (!empty($a['firma_responsable_data'])) {
+            $content .= '<div style="flex:1;min-width:180px">';
+            $content .= '<img src="' . htmlspecialchars($a['firma_responsable_data']) . '" alt="Firma Responsable" style="max-width:200px;border:1px solid #ccc;padding:4px;background:#fff;display:block;margin:0 auto">';
+            $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Responsable del Vehículo<br>' . htmlspecialchars($a['operador_nombre']) . '</p>';
+            $content .= '</div>';
+        }
+        if (!empty($a['firma_guardia_data'])) {
+            $content .= '<div style="flex:1;min-width:180px">';
+            $content .= '<img src="' . htmlspecialchars($a['firma_guardia_data']) . '" alt="Firma Guardia" style="max-width:200px;border:1px solid #ccc;padding:4px;background:#fff;display:block;margin:0 auto">';
+            $content .= '<p style="font-size:10px;color:#888;margin-top:4px">Guardia de Seguridad</p>';
+            $content .= '</div>';
+        }
+        $content .= '</div></div>';
+    }
+
+    // Bloque de firmas físicas (siempre presente para impresión)
+    $encargado = htmlspecialchars($a['creado_por_nombre'] ?? current_user()['nombre'] ?? 'Encargado');
+    $content .= '<div class="signatures" style="margin-top:40px">';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizado por:</strong></p><p>' . $encargado . '</p><p style="font-size:10px;color:#888">Encargado de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Responsable del Vehículo:</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p><p style="font-size:10px;color:#888">Conductor / Operador</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Guardia de Seguridad:</strong></p><p>_________________________</p><p style="font-size:10px;color:#888">Nombre y Firma</p></div>';
+    $content .= '</div>';
+
+    // Nota al pie
+    $content .= '<div style="margin-top:20px;border-top:1px solid #ddd;padding-top:8px;text-align:center;font-size:10px;color:#888">';
+    $content .= 'Este documento constituye un pase de salida oficial del vehículo descrito. Debe ser presentado al guardia de seguridad al momento de la salida.';
+    $content .= '</div>';
+    break;
+
 default:
     die('Tipo de documento no soportado: ' . htmlspecialchars($type));
 }
@@ -508,7 +604,7 @@ async function saveAsAttachment() {
   // Determine entity for attachment
   let entidad = '';
   let entidadId = id;
-  if (type === 'asignacion') { entidad = 'asignaciones'; }
+  if (type === 'asignacion' || type === 'pase_salida') { entidad = 'asignaciones'; }
   else if (type === 'mantenimiento') { entidad = 'mantenimientos'; }
   else if (type === 'combustible') { entidad = 'combustible'; }
   else if (type === 'combustible_lote') {

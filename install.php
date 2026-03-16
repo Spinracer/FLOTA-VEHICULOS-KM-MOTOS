@@ -45,8 +45,16 @@ if (file_exists($envFile)) {
     }
 }
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+$_dbUser = getenv('DB_USER');
+$_dbPass = getenv('DB_PASS');
+if (!$_dbUser || $_dbUser === '') {
+    die("FATAL: DB_USER no está configurado. Crea un archivo .env o exporta DB_USER.\n");
+}
+if ($_dbPass === false || $_dbPass === '') {
+    die("FATAL: DB_PASS no está configurado. Crea un archivo .env o exporta DB_PASS.\n");
+}
+define('DB_USER', $_dbUser);
+define('DB_PASS', $_dbPass);
 define('DB_NAME', getenv('DB_NAME') ?: 'flotacontrol');
 define('DB_SOCKET', getenv('DB_SOCKET') ?: '');
 
@@ -878,6 +886,23 @@ $asgExtraCols = [
   'firma_entrega_token'   => "VARCHAR(128) NULL",
   'firma_token_created_at' => "DATETIME NULL",
   'firma_entrega_token_created_at' => "DATETIME NULL",
+  // Pase de salida
+  'destino'                           => "VARCHAR(255) NULL",
+  'hora_salida'                       => "TIME NULL",
+  'hora_regreso'                      => "TIME NULL",
+  'observaciones_pase'                => "TEXT NULL",
+  'firma_guardia_tipo'                => "ENUM('digital','fisica','ninguna') NOT NULL DEFAULT 'ninguna'",
+  'firma_guardia_data'                => "LONGTEXT NULL",
+  'firma_guardia_token'               => "VARCHAR(128) NULL",
+  'firma_guardia_token_created_at'    => "DATETIME NULL",
+  'firma_guardia_fecha'               => "DATETIME NULL",
+  'firma_guardia_ip'                  => "VARCHAR(45) NULL",
+  'firma_responsable_tipo'            => "ENUM('digital','fisica','ninguna') NOT NULL DEFAULT 'ninguna'",
+  'firma_responsable_data'            => "LONGTEXT NULL",
+  'firma_responsable_token'           => "VARCHAR(128) NULL",
+  'firma_responsable_token_created_at'=> "DATETIME NULL",
+  'firma_responsable_fecha'           => "DATETIME NULL",
+  'firma_responsable_ip'              => "VARCHAR(45) NULL",
 ];
 foreach ($asgExtraCols as $col => $def) {
   try {
@@ -1558,41 +1583,57 @@ foreach ([
     } catch (Throwable $e) { step("Columna {$tbl}.{$col}", false, $e->getMessage()); }
 }
 
+// ─── Primer usuario admin desde variables de entorno ───
 $generatedPasswords = [];
-$usuarios_iniciales = [
-    [
-        'nombre' => 'Coordinador IT',
-        'email'  => 'coordinador@flotacontrol.local',
-        'rol'    => 'coordinador_it',
-    ],
-    [
-        'nombre' => 'Soporte Sistema',
-        'email'  => 'soporte@flotacontrol.local',
-        'rol'    => 'soporte',
-    ],
-    [
-        'nombre' => 'Monitor Flota',
-        'email'  => 'monitoreo@flotacontrol.local',
-        'rol'    => 'monitoreo',
-    ],
-];
-foreach ($usuarios_iniciales as $u) {
+$adminEmail    = getenv('ADMIN_EMAIL');
+$adminPassword = getenv('ADMIN_PASSWORD');
+$adminName     = getenv('ADMIN_NAME') ?: 'Administrador';
+
+if ($adminEmail && $adminPassword) {
     try {
         $exists = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = ?");
-        $exists->execute([$u['email']]);
+        $exists->execute([$adminEmail]);
         if (!$exists->fetchColumn()) {
-            $pass = bin2hex(random_bytes(8)); // 16 chars random password
-            $hash = password_hash($pass, PASSWORD_DEFAULT);
-            $pdo->prepare("INSERT INTO usuarios (nombre,email,password,rol) VALUES (?,?,?,?)")
-                ->execute([$u['nombre'], $u['email'], $hash, $u['rol']]);
-            $generatedPasswords[] = ['nombre' => $u['nombre'], 'email' => $u['email'], 'pass' => $pass, 'rol' => $u['rol']];
-            step("Usuario '{$u['nombre']}' ({$u['rol']}) creado", true);
+            $hash = password_hash($adminPassword, PASSWORD_DEFAULT);
+            $pdo->prepare("INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)")
+                ->execute([$adminName, $adminEmail, $hash, 'coordinador_it']);
+            $generatedPasswords[] = [
+                'nombre' => $adminName,
+                'email'  => $adminEmail,
+                'pass'   => '(definido via ADMIN_PASSWORD)',
+                'rol'    => 'coordinador_it',
+            ];
+            step("Usuario admin '{$adminName}' (coordinador_it) creado", true);
         } else {
-            step("Usuario '{$u['email']}' ya existe", true, "No se sobreescribió");
+            step("Usuario '{$adminEmail}' ya existe", true, "No se sobreescribió");
         }
     } catch (PDOException $e) {
-        step("Crear usuario '{$u['nombre']}'", false, $e->getMessage());
+        step("Crear usuario admin", false, $e->getMessage());
     }
+} else {
+    step("Creación de usuario admin desde .env omitida", true, "ADMIN_EMAIL/ADMIN_PASSWORD no definidos.");
+}
+
+// ─── Usuario de prueba predeterminado (admin@flotacontrol.local / 123) ───
+try {
+    $defaultExists = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE email = ?");
+    $defaultExists->execute(['admin@flotacontrol.local']);
+    if (!$defaultExists->fetchColumn()) {
+        $defaultHash = password_hash('123', PASSWORD_DEFAULT);
+        $pdo->prepare("INSERT INTO usuarios (nombre, email, password, rol) VALUES (?, ?, ?, ?)")
+            ->execute(['Admin', 'admin@flotacontrol.local', $defaultHash, 'coordinador_it']);
+        $generatedPasswords[] = [
+            'nombre' => 'Admin',
+            'email'  => 'admin@flotacontrol.local',
+            'pass'   => '123',
+            'rol'    => 'coordinador_it',
+        ];
+        step("Usuario de prueba 'Admin' (coordinador_it) creado", true);
+    } else {
+        step("Usuario 'admin@flotacontrol.local' ya existe", true, "No se sobreescribió");
+    }
+} catch (PDOException $e) {
+    step("Crear usuario de prueba", false, $e->getMessage());
 }
 
 if ($ok): 

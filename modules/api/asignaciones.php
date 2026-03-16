@@ -186,8 +186,14 @@ try {
         $momento = trim($d['momento'] ?? 'retorno');
         if ($asigId <= 0) { http_response_code(400); echo json_encode(['error' => 'ID inválido.']); exit; }
         $token = bin2hex(random_bytes(32));
-        $col = $momento === 'entrega' ? 'firma_entrega_token' : 'firma_token';
-        $colTs = $momento === 'entrega' ? 'firma_entrega_token_created_at' : 'firma_token_created_at';
+        $colMap = [
+            'entrega'      => ['firma_entrega_token', 'firma_entrega_token_created_at'],
+            'retorno'      => ['firma_token', 'firma_token_created_at'],
+            'guardia'      => ['firma_guardia_token', 'firma_guardia_token_created_at'],
+            'responsable'  => ['firma_responsable_token', 'firma_responsable_token_created_at'],
+        ];
+        if (!isset($colMap[$momento])) { http_response_code(400); echo json_encode(['error' => 'Momento inválido.']); exit; }
+        [$col, $colTs] = $colMap[$momento];
         $db->prepare("UPDATE asignaciones SET {$col} = ?, {$colTs} = NOW() WHERE id = ?")->execute([$token, $asigId]);
         $baseUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
                  . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
@@ -383,8 +389,8 @@ try {
                 $firmaEntregaFecha = ($firmaEntregaTipo !== 'ninguna') ? date('Y-m-d H:i:s') : null;
                 $firmaEntregaIp = ($firmaEntregaTipo !== 'ninguna') ? ($_SERVER['REMOTE_ADDR'] ?? null) : null;
 
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip)
-                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip,destino,hora_salida,hora_regreso,observaciones_pase)
+                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
@@ -410,6 +416,10 @@ try {
                     $firmaEntregaData,
                     $firmaEntregaFecha,
                     $firmaEntregaIp,
+                    trim((string)($d['destino'] ?? '')) ?: null,
+                    trim((string)($d['hora_salida'] ?? '')) ?: null,
+                    trim((string)($d['hora_regreso'] ?? '')) ?: null,
+                    trim((string)($d['observaciones_pase'] ?? '')) ?: null,
                 ]);
 
                 $id = (int)$db->lastInsertId();
@@ -523,7 +533,8 @@ try {
                         end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?,
                         end_checklist_luces=?, end_checklist_liquidos=?, end_checklist_motor=?, end_checklist_parabrisas=?, end_checklist_documentacion=?, end_checklist_frenos=?, end_checklist_espejos=?,
                         end_checklist_detalles=?,
-                        firma_tipo=?, firma_data=COALESCE(?,firma_data), firma_token=COALESCE(?,firma_token), firma_fecha=COALESCE(firma_fecha,IF(?='ninguna',NULL,NOW())), firma_ip=COALESCE(firma_ip,?)
+                        firma_tipo=?, firma_data=COALESCE(?,firma_data), firma_token=COALESCE(?,firma_token), firma_fecha=COALESCE(firma_fecha,IF(?='ninguna',NULL,NOW())), firma_ip=COALESCE(firma_ip,?),
+                        destino=COALESCE(?,destino), hora_salida=COALESCE(?,hora_salida), hora_regreso=COALESCE(?,hora_regreso), observaciones_pase=COALESCE(?,observaciones_pase)
                     WHERE id=?");
                 $stmt->execute([
                     $d['end_at'] ?: date('Y-m-d H:i:s'),
@@ -549,6 +560,10 @@ try {
                     $firmaToken,
                     $firmaTipo,
                     $_SERVER['REMOTE_ADDR'] ?? null,
+                    trim((string)($d['destino'] ?? '')) ?: null,
+                    trim((string)($d['hora_salida'] ?? '')) ?: null,
+                    trim((string)($d['hora_regreso'] ?? '')) ?: null,
+                    trim((string)($d['observaciones_pase'] ?? '')) ?: null,
                     $id
                 ]);
 
