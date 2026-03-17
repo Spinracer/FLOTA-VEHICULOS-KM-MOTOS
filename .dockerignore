@@ -1,0 +1,14 @@
+.git
+.github
+.vscode
+.idea
+.claude
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+.installed.lock
+docker-compose.yml
+docker-compose.override.yml
+tests/
