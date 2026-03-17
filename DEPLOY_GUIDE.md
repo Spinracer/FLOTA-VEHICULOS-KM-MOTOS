@@ -1,15 +1,24 @@
 # Guía de Despliegue — FlotaControl
 
-## Instalación Rápida (Script Interactivo)
+## 🚀 Instalación Rápida (Script Interactivo) — RECOMENDADO
 
-La forma más rápida de desplegar es usar el script interactivo que te pide todos los datos:
+La forma **más rápida y segura** de desplegar es usar el script interactivo:
 
 ```bash
 # En el servidor Ubuntu:
 sudo bash deploy.sh
 ```
 
-El script configura automáticamente: dependencias, BD, Nginx, PHP-FPM, SSL, cron de purga y backups. Solo rellena lo que te pida.
+El script configura automáticamente:
+- ✅ Todas las dependencias (PHP 8.3, Nginx, MariaDB, etc.)
+- ✅ Base de datos y usuarios
+- ✅ Permisos de seguridad
+- ✅ Nginx + PHP-FPM
+- ✅ SSL con Let's Encrypt (si usas dominio)
+- ✅ Cron de purga automática y backups
+- ✅ Archivo `.env` seguro
+
+**➡️ PARA GUÍA PASO A PASO CON SSH:** Lee `DEPLOY_SSH.md`
 
 > **Nota:** Si tienes discos ya montados con datos, el script **NO** formatea nada. Solo crea los subdirectorios necesarios y un symlink.
 
@@ -376,3 +385,166 @@ du -sh /mnt/data/flotacontrol/uploads/
 └── backups/
     └── db_YYYYMMDD_HHMM.sql.gz
 ```
+
+---
+
+## Acceso Post-Despliegue
+
+### 1. Abrir la Aplicación
+
+Después de que el script termine exitosamente:
+
+**Si usaste dominio (Modo 2):**
+```
+https://flota.miempresa.com
+```
+
+**Si usaste IP local (Modo 1):**
+```
+http://192.168.1.100
+```
+
+### 2. Completar Instalador Web
+
+1. Abre la URL anterior en tu navegador
+2. Verás **"Installer — FlotaControl"**
+3. Haz clic en **"Comenzar Instalación"**
+4. El instalador:
+   - Verifica conectividad de BD ✓
+   - Crea todas las tablas ✓
+   - Crea el usuario administrador
+5. **GUARDA LAS CREDENCIALES que se muestren**
+
+### 3. Iniciar Sesión
+
+- **Email:** El que creaste en el instalador
+- **Contraseña:** La que creaste en el instalador
+- **Acceso:** Desde cualquier PC en la red
+
+---
+
+## Verificación Post-Despliegue
+
+Después de desplegar, ejecuta estas verificaciones:
+
+### 1. Servicios Activos
+
+```bash
+sudo systemctl status nginx php8.3-fpm mysql
+```
+
+Todos deben mostrar **"active (running)"** en verde.
+
+### 2. Verificar Base de Datos
+
+```bash
+sudo mysql -u flotacontrol -p -e "USE flotacontrol; SHOW TABLES;"
+```
+
+Deberá mostrar ~50 tablas como `operadores`, `vehiculos`, `ordenes_compra`, etc.
+
+### 3. Verificar Permisos
+
+```bash
+# El .env debe ser propiedad de www-data con permisos 600
+sudo ls -la /var/www/flotacontrol/.env
+
+# Salida esperada:
+# -rw------- 1 www-data www-data 400 Mar 16 17:47 /var/www/flotacontrol/.env
+```
+
+### 4. Ver Logs de Acceso
+
+```bash
+# Ver últimos accesos (debe mostrar la instalación)
+sudo tail -20 /var/log/nginx/access.log
+
+# Si hay errores, revisar:
+sudo tail -50 /var/log/nginx/error.log
+```
+
+### 5. Verificar SSL (si usas dominio)
+
+```bash
+# Ver fecha de expiración
+sudo certbot certificates
+
+# Renovar manualmente si es necesario
+sudo certbot renew --dry-run
+```
+
+---
+
+## Ocultando el Instalador
+
+**IMPORTANTE:** Después de completar la instalación, deshabilita el instalador:
+
+```bash
+sudo rm /var/www/flotacontrol/install.php
+```
+
+Esto evita que alguien vuelva a instalar la aplicación.
+
+---
+
+## De Desarrollo Local a Servidor
+
+Si estás trabajando localmente con Docker y quieres pasar a servidor:
+
+### 1. Exportar la Base de Datos Local
+
+```bash
+# Desde tu PC local
+docker exec flotacontrol-db mysqldump -u flotacontrol -p'TestPass2024x' flotacontrol > backup_local.sql
+```
+
+### 2. Copiar al Servidor
+
+```bash
+scp backup_local.sql usuario@192.168.1.100:/tmp/
+```
+
+### 3. Importar en el Servidor
+
+```bash
+ssh usuario@192.168.1.100
+sudo mysql -u flotacontrol -p'TU_PASSWORD' flotacontrol < /tmp/backup_local.sql
+rm /tmp/backup_local.sql
+```
+
+### 4. Verificar Datos en Servidor
+
+```bash
+# En el navegador
+https://flota.miempresa.com
+# Deberá mostrar todos los datos del desarrollo local
+```
+
+---
+
+## Resumen de Archivos Importantes
+
+| Archivo | Ubicación | Propósito | Permisos |
+|---------|-----------|----------|---------|
+| `.env` | `/var/www/flotacontrol/` | Credenciales y configuración | 600 |
+| `.installed.lock` | `/var/www/flotacontrol/` | Previene reinstalación | 644 |
+| `install.php` | `/var/www/flotacontrol/` | Instalador (ELIMINAR después) | 644 |
+| `nginx.conf` | `/etc/nginx/sites-enabled/flotacontrol` | Configuración Nginx | 644 |
+| `www.conf` | `/etc/php/8.3/fpm/pool.d/` | Pool de PHP-FPM | 644 |
+| Uploads | `/mnt/data/flotacontrol/uploads/` | Archivos y documentos | 755 |
+| Backups | `/mnt/data/backups/` | Copias de seguridad | 744 |
+
+---
+
+## Solución Rápida de Problemas Comunes
+
+| Problema | Solución |
+|----------|----------|
+| **403 Forbidden** | `sudo chown -R www-data:www-data /var/www/flotacontrol` |
+| **502 Bad Gateway** | `sudo systemctl restart php8.3-fpm` |
+| **500 Internal Server Error** | Revisar logs: `sudo tail -50 /var/log/nginx/error.log` |
+| **No conecta a BD** | Verificar .env y usuario MySQL con `sudo mysql -u flotacontrol -p` |
+| **Sin acceso a uploads** | `sudo chown -R www-data:www-data /mnt/data/flotacontrol` |
+| **Certificado SSL expirado** | `sudo certbot renew --force-renewal` |
+
+Para más detalles, **ver `DEPLOY_SSH.md`** → Sección "Troubleshooting"

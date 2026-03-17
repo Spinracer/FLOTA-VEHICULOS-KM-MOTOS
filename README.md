@@ -62,7 +62,20 @@
 
 ---
 
-## 🚀 Instalación paso a paso
+## 🚀 Instalación / Despliegue
+
+### 📍 Para tu caso:
+
+| Caso | Guía | Comando |
+|------|------|---------|
+| **Desarrollo local con Docker** | Levantado aquí en puerto 8080 | `docker compose up -d` |
+| **Despliegue automático en servidor (RECOMENDADO)** | ➡️ **[DESPLIEGUE_RAPIDO.md](./DESPLIEGUE_RAPIDO.md)** | `sudo bash deploy.sh` |
+| **Despliegue detallado por SSH** | ➡️ **[DEPLOY_SSH.md](./DEPLOY_SSH.md)** | Paso a paso + troubleshooting |
+| **Instalación manual paso a paso** | ➡️ **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** | Para aprender cómo funciona |
+
+---
+
+## 🚀 Instalación paso a paso (Local/Dev)
 
 ### 1. Copiar archivos al servidor
 Copia la carpeta `flotacontrol/` a la raíz web de tu servidor:
