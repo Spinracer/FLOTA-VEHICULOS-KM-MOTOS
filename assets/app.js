@@ -241,6 +241,27 @@ class AttachmentWidget {
   onFiles(fileList) {
     for (const f of fileList) this.pendingFiles.push(f);
     this.render();
+    // Auto-upload if entity already exists (detail/profile views)
+    if (this.entidadId) this._autoUpload();
+  }
+
+  async _autoUpload() {
+    if (!this.pendingFiles.length || !this.entidadId) return;
+    const fd = new FormData();
+    fd.append('entidad', this.entidad);
+    fd.append('entidad_id', this.entidadId);
+    for (const f of this.pendingFiles) fd.append('archivo[]', f);
+    fd.append('_csrf_token', getCsrfToken());
+    try {
+      const res = await fetch('/api/attachments.php', {method:'POST', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}, body: fd});
+      const text = await res.text();
+      let d;
+      try { d = JSON.parse(text); } catch(_) { throw new Error(text || 'Respuesta vacía del servidor'); }
+      if (!res.ok) throw new Error(d.error || 'Error al subir');
+      this.pendingFiles = [];
+      toast(`${d.uploaded.length} adjunto(s) subido(s)`);
+      await this.load();
+    } catch(e) { toast('Error adjuntos: ' + e.message, 'error'); console.error('Upload error:', e); }
   }
 
   removePending(idx) {
