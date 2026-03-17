@@ -300,6 +300,11 @@ async function eliminar(id) {
 
 let kmChart = null;
 
+function scrollToSection(secId) {
+  const el = document.getElementById(secId);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function verPerfil(id) {
   const cnt = document.getElementById('profile-content');
   cnt.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>';
@@ -322,16 +327,53 @@ async function verPerfil(id) {
       </div>
       ${tagsHtml ? `<div style="margin-bottom:12px">${tagsHtml}</div>` : ''}
 
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;">
-        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_asignaciones}</div><div class="kpi-sub">Asignaciones</div></div>
-        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${t.total_mantenimientos}</div><div class="kpi-sub">Mantenimientos</div></div>
-        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">${Number(t.total_litros).toFixed(0)} L</div><div class="kpi-sub">Litros total</div></div>
-        <div class="kpi-card" style="padding:10px;text-align:center"><div class="kpi-value" style="font-size:18px">L ${Number(t.gasto_total).toFixed(0)}</div><div class="kpi-sub">Gasto total</div></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;">
+        <div class="kpi-card" style="padding:10px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="scrollToSection('sec-asignaciones')" title="Ver asignaciones">
+          <div class="kpi-value" style="font-size:18px">${t.total_asignaciones}</div><div class="kpi-sub">Asignaciones</div>
+        </div>
+        <div class="kpi-card" style="padding:10px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="scrollToSection('sec-mantenimientos')" title="Ver mantenimientos">
+          <div class="kpi-value" style="font-size:18px">${t.total_mantenimientos}</div><div class="kpi-sub">Mantenimientos</div>
+        </div>
+        <div class="kpi-card" style="padding:10px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="scrollToSection('sec-combustible')" title="Ver cargas de combustible">
+          <div class="kpi-value" style="font-size:18px">${Number(t.total_litros).toFixed(0)} L</div><div class="kpi-sub">Litros total</div>
+        </div>
+        <div class="kpi-card" style="padding:10px;text-align:center;cursor:pointer;transition:border-color .2s" onclick="scrollToSection('sec-gastos')" title="Ver desglose de gastos">
+          <div class="kpi-value" style="font-size:18px">L ${Number(t.gasto_total).toFixed(0)}</div><div class="kpi-sub">Gasto total</div>
+        </div>
         <div class="kpi-card" style="padding:10px;text-align:center;border:1px solid var(--accent)">
           <div class="kpi-value" style="font-size:18px;color:var(--accent)">L ${Number(t.costo_por_km).toFixed(2)}</div>
           <div class="kpi-sub">Costo / km</div>
         </div>
+      </div>
+
+      <!-- Desglose de Gastos -->
+      <div id="sec-gastos" style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:10px">💰 Desglose de Gastos</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+          <div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px">
+            <div style="font-size:15px;font-weight:700;color:#f59e0b">L ${Number(t.gasto_mantenimiento).toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--text2)">Mantenimiento</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px">
+            <div style="font-size:15px;font-weight:700;color:#3b82f6">L ${Number(t.gasto_combustible).toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--text2)">Combustible</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px">
+            <div style="font-size:15px;font-weight:700;color:#ef4444">L ${Number(t.gasto_incidentes||0).toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--text2)">Incidentes</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--accent)">
+            <div style="font-size:15px;font-weight:700;color:var(--accent)">L ${Number(t.gasto_total).toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--text2)">Total General</div>
+          </div>
+        </div>
+        ${Number(t.gasto_total) > 0 ? `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px">
+          ${Number(t.gasto_mantenimiento) > 0 ? `<div style="flex:${t.gasto_mantenimiento};background:#f59e0b" title="Mantenimiento: L ${Number(t.gasto_mantenimiento).toFixed(2)}"></div>` : ''}
+          ${Number(t.gasto_combustible) > 0 ? `<div style="flex:${t.gasto_combustible};background:#3b82f6" title="Combustible: L ${Number(t.gasto_combustible).toFixed(2)}"></div>` : ''}
+          ${Number(t.gasto_incidentes||0) > 0 ? `<div style="flex:${t.gasto_incidentes};background:#ef4444" title="Incidentes: L ${Number(t.gasto_incidentes||0).toFixed(2)}"></div>` : ''}
+        </div>` : ''}
       </div>`;
+
 
     // ── Datos adicionales del vehículo ──
     if (v.costo_adquisicion || v.aseguradora || v.poliza_numero) {
@@ -359,8 +401,17 @@ async function verPerfil(id) {
         </div>`;
     }
 
+    if (d.historial_asignaciones && d.historial_asignaciones.length) {
+      html += '<div id="sec-asignaciones" class="section-title" style="margin:12px 0 6px">🚗 Últimas asignaciones</div><table><thead><tr><th>Operador</th><th>Inicio</th><th>Fin</th><th>KM Inicio</th><th>KM Fin</th><th>Estado</th></tr></thead><tbody>';
+      d.historial_asignaciones.forEach(a => {
+        const eb = {'Activa':'badge-green','Cerrada':'badge-gray'};
+        html += `<tr><td>${a.operador_nombre||'—'}</td><td>${a.start_at}</td><td>${a.end_at||'—'}</td><td>${a.start_km?Number(a.start_km).toLocaleString()+' km':'—'}</td><td>${a.end_km?Number(a.end_km).toLocaleString()+' km':'—'}</td><td><span class="badge ${eb[a.estado]||'badge-gray'}">${a.estado}</span></td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+
     if (d.historial_mantenimientos.length) {
-      html += '<div class="section-title" style="margin:12px 0 6px">🔧 Últimos mantenimientos</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Costo</th><th>Estado</th><th>Proveedor</th></tr></thead><tbody>';
+      html += '<div id="sec-mantenimientos" class="section-title" style="margin:12px 0 6px">🔧 Últimos mantenimientos</div><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Costo</th><th>Estado</th><th>Proveedor</th></tr></thead><tbody>';
       d.historial_mantenimientos.forEach(m => {
         html += `<tr><td>${m.fecha}</td><td>${m.tipo}</td><td>L ${Number(m.costo).toFixed(2)}</td><td><span class="badge">${m.estado}</span></td><td>${m.proveedor_nombre||'—'}</td></tr>`;
       });
@@ -368,7 +419,7 @@ async function verPerfil(id) {
     }
 
     if (d.historial_combustible.length) {
-      html += '<div class="section-title" style="margin:12px 0 6px">⛽ Últimas cargas</div><table><thead><tr><th>Fecha</th><th>Litros</th><th>Total</th><th>KM</th></tr></thead><tbody>';
+      html += '<div id="sec-combustible" class="section-title" style="margin:12px 0 6px">⛽ Últimas cargas</div><table><thead><tr><th>Fecha</th><th>Litros</th><th>Total</th><th>KM</th></tr></thead><tbody>';
       d.historial_combustible.forEach(f => {
         html += `<tr><td>${f.fecha}</td><td>${Number(f.litros).toFixed(1)} L</td><td>L ${Number(f.total).toFixed(2)}</td><td>${f.km?Number(f.km).toLocaleString()+' km':'—'}</td></tr>`;
       });

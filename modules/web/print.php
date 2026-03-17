@@ -67,8 +67,10 @@ case 'asignacion':
 
     $content .= '<div class="section"><h3>Datos de la Asignación</h3>';
     $content .= '<table class="info-table"><tbody>';
+    $folioPase = 'PS-' . str_pad($id, 6, '0', STR_PAD_LEFT);
     $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>Inicio:</strong></td><td>{$a['start_at']}</td></tr>";
-    $content .= "<tr><td><strong>Fin:</strong></td><td>" . ($a['end_at'] ?? 'Vigente') . "</td><td><strong>KM Inicio:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td></tr>";
+    $content .= "<tr><td><strong>Pase de Salida:</strong></td><td><strong>{$folioPase}</strong></td><td><strong>KM Inicio:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td></tr>";
+    $content .= "<tr><td><strong>Fin:</strong></td><td>" . ($a['end_at'] ?? 'Vigente') . "</td><td></td><td></td></tr>";
     if ($a['end_at']) {
         $content .= "<tr><td><strong>KM Retorno:</strong></td><td>" . number_format((float)($a['end_km'] ?? 0), 0) . " km</td><td><strong>KM Recorridos:</strong></td><td>" . number_format(((float)($a['end_km'] ?? 0) - (float)($a['start_km'] ?? 0)), 0) . " km</td></tr>";
     }
@@ -393,11 +395,13 @@ case 'pase_salida':
     $title = 'Pase de Salida de Vehículo';
     $subtitle = 'Control de Flota Vehicular';
     $folio = 'PS-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+    $folioAsignacion = 'ASG-' . str_pad($id, 6, '0', STR_PAD_LEFT);
 
     // Header del pase
     $content .= '<div class="section" style="text-align:center;border:2px solid #1a1a1a;border-radius:8px;padding:16px;margin-bottom:16px">';
     $content .= '<h3 style="background:transparent;color:#1a1a1a;margin:0;padding:0;font-size:18px;text-transform:uppercase;letter-spacing:2px">PASE DE SALIDA DE VEHÍCULO</h3>';
     $content .= '<p style="font-size:12px;color:#555;margin-top:4px">Folio: <strong>' . $folio . '</strong> | Fecha: <strong>' . date('d/m/Y', strtotime($a['start_at'])) . '</strong></p>';
+    $content .= '<p style="font-size:11px;color:#666;margin-top:2px">Hoja de Asignación: <strong>' . $folioAsignacion . '</strong></p>';
     $content .= '</div>';
 
     // Datos del vehículo

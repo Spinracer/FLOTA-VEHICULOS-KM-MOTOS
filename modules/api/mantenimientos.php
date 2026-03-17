@@ -470,6 +470,7 @@ try {
                 $d['proveedor_id'] = $ctx['proveedor_id'];
             }
             $km = isset($d['km']) && $d['km'] !== '' ? (float)$d['km'] : null;
+            $exitKmVal = isset($d['exit_km']) && $d['exit_km'] !== '' ? (float)$d['exit_km'] : null;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['vehiculo_id'], $km, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
             $db->beginTransaction();
@@ -484,7 +485,7 @@ try {
                 $stmt->execute([
                     $d['fecha'], $d['vehiculo_id'], $d['tipo'], $d['descripcion'] ?: null,
                     (float)($d['costo'] ?? 0), $d['km'] ?: null,
-                    $d['exit_km'] ?? null,
+                    $exitKmVal,
                     $d['proximo_km'] ?: null, $d['proveedor_id'] ?: null, $estadoNuevo,
                     $d['resumen'] ?? null,
                     $completedAt, $completedBy,

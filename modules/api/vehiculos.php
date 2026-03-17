@@ -61,14 +61,15 @@ try {
                     (SELECT COUNT(*) FROM combustible WHERE vehiculo_id=?) AS total_cargas,
                     (SELECT COALESCE(SUM(litros),0) FROM combustible WHERE vehiculo_id=?) AS total_litros,
                     (SELECT COALESCE(SUM(total),0) FROM combustible WHERE vehiculo_id=?) AS gasto_combustible,
-                    (SELECT COUNT(*) FROM incidentes WHERE vehiculo_id=?) AS total_incidentes
+                    (SELECT COUNT(*) FROM incidentes WHERE vehiculo_id=?) AS total_incidentes,
+                    (SELECT COALESCE(SUM(costo_est),0) FROM incidentes WHERE vehiculo_id=?) AS gasto_incidentes
                 ");
-                $totalesStmt->execute([$id,$id,$id,$id,$id,$id,$id]);
+                $totalesStmt->execute([$id,$id,$id,$id,$id,$id,$id,$id]);
                 $totales = $totalesStmt->fetch();
 
                 // Costo por kilómetro
                 $km = (float)($vehiculo['km_actual'] ?? 0);
-                $gastoTotal = (float)$totales['gasto_mantenimiento'] + (float)$totales['gasto_combustible'];
+                $gastoTotal = (float)$totales['gasto_mantenimiento'] + (float)$totales['gasto_combustible'] + (float)$totales['gasto_incidentes'];
                 $totales['costo_por_km'] = $km > 0 ? round($gastoTotal / $km, 2) : 0;
                 $totales['gasto_total'] = round($gastoTotal, 2);
 
@@ -79,6 +80,10 @@ try {
                 // Historial reciente combustible
                 $histFuel = $db->prepare("SELECT id,fecha,litros,total,km FROM combustible WHERE vehiculo_id=? ORDER BY fecha DESC LIMIT 10");
                 $histFuel->execute([$id]);
+
+                // Historial reciente asignaciones
+                $histAsg = $db->prepare("SELECT a.id,a.start_at,a.end_at,a.start_km,a.end_km,a.estado,o.nombre AS operador_nombre FROM asignaciones a LEFT JOIN operadores o ON o.id=a.operador_id WHERE a.vehiculo_id=? ORDER BY a.start_at DESC LIMIT 10");
+                $histAsg->execute([$id]);
 
                 // Historial odómetro (últimos 30 registros para gráfica)
                 $histOdo = $db->prepare("SELECT reading_km, source, recorded_at FROM odometer_logs WHERE vehicle_id=? ORDER BY recorded_at ASC LIMIT 30");
@@ -101,6 +106,7 @@ try {
                     'totales' => $totales,
                     'historial_mantenimientos' => $histMnt->fetchAll(),
                     'historial_combustible' => $histFuel->fetchAll(),
+                    'historial_asignaciones' => $histAsg->fetchAll(),
                     'historial_odometro' => $histOdo->fetchAll(),
                     'etiquetas' => $tagsStmt->fetchAll(),
                     'telemetria' => $telemetria,
