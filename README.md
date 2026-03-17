@@ -66,16 +66,18 @@
 
 ### 📍 Elige tu Caso:
 
-| Caso | Guía | Tiempo |
-|------|------|--------|
-| **🎯 Despliegue Docker en Servidor (SIN CONFLICTOS)** | ➡️ **[DOCKER_DEPLOY_RAPIDO.md](./DOCKER_DEPLOY_RAPIDO.md)** | ~10 min |
-| Docker — Referencia Completa | ➡️ **[DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)** | — |
-| Instalación Nativa (Nginx+PHP+MySQL) | ➡️ **[DESPLIEGUE_RAPIDO.md](./DESPLIEGUE_RAPIDO.md)** | ~15 min |
-| Instalación Nativa — Referencia Completa | ➡️ **[DEPLOY_SSH.md](./DEPLOY_SSH.md)** | — |
-| Instalación Manual Paso a Paso | ➡️ **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** | — |
-| Desarrollo Local (Docker) — YA CORRIENDO | http://localhost:8080 | ✅ |
+| Caso | Guía | Acceso | Tiempo |
+|------|------|--------|---------|
+| **🎯 Docker + Cloudflare Tunnel (RECOMENDADO)** | ➡️ **[CLOUDFLARE_TUNNEL_RAPIDO.md](./CLOUDFLARE_TUNNEL_RAPIDO.md)** | `https://flota.it-kmmotos.online` | ~15 min |
+| Docker + Cloudflare Tunnel — Referencia | ➡️ **[DOCKER_CLOUDFLARE_TUNNEL.md](./DOCKER_CLOUDFLARE_TUNNEL.md)** | — | — |
+| Docker Local (IP:8080) | ➡️ **[DOCKER_DEPLOY_RAPIDO.md](./DOCKER_DEPLOY_RAPIDO.md)** | `http://192.168.x.x:8080` | ~10 min |
+| Docker — Referencia Completa | ➡️ **[DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)** | — | — |
+| Instalación Nativa (Nginx+PHP+MySQL) | ➡️ **[DESPLIEGUE_RAPIDO.md](./DESPLIEGUE_RAPIDO.md)** | `http://192.168.x.x` | ~15 min |
+| Instalación Nativa — Referencia Completa | ➡️ **[DEPLOY_SSH.md](./DEPLOY_SSH.md)** | — | — |
+| Instalación Manual Paso a Paso | ➡️ **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** | — | — |
+| Desarrollo Local (Docker) — YA CORRIENDO | http://localhost:8080 | `admin@gmail.com` | ✅ |
 
-**🐳 RECOMENDACIÓN:** Si tienes otros proyectos Docker, usa `DOCKER_DEPLOY_RAPIDO.md`
+**🌐 RECOMENDACIÓN:** Cloudflare Tunnel + Docker = Lo mejor (sin puertos, HTTPS automático, dominio)
 
 ---
 
