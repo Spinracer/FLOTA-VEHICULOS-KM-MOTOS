@@ -64,14 +64,36 @@
 
 ## 🚀 Instalación / Despliegue
 
-### 📍 Para tu caso:
+### 📍 Elige tu Caso:
 
-| Caso | Guía | Comando |
-|------|------|---------|
-| **Desarrollo local con Docker** | Levantado aquí en puerto 8080 | `docker compose up -d` |
-| **Despliegue automático en servidor (RECOMENDADO)** | ➡️ **[DESPLIEGUE_RAPIDO.md](./DESPLIEGUE_RAPIDO.md)** | `sudo bash deploy.sh` |
-| **Despliegue detallado por SSH** | ➡️ **[DEPLOY_SSH.md](./DEPLOY_SSH.md)** | Paso a paso + troubleshooting |
-| **Instalación manual paso a paso** | ➡️ **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** | Para aprender cómo funciona |
+| Caso | Guía | Tiempo |
+|------|------|--------|
+| **🎯 Despliegue Docker en Servidor (SIN CONFLICTOS)** | ➡️ **[DOCKER_DEPLOY_RAPIDO.md](./DOCKER_DEPLOY_RAPIDO.md)** | ~10 min |
+| Docker — Referencia Completa | ➡️ **[DOCKER_DEPLOY.md](./DOCKER_DEPLOY.md)** | — |
+| Instalación Nativa (Nginx+PHP+MySQL) | ➡️ **[DESPLIEGUE_RAPIDO.md](./DESPLIEGUE_RAPIDO.md)** | ~15 min |
+| Instalación Nativa — Referencia Completa | ➡️ **[DEPLOY_SSH.md](./DEPLOY_SSH.md)** | — |
+| Instalación Manual Paso a Paso | ➡️ **[DEPLOY_GUIDE.md](./DEPLOY_GUIDE.md)** | — |
+| Desarrollo Local (Docker) — YA CORRIENDO | http://localhost:8080 | ✅ |
+
+**🐳 RECOMENDACIÓN:** Si tienes otros proyectos Docker, usa `DOCKER_DEPLOY_RAPIDO.md`
+
+---
+
+## 🌐 Desarrollo Local — YA CORRIENDO EN DOCKER
+
+El servidor local está configurado con Docker Compose y ya está funcionando:
+
+```bash
+# Ver estado
+docker compose ps
+
+# Acceder
+http://localhost:8080
+
+# Credenciales
+Email:    coordinadorityseguridadkmmotos@gmail.com
+Password: coordinadorityseguridadkmmotos@gmail.com
+```
 
 ---
 
