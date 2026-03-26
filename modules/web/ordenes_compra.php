@@ -194,6 +194,7 @@ async function load() {
 
   tbody.innerHTML = rows.map(r => {
     const folio = 'OC-' + String(r.id).padStart(6, '0');
+    const estadoClick = <?= $isAdmin ? 'true' : 'false' ?> ? `onclick="avanzarEstado(${r.id},'${folio}','${(r.descripcion||'').replace(/'/g,"\\'")}','${r.estado}')" style="cursor:pointer" title="Clic para cambiar estado"` : '';
     return `<tr>
     <td><strong style="font-family:monospace;color:var(--accent2)">${folio}</strong></td>
     <td>${r.created_at?.substring(0,10) || '—'}</td>
@@ -204,7 +205,7 @@ async function load() {
     <td>${Number(r.monto_estimado) > 0 ? 'L '+Number(r.monto_estimado).toFixed(2) : '—'}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="verItemsOC(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td><span class="badge ${UB[r.urgencia]||'badge-gray'}">${r.urgencia || 'Normal'}</span></td>
-    <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
+    <td><span class="badge ${EB[r.estado]||'badge-gray'}" ${estadoClick}>${r.estado}</span></td>
     <td><div class="action-btns">
       <button class="btn btn-ghost btn-sm" onclick="verDetalle(${r.id})" title="Ver detalle">📋</button>
       <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=orden_compra&id=${r.id}','_blank')" title="Imprimir">🖨️</button>
@@ -362,6 +363,23 @@ async function cambiarEstado(nuevoEstado) {
 
 async function aprobar() { cambiarEstado('Aprobada'); }
 async function rechazar() { cambiarEstado('Rechazada'); }
+
+// ── Avanzar estado desde la tabla (clic en badge) ──
+const ESTADO_FLOW = { 'Pendiente': 'Aprobada', 'Aprobada': 'Completada', 'Rechazada': 'Pendiente', 'Cancelada': 'Pendiente' };
+function avanzarEstado(id, folio, desc, estadoActual) {
+  const siguiente = ESTADO_FLOW[estadoActual];
+  if (!siguiente) { toast('Esta orden ya está en estado final', 'warning'); return; }
+  const descCorta = desc.length > 60 ? desc.substring(0, 60) + '...' : desc;
+  sysConfirm(
+    `${folio}\n${descCorta}\n\n¿Cambiar estado de "${estadoActual}" a "${siguiente}"?`,
+    async () => {
+      await api('/api/ordenes_compra.php', 'PUT', { id, _accion: 'cambiar_estado', estado: siguiente });
+      toast(`${folio} → ${siguiente}`);
+      load();
+    },
+    { title: 'Cambiar estado de orden', confirmText: `Sí, pasar a ${siguiente}` }
+  );
+}
 <?php endif; ?>
 
 // ── OC Items ──
@@ -483,11 +501,12 @@ async function guardarItemOC() {
 }
 
 async function delItemOC(itemId) {
-  if (!confirm('¿Eliminar esta partida?')) return;
-  await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${currentOCId}&item_id=${itemId}`, 'DELETE');
-  toast('Partida eliminada', 'warning');
-  await loadOCItems();
-  load();
+  sysConfirm('¿Eliminar esta partida?', async () => {
+    await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${currentOCId}&item_id=${itemId}`, 'DELETE');
+    toast('Partida eliminada', 'warning');
+    await loadOCItems();
+    load();
+  }, { title: 'Eliminar partida', confirmText: 'Eliminar', danger: true });
 }
 
 document.addEventListener('DOMContentLoaded', load);

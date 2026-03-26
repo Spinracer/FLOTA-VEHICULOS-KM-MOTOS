@@ -112,9 +112,33 @@ function resetForm(modalId) {
   document.querySelectorAll(`#${modalId} input[type=date]`).forEach(el => el.value = today);
 }
 
-// ── CONFIRM DELETE ─────────────────────────────
+// ── SYSTEM CONFIRM MODAL ─────────────────────────
+// Custom in-app confirmation (replaces browser confirm())
+function sysConfirm(msg, cb, { title = 'Confirmar', confirmText = 'Aceptar', cancelText = 'Cancelar', danger = false } = {}) {
+  // Remove any existing confirm modal
+  document.getElementById('sys-confirm-modal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'sys-confirm-modal';
+  modal.className = 'modal-bg open';
+  modal.innerHTML = `<div class="modal" style="max-width:420px;text-align:center">
+    <div class="modal-title" style="margin-bottom:12px">${title}</div>
+    <p style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:24px;white-space:pre-line">${msg}</p>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn btn-ghost" id="sys-confirm-cancel">${cancelText}</button>
+      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="sys-confirm-ok">${confirmText}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#sys-confirm-cancel').onclick = () => modal.remove();
+  modal.querySelector('#sys-confirm-ok').onclick = () => { modal.remove(); cb(); };
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#sys-confirm-ok').focus();
+}
+
 function confirmDelete(msg, cb) {
-  if (confirm(msg || '¿Estás seguro de eliminar este registro?')) cb();
+  sysConfirm(msg || '¿Estás seguro de eliminar este registro?', cb, { title: 'Confirmar eliminación', confirmText: 'Eliminar', danger: true });
 }
 
 // ── DEBOUNCE ───────────────────────────────────
@@ -270,13 +294,14 @@ class AttachmentWidget {
   }
 
   async deleteAtt(id) {
-    if (!confirm('¿Eliminar este adjunto?')) return;
-    try {
-      await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}});
-      this.attachments = this.attachments.filter(a => a.id !== id);
-      this.render();
-      toast('Adjunto eliminado', 'warning');
-    } catch(e) { toast('Error al eliminar adjunto', 'error'); }
+    sysConfirm('¿Eliminar este adjunto?', async () => {
+      try {
+        await fetch(`/api/attachments.php?id=${id}`, {method:'DELETE', credentials:'include', headers:{'X-CSRF-Token': getCsrfToken()}});
+        this.attachments = this.attachments.filter(a => a.id !== id);
+        this.render();
+        toast('Adjunto eliminado', 'warning');
+      } catch(e) { toast('Error al eliminar adjunto', 'error'); }
+    }, { title: 'Eliminar adjunto', confirmText: 'Eliminar', danger: true });
   }
 
   /** Upload all pending files. Call after saving the parent entity. */

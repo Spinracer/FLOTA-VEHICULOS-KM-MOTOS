@@ -649,25 +649,26 @@ function resetMappings() {
 
 // ── Eliminar registro de historial ──
 async function deleteRun(runId) {
-  if (!confirm('¿Eliminar este registro de importación del historial?')) return;
-  try {
-    const res = await fetch('/api/importacion_vehiculos.php?action=delete_run', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': getCsrfToken(),
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify({ run_id: runId })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Error al eliminar');
-    toast('Registro eliminado');
-    loadHistory();
-  } catch(e) {
-    toast(e.message, 'error');
-  }
+  sysConfirm('¿Eliminar este registro de importación del historial?', async () => {
+    try {
+      const res = await fetch('/api/importacion_vehiculos.php?action=delete_run', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ run_id: runId })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Error al eliminar');
+      toast('Registro eliminado');
+      loadHistory();
+    } catch(e) {
+      toast(e.message, 'error');
+    }
+  }, { title: 'Eliminar registro de importación', confirmText: 'Eliminar', danger: true });
 }
 
 // Cargar historial al inicio si vamos directamente al paso 3 (no aplica, pero por si acaso)
