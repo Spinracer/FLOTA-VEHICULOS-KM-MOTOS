@@ -203,6 +203,19 @@ try {
         exit;
     }
 
+    if ($action === 'ocs_for_vehicle') {
+        $vehiculoId = (int)($_GET['vehiculo_id'] ?? 0);
+        if ($vehiculoId <= 0) { http_response_code(400); echo json_encode(['error' => 'vehiculo_id requerido']); exit; }
+        $st = $db->prepare("SELECT id, descripcion, monto_estimado, estado, created_at,
+            (SELECT COUNT(*) FROM orden_compra_items oci WHERE oci.orden_compra_id = oc.id) AS items_count
+            FROM ordenes_compra oc
+            WHERE oc.vehiculo_id = ? AND oc.estado IN ('Aprobada','Completada') AND oc.deleted_at IS NULL
+            ORDER BY oc.created_at DESC");
+        $st->execute([$vehiculoId]);
+        echo json_encode(['ok' => true, 'ocs' => $st->fetchAll()]);
+        exit;
+    }
+
     // ───────────── Aprobaciones multinivel ─────────────
     if ($action === 'aprobaciones') {
         $mantId = (int)($_GET['mantenimiento_id'] ?? 0);
@@ -299,7 +312,7 @@ try {
             $totalCount = (int)$total->fetchColumn();
 
             $listParams = array_merge($params, [$per, $off]);
-            $stmt = $db->prepare("SELECT m.*, v.placa, v.marca, p.nombre AS proveedor_nombre,
+            $stmt = $db->prepare("SELECT m.*, m.orden_compra_id, v.placa, v.marca, p.nombre AS proveedor_nombre,
                 (SELECT COUNT(*) FROM mantenimiento_items mi WHERE mi.mantenimiento_id = m.id) AS items_count,
                 (SELECT COALESCE(SUM(mi2.subtotal),0) FROM mantenimiento_items mi2 WHERE mi2.mantenimiento_id = m.id) AS items_total
                 FROM mantenimientos m
@@ -337,8 +350,9 @@ try {
             try {
                 // Estado inicial siempre es Pendiente (flujo OT)
                 $estadoInicial = $d['estado'] ?? 'Pendiente';
-                $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado) VALUES (?,?,?,?,?,?,?,?,?)");
-                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)($d['costo']??0),$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$estadoInicial]);
+                $ordenCompraId = ((int)($d['orden_compra_id'] ?? 0)) ?: null;
+                $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado,orden_compra_id) VALUES (?,?,?,?,?,?,?,?,?,?)");
+                $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)($d['costo']??0),$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$estadoInicial,$ordenCompraId]);
                 if ($km) {
                     odometro_registrar($db, (int)$d['vehiculo_id'], $km, 'maintenance', (int)($_SESSION['user_id'] ?? 0));
                 }
@@ -481,7 +495,8 @@ try {
                     $completedAt = date('Y-m-d H:i:s');
                     $completedBy = (int)($_SESSION['user_id'] ?? 0);
                 }
-                $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,exit_km=?,proximo_km=?,proveedor_id=?,estado=?,resumen=?,completed_at=COALESCE(?,completed_at),completed_by=COALESCE(?,completed_by) WHERE id=?");
+                $ordenCompraId = ((int)($d['orden_compra_id'] ?? 0)) ?: null;
+                $stmt = $db->prepare("UPDATE mantenimientos SET fecha=?,vehiculo_id=?,tipo=?,descripcion=?,costo=?,km=?,exit_km=?,proximo_km=?,proveedor_id=?,estado=?,resumen=?,completed_at=COALESCE(?,completed_at),completed_by=COALESCE(?,completed_by),orden_compra_id=? WHERE id=?");
                 $stmt->execute([
                     $d['fecha'], $d['vehiculo_id'], $d['tipo'], $d['descripcion'] ?: null,
                     (float)($d['costo'] ?? 0), $d['km'] ?: null,
@@ -489,6 +504,7 @@ try {
                     $d['proximo_km'] ?: null, $d['proveedor_id'] ?: null, $estadoNuevo,
                     $d['resumen'] ?? null,
                     $completedAt, $completedBy,
+                    $ordenCompraId,
                     $d['id']
                 ]);
                 if ($km) {

@@ -1498,6 +1498,35 @@ try {
     step("Tabla 'ordenes_compra'", true);
 } catch (Throwable $e) { step("Tabla 'ordenes_compra'", false, $e->getMessage()); }
 
+// 3.20b Items de Órdenes de Compra
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS orden_compra_items (
+      id               INT AUTO_INCREMENT PRIMARY KEY,
+      orden_compra_id  INT NOT NULL,
+      descripcion      VARCHAR(255) NOT NULL,
+      cantidad         DECIMAL(10,2) NOT NULL DEFAULT 1,
+      unidad           VARCHAR(20) NOT NULL DEFAULT 'PZA',
+      precio_unitario  DECIMAL(10,2) NOT NULL DEFAULT 0,
+      subtotal         DECIMAL(12,2) GENERATED ALWAYS AS (cantidad * precio_unitario) STORED,
+      notas            TEXT NULL,
+      component_id     INT NULL,
+      created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_oci_oc (orden_compra_id),
+      CONSTRAINT fk_oci_oc FOREIGN KEY (orden_compra_id) REFERENCES ordenes_compra(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    step("Tabla 'orden_compra_items'", true);
+} catch (Throwable $e) { step("Tabla 'orden_compra_items'", false, $e->getMessage()); }
+
+// 3.20c Columna orden_compra_id en mantenimientos
+try {
+    $cols = $pdo->query("SHOW COLUMNS FROM mantenimientos LIKE 'orden_compra_id'")->fetchAll();
+    if (empty($cols)) {
+        $pdo->exec("ALTER TABLE mantenimientos ADD COLUMN orden_compra_id INT NULL COMMENT 'OC vinculada'");
+        $pdo->exec("ALTER TABLE mantenimientos ADD INDEX idx_mant_oc (orden_compra_id)");
+    }
+    step("Columna mantenimientos.orden_compra_id", true);
+} catch (Throwable $e) { step("Columna mantenimientos.orden_compra_id", false, $e->getMessage()); }
+
 // ─────────────────────────────────────────────────────────
 // 3.21 Documentos Vehiculares
 // ─────────────────────────────────────────────────────────

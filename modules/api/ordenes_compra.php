@@ -16,6 +16,77 @@ $db = getDB();
 $method = $_SERVER['REQUEST_METHOD'];
 
 try {
+    // ───────────── ITEMS (partidas) de OC ─────────────
+    $action = $_GET['action'] ?? '';
+    if ($action === 'items') {
+        $ocId = (int)($_GET['orden_compra_id'] ?? 0);
+        if ($ocId <= 0) {
+            http_response_code(422);
+            echo json_encode(['error' => 'orden_compra_id es obligatorio.']);
+            exit;
+        }
+        switch ($method) {
+            case 'GET':
+                $stmt = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ? ORDER BY id ASC");
+                $stmt->execute([$ocId]);
+                $items = $stmt->fetchAll();
+                $totStmt = $db->prepare("SELECT COALESCE(SUM(subtotal),0) AS total FROM orden_compra_items WHERE orden_compra_id = ?");
+                $totStmt->execute([$ocId]);
+                $total = (float)$totStmt->fetchColumn();
+                echo json_encode(['items' => $items, 'total' => $total]);
+                break;
+
+            case 'POST':
+                if (!can('create')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); break; }
+                $d = json_decode(file_get_contents('php://input'), true);
+                if (empty($d['descripcion'])) { http_response_code(422); echo json_encode(['error' => 'La descripción es obligatoria.']); break; }
+
+                $db->prepare("INSERT INTO orden_compra_items (orden_compra_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
+                   ->execute([
+                       $ocId, $d['descripcion'],
+                       (float)($d['cantidad'] ?? 1),
+                       $d['unidad'] ?? 'PZA',
+                       (float)($d['precio_unitario'] ?? 0),
+                       $d['notas'] ?? null,
+                       !empty($d['component_id']) ? (int)$d['component_id'] : null,
+                   ]);
+                $newId = (int)$db->lastInsertId();
+                // Auto-recalcular monto_estimado
+                $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
+                   ->execute([$ocId, $ocId]);
+                audit_log('orden_compra_items', 'create', $newId, [], $d);
+                echo json_encode(['id' => $newId, 'ok' => true]);
+                break;
+
+            case 'PUT':
+                if (!can('edit')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); break; }
+                $d = json_decode(file_get_contents('php://input'), true);
+                $db->prepare("UPDATE orden_compra_items SET descripcion=?, cantidad=?, unidad=?, precio_unitario=?, notas=?, component_id=? WHERE id=?")
+                   ->execute([
+                       $d['descripcion'], (float)($d['cantidad'] ?? 1), $d['unidad'] ?? 'PZA',
+                       (float)($d['precio_unitario'] ?? 0), $d['notas'] ?? null,
+                       !empty($d['component_id']) ? (int)$d['component_id'] : null,
+                       (int)$d['id'],
+                   ]);
+                $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
+                   ->execute([$ocId, $ocId]);
+                audit_log('orden_compra_items', 'update', (int)$d['id'], [], $d);
+                echo json_encode(['ok' => true]);
+                break;
+
+            case 'DELETE':
+                if (!can('delete')) { http_response_code(403); echo json_encode(['error' => 'Sin permisos.']); break; }
+                $itemId = (int)$_GET['item_id'];
+                $db->prepare("DELETE FROM orden_compra_items WHERE id = ?")->execute([$itemId]);
+                $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
+                   ->execute([$ocId, $ocId]);
+                audit_log('orden_compra_items', 'delete', $itemId, [], []);
+                echo json_encode(['ok' => true]);
+                break;
+        }
+        exit;
+    }
+
     switch ($method) {
 
     // ─── GET ───
@@ -69,7 +140,8 @@ try {
         $total = (int)$cnt->fetchColumn();
 
         $st = $db->prepare("
-            SELECT oc.*, u.nombre AS solicitante_nombre, v.placa, v.marca, p.nombre AS proveedor_nombre
+            SELECT oc.*, u.nombre AS solicitante_nombre, v.placa, v.marca, p.nombre AS proveedor_nombre,
+                   (SELECT COUNT(*) FROM orden_compra_items oci WHERE oci.orden_compra_id = oc.id) AS items_count
             FROM ordenes_compra oc
             LEFT JOIN usuarios u ON u.id = oc.solicitante_id
             LEFT JOIN vehiculos v ON v.id = oc.vehiculo_id

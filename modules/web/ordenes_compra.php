@@ -22,7 +22,7 @@ ob_start();
 
 <div class="table-wrap">
   <table><thead><tr>
-    <th>Folio</th><th>Fecha</th><th>Solicitante</th><th>Descripción</th><th>Vehículo</th><th>Proveedor</th><th>Monto est.</th><th>Urgencia</th><th>Estado</th>
+    <th>Folio</th><th>Fecha</th><th>Solicitante</th><th>Descripción</th><th>Vehículo</th><th>Proveedor</th><th>Monto est.</th><th>Items</th><th>Urgencia</th><th>Estado</th>
     <th>Acciones</th>
   </tr></thead>
   <tbody id="tbody"></tbody></table>
@@ -120,6 +120,48 @@ ob_start();
   </div>
 </div>
 
+<!-- MODAL PARTIDAS OC -->
+<div class="modal-bg" id="modal-oc-items">
+  <div class="modal" style="max-width:800px">
+    <div class="modal-title" id="oc-items-title">📋 Partidas de Orden</div>
+    <div id="oc-items-content" style="max-height:60vh;overflow-y:auto">
+      <table class="data-table"><thead><tr><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P.Unit.</th><th>Subtotal</th><th>Notas</th><th>Acciones</th></tr></thead>
+      <tbody id="oc-items-body"></tbody>
+      <tfoot><tr><td colspan="4"><strong>TOTAL</strong></td><td id="oc-items-total"><strong>L 0.00</strong></td><td colspan="2"></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-oc-items')">Cerrar</button>
+      <button class="btn btn-primary btn-sm" id="btn-add-oc-item" onclick="abrirNuevoItemOC()">+ Agregar Partida</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVA/EDITAR PARTIDA OC -->
+<div class="modal-bg" id="modal-oc-item">
+  <div class="modal" style="max-width:550px">
+    <div class="modal-title" id="oc-item-title">➕ Nueva Partida</div>
+    <div class="form-grid">
+      <input type="hidden" name="oc_item_id">
+      <div class="form-group"><label>Componente (catálogo)</label>
+        <select name="oc_component_id" id="selOCComponent"><option value="">— Sin componente —</option></select>
+      </div>
+      <div class="form-group full"><label>Descripción *</label><input name="oc_item_desc" placeholder="Descripción del item..."></div>
+      <div class="form-group"><label>Cantidad</label><input name="oc_item_qty" type="number" step="0.01" value="1"></div>
+      <div class="form-group"><label>Unidad</label>
+        <select name="oc_item_unidad"><option>PZA</option><option>LT</option><option>KG</option><option>SVC</option><option>HR</option><option>JUEGO</option></select>
+      </div>
+      <div class="form-group"><label>Precio Unitario (L)</label><input name="oc_item_precio" type="number" step="0.01" value="0"></div>
+      <div class="form-group"><label>Subtotal</label><input name="oc_item_subtotal" readonly style="font-weight:700;color:var(--accent2)"></div>
+      <div class="form-group full"><label>Notas</label><input name="oc_item_notas" placeholder="Observaciones opcionales..."></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-oc-item')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarItemOC()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const pager = new Paginator('pgr', load, 25);
 const EB = {'Pendiente':'badge-yellow','Aprobada':'badge-green','Rechazada':'badge-red','Completada':'badge-blue','Cancelada':'badge-gray'};
@@ -148,7 +190,7 @@ async function load() {
   `;
 
   const tbody = document.getElementById('tbody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="10"><div class="empty"><div class="empty-icon">🛒</div><div class="empty-title">Sin órdenes de compra</div></div></td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="11"><div class="empty"><div class="empty-icon">🛒</div><div class="empty-title">Sin órdenes de compra</div></div></td></tr>'; return; }
 
   tbody.innerHTML = rows.map(r => {
     const folio = 'OC-' + String(r.id).padStart(6, '0');
@@ -160,6 +202,7 @@ async function load() {
     <td>${r.placa ? '<strong style="color:var(--accent2)">'+r.placa+'</strong> '+r.marca : '—'}</td>
     <td>${r.proveedor_nombre || '—'}</td>
     <td>${Number(r.monto_estimado) > 0 ? 'L '+Number(r.monto_estimado).toFixed(2) : '—'}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="verItemsOC(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td><span class="badge ${UB[r.urgencia]||'badge-gray'}">${r.urgencia || 'Normal'}</span></td>
     <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
     <td><div class="action-btns">
@@ -320,6 +363,132 @@ async function cambiarEstado(nuevoEstado) {
 async function aprobar() { cambiarEstado('Aprobada'); }
 async function rechazar() { cambiarEstado('Rechazada'); }
 <?php endif; ?>
+
+// ── OC Items ──
+let currentOCId = null;
+let currentOCEstado = null;
+let ocComponents = [];
+
+async function loadOCComponents() {
+  if (ocComponents.length) return;
+  try {
+    const data = await api('/api/componentes.php?section=catalog&per=500&activo=1');
+    ocComponents = data.rows || [];
+    const sel = document.getElementById('selOCComponent');
+    sel.innerHTML = '<option value="">— Sin componente —</option>' +
+      ocComponents.map(c => `<option value="${c.id}">${c.nombre} (${c.tipo})</option>`).join('');
+  } catch(e) {}
+}
+
+async function verItemsOC(ocId, estado) {
+  currentOCId = ocId;
+  currentOCEstado = estado;
+  const folio = 'OC-' + String(ocId).padStart(6, '0');
+  document.getElementById('oc-items-title').textContent = '📋 Partidas — ' + folio;
+  document.getElementById('btn-add-oc-item').style.display = (estado === 'Completada' || estado === 'Cancelada') ? 'none' : '';
+  openModal('modal-oc-items');
+  await loadOCItems();
+}
+
+async function loadOCItems() {
+  const data = await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${currentOCId}`);
+  const tbody = document.getElementById('oc-items-body');
+  const canEdit = (currentOCEstado !== 'Completada' && currentOCEstado !== 'Cancelada');
+  if (!data.items || !data.items.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#8892a4">Sin partidas. Agrega la primera.</td></tr>';
+  } else {
+    tbody.innerHTML = data.items.map(i => `<tr>
+      <td>${i.descripcion}</td>
+      <td>${Number(i.cantidad).toFixed(2)}</td>
+      <td>${i.unidad}</td>
+      <td>L ${Number(i.precio_unitario).toFixed(2)}</td>
+      <td><strong>L ${Number(i.subtotal).toFixed(2)}</strong></td>
+      <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${i.notas||''}</td>
+      <td>${canEdit ? `<div class="action-btns">
+        <button class="btn btn-ghost btn-sm" onclick='editarItemOC(${JSON.stringify(i)})' title="Editar">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="delItemOC(${i.id})" title="Eliminar">🗑️</button>
+      </div>` : ''}</td>
+    </tr>`).join('');
+  }
+  document.getElementById('oc-items-total').innerHTML = `<strong>L ${Number(data.total||0).toFixed(2)}</strong>`;
+}
+
+function abrirNuevoItemOC() {
+  loadOCComponents();
+  document.getElementById('oc-item-title').textContent = '➕ Nueva Partida';
+  const modal = document.getElementById('modal-oc-item');
+  modal.querySelector('[name=oc_item_id]').value = '';
+  modal.querySelector('[name=oc_item_desc]').value = '';
+  modal.querySelector('[name=oc_item_qty]').value = '1';
+  modal.querySelector('[name=oc_item_unidad]').value = 'PZA';
+  modal.querySelector('[name=oc_item_precio]').value = '0';
+  modal.querySelector('[name=oc_item_subtotal]').value = '';
+  modal.querySelector('[name=oc_item_notas]').value = '';
+  modal.querySelector('[name=oc_component_id]').value = '';
+  openModal('modal-oc-item');
+}
+
+function editarItemOC(item) {
+  loadOCComponents();
+  document.getElementById('oc-item-title').textContent = '✏️ Editar Partida';
+  const modal = document.getElementById('modal-oc-item');
+  modal.querySelector('[name=oc_item_id]').value = item.id;
+  modal.querySelector('[name=oc_item_desc]').value = item.descripcion;
+  modal.querySelector('[name=oc_item_qty]').value = item.cantidad;
+  modal.querySelector('[name=oc_item_unidad]').value = item.unidad;
+  modal.querySelector('[name=oc_item_precio]').value = item.precio_unitario;
+  modal.querySelector('[name=oc_item_subtotal]').value = 'L ' + Number(item.subtotal).toFixed(2);
+  modal.querySelector('[name=oc_item_notas]').value = item.notas || '';
+  modal.querySelector('[name=oc_component_id]').value = item.component_id || '';
+  openModal('modal-oc-item');
+}
+
+// Auto-calc subtotal preview
+document.querySelector('[name=oc_item_qty]')?.addEventListener('input', calcOCSubtotal);
+document.querySelector('[name=oc_item_precio]')?.addEventListener('input', calcOCSubtotal);
+function calcOCSubtotal() {
+  const q = parseFloat(document.querySelector('[name=oc_item_qty]').value) || 0;
+  const p = parseFloat(document.querySelector('[name=oc_item_precio]').value) || 0;
+  document.querySelector('[name=oc_item_subtotal]').value = 'L ' + (q * p).toFixed(2);
+}
+
+// Auto-fill desc from component
+document.getElementById('selOCComponent')?.addEventListener('change', function() {
+  const comp = ocComponents.find(c => c.id == this.value);
+  if (comp) {
+    const descField = document.querySelector('[name=oc_item_desc]');
+    if (!descField.value) descField.value = comp.nombre;
+  }
+});
+
+async function guardarItemOC() {
+  const modal = document.getElementById('modal-oc-item');
+  const id = modal.querySelector('[name=oc_item_id]').value;
+  const desc = modal.querySelector('[name=oc_item_desc]').value.trim();
+  if (!desc) { toast('La descripción es obligatoria', 'error'); return; }
+  const payload = {
+    descripcion: desc,
+    cantidad: parseFloat(modal.querySelector('[name=oc_item_qty]').value) || 1,
+    unidad: modal.querySelector('[name=oc_item_unidad]').value,
+    precio_unitario: parseFloat(modal.querySelector('[name=oc_item_precio]').value) || 0,
+    notas: modal.querySelector('[name=oc_item_notas]').value || null,
+    component_id: modal.querySelector('[name=oc_component_id]').value || null,
+  };
+  if (id) payload.id = parseInt(id);
+  await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${currentOCId}`, id ? 'PUT' : 'POST', payload);
+  toast(id ? 'Partida actualizada' : 'Partida agregada');
+  closeModal('modal-oc-item');
+  await loadOCItems();
+  load(); // refresh main table for updated monto
+}
+
+async function delItemOC(itemId) {
+  if (!confirm('¿Eliminar esta partida?')) return;
+  await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${currentOCId}&item_id=${itemId}`, 'DELETE');
+  toast('Partida eliminada', 'warning');
+  await loadOCItems();
+  load();
+}
 
 document.addEventListener('DOMContentLoaded', load);
 </script>

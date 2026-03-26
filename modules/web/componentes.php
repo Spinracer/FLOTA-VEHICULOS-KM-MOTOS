@@ -25,9 +25,9 @@ ob_start();
   <!-- Tabs: Catálogo vs Por Vehículo -->
   <div style="display:flex;gap:8px;margin-left:auto">
     <button class="btn btn-ghost tab-btn active" id="tabCatalog" onclick="switchTab('catalog')">📦 Catálogo</button>
-    <button class="btn btn-ghost tab-btn" id="tabVehicle" onclick="switchTab('vehicle')">🚗 Por Vehículo</button>
-    <button class="btn btn-ghost" onclick="verMovimientos()">📦 Movimientos</button>
-    <button class="btn btn-ghost" onclick="verAlertasVenc()">⏰ Vencimientos <span class="badge badge-red" id="badgeVenc" style="display:none">0</span></button>
+    <button class="btn btn-ghost tab-btn" id="tabVehicle" onclick="switchTab('vehicle')" style="display:none">🚗 Por Vehículo</button>
+    <button class="btn btn-ghost" onclick="verMovimientos()" style="display:none">📦 Movimientos</button>
+    <button class="btn btn-ghost" onclick="verAlertasVenc()" style="display:none">⏰ Vencimientos <span class="badge badge-red" id="badgeVenc" style="display:none">0</span></button>
   </div>
 </div>
 
@@ -38,7 +38,7 @@ ob_start();
     <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevoCatalogo()">+ Nuevo Componente</button><?php endif; ?>
   </div>
   <div class="table-wrap">
-    <table><thead><tr><th>Nombre</th><th>Tipo</th><th>Descripción</th><th>Stock</th><th>Mín.</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
+    <table><thead><tr><th>Nombre</th><th>Tipo</th><th>Descripción</th><th style="display:none">Stock</th><th style="display:none">Mín.</th><th>Estado</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
     <tbody id="tbodyCatalog"></tbody></table>
     <div id="pgrCatalog"></div>
   </div>
@@ -76,7 +76,7 @@ ob_start();
 <!-- ═══════════════ MODAL CATÁLOGO ═══════════════ -->
 <div class="modal-bg" id="modalCatalog">
   <div class="modal">
-    <div class="modal-title" id="mtitleCat">📦 Nuevo Componente</div>
+    <div class="modal-title" id="mtitleCat">📦 Nuevo Item de Catálogo</div>
     <div class="form-grid">
       <input type="hidden" name="id">
       <div class="form-group"><label>Nombre *</label><input name="nombre" placeholder="Gato hidráulico"></div>
@@ -93,7 +93,7 @@ ob_start();
         </select>
       </div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Descripción del componente..."></textarea></div>
-      <div class="form-group"><label>Stock mínimo</label><input name="stock_minimo" type="number" min="0" value="0"></div>
+      <div class="form-group" style="display:none"><label>Stock mínimo</label><input name="stock_minimo" type="number" min="0" value="0"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modalCatalog')">Cancelar</button>
@@ -176,8 +176,8 @@ async function loadCatalog() {
     <td><strong>${r.nombre}</strong></td>
     <td><span class="badge ${TIPO_BADGE[r.tipo]||'badge-gray'}">${TIPO_LABELS[r.tipo]||r.tipo}</span></td>
     <td class="td-truncate">${r.descripcion||'—'}</td>
-    <td><span class="badge ${stkClass}">${stk}</span></td>
-    <td>${min}</td>
+    <td style="display:none"><span class="badge ${stkClass}">${stk}</span></td>
+    <td style="display:none">${min}</td>
     <td><span class="badge ${Number(r.activo)?'badge-green':'badge-red'}">${Number(r.activo)?'Activo':'Inactivo'}</span></td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       <button class="btn ${Number(r.activo)?'btn-danger':'btn-primary'} btn-sm" onclick="toggleActivo(${r.id},${Number(r.activo)})" title="${Number(r.activo)?'Desactivar':'Activar'}">${Number(r.activo)?'❌':'✅'}</button>
@@ -188,13 +188,13 @@ async function loadCatalog() {
 }
 
 function abrirNuevoCatalogo() {
-  document.getElementById('mtitleCat').textContent = '📦 Nuevo Componente';
+  document.getElementById('mtitleCat').textContent = '📦 Nuevo Item de Catálogo';
   resetForm('modalCatalog');
   openModal('modalCatalog');
 }
 
 function editarCatalogo(r) {
-  document.getElementById('mtitleCat').textContent = '✏️ Editar Componente';
+  document.getElementById('mtitleCat').textContent = '✏️ Editar Item de Catálogo';
   fillForm('modalCatalog', {id: r.id, nombre: r.nombre, tipo: r.tipo, descripcion: r.descripcion, stock_minimo: r.stock_minimo||0});
   openModal('modalCatalog');
 }
@@ -441,4 +441,4 @@ async function verAlertasVenc() {
   document.body.appendChild(wrap);
 }
 </script>
-<?php $content = ob_get_clean(); echo render_layout('Componentes / Inventario', 'componentes', $content); ?>
+<?php $content = ob_get_clean(); echo render_layout('Catálogo de Productos y Servicios', 'componentes', $content); ?>

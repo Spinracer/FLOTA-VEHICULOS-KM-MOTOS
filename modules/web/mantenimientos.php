@@ -58,6 +58,9 @@ ob_start();
       <div class="form-group"><label>KM al momento</label><input name="km" type="number" step="0.1" placeholder="46500"></div>
       <div class="form-group"><label>Próximo servicio (km)</label><input name="proximo_km" type="number" placeholder="56500"></div>
       <div class="form-group"><label>Proveedor / Taller</label><select name="proveedor_id"><option value="">— Ninguno —</option><?php foreach($proveedores as $p): ?><option value="<?=$p['id']?>"><?=htmlspecialchars($p['nombre'])?></option><?php endforeach; ?></select></div>
+      <div class="form-group"><label>OC vinculada</label>
+        <select name="orden_compra_id" id="selOCVinculada"><option value="">— Sin OC —</option></select>
+      </div>
       <div class="form-group"><label>Estado</label><select name="estado" id="selEstadoOT"><option>Pendiente</option><option>En proceso</option><option>Completado</option><option>Cancelado</option></select></div>
       <div class="form-group" id="grpExitKm" style="display:none"><label>KM Salida *</label><input name="exit_km" type="number" step="0.1" placeholder="KM al salir del taller"></div>
       <div class="form-group full" id="grpResumen" style="display:none"><label>Resumen de trabajo *</label><textarea name="resumen" placeholder="Describa los trabajos realizados..."></textarea></div>
@@ -138,7 +141,7 @@ async function load(){
     <td>${r.fecha}</td>
     <td><strong style="color:var(--accent2)">${r.placa||''} ${r.marca||''}</strong></td>
     <td><span class="badge badge-yellow">${r.tipo}</span></td>
-    <td class="td-truncate">${r.descripcion||'—'}</td>
+    <td class="td-truncate">${r.descripcion||'—'}${r.orden_compra_id ? `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">OC-${String(r.orden_compra_id).padStart(6,'0')}</span>` : ''}</td>
     <td><strong style="color:var(--green)">L ${Number(r.costo).toFixed(2)}</strong></td>
     <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
@@ -164,12 +167,13 @@ function abrirNuevo(){
 function editar(r){
   document.getElementById('mtitle').textContent='✏️ Editar OT #'+r.id;
   document.getElementById('inputCostoOT').setAttribute('readonly','');
-  fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,exit_km:r.exit_km||'',proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,resumen:r.resumen||'',descripcion:r.descripcion});
+  fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,exit_km:r.exit_km||'',proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,resumen:r.resumen||'',descripcion:r.descripcion,orden_compra_id:r.orden_compra_id||''});
   openModal('modal');
   attMant.setEntityId(r.id);
   attMant.load();
   toggleCierreFields();
   loadComponents(r.vehiculo_id);
+  loadOCsForVehicle(r.vehiculo_id, r.orden_compra_id);
 }
 
 function toggleCierreFields(){
@@ -313,6 +317,52 @@ async function aprobar(mantId) {
     checkPendingApprovals();
   } catch(e) { toast('Error: ' + (e.message || 'Error desconocido'),'error'); }
 }
+
+// ═══ OC vinculada ═══
+document.querySelector('[name=vehiculo_id]')?.addEventListener('change', function() {
+  loadOCsForVehicle(this.value);
+  loadComponents(this.value);
+});
+
+async function loadOCsForVehicle(vehiculoId, selectedOcId) {
+  const sel = document.getElementById('selOCVinculada');
+  sel.innerHTML = '<option value="">— Sin OC —</option>';
+  if (!vehiculoId) return;
+  try {
+    const data = await api(`/api/mantenimientos.php?action=ocs_for_vehicle&vehiculo_id=${vehiculoId}`);
+    if (data.ocs && data.ocs.length) {
+      sel.innerHTML += data.ocs.map(oc => {
+        const folio = 'OC-' + String(oc.id).padStart(6, '0');
+        const desc = (oc.descripcion || '').substring(0, 40);
+        return `<option value="${oc.id}" ${oc.id == selectedOcId ? 'selected' : ''}>${folio} — ${desc} (L ${Number(oc.monto_estimado||0).toFixed(0)}) [${oc.items_count} items]</option>`;
+      }).join('');
+    }
+  } catch(e) {}
+}
+
+document.getElementById('selOCVinculada')?.addEventListener('change', async function() {
+  const ocId = this.value;
+  const mantId = document.querySelector('#modal [name=id]').value;
+  if (!ocId || !mantId) return;
+  try {
+    const data = await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${ocId}`);
+    if (data.items && data.items.length > 0) {
+      if (confirm(`La OC tiene ${data.items.length} partidas. ¿Importar como partidas de esta OT?`)) {
+        for (const item of data.items) {
+          await api(`/api/mantenimientos.php?action=items&mantenimiento_id=${mantId}`, 'POST', {
+            descripcion: item.descripcion,
+            cantidad: item.cantidad,
+            unidad: item.unidad,
+            precio_unitario: item.precio_unitario,
+            notas: 'Importado desde OC-' + String(ocId).padStart(6, '0'),
+            component_id: item.component_id || null,
+          });
+        }
+        toast(`${data.items.length} partidas importadas desde OC`);
+      }
+    }
+  } catch(e) { console.error(e); }
+});
 
 // ═══ Componentes para items ═══
 const TIPO_COMP = {tool:'🔧',safety:'🦺',document:'📄',card:'💳',accessory:'🔩',part:'⚙️',consumable:'🛢️',service:'🔨'};

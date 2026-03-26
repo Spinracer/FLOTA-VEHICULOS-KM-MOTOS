@@ -95,7 +95,7 @@ tailwind.config = {
     <?= $nav('/incidentes.php', 'incidentes', '⚠️', 'Incidentes') ?>
     <?= $nav('/recordatorios.php', 'recordatorios', '🔔', 'Recordatorios') ?>
     <?= $nav('/reportes.php', 'reportes', '📈', 'Reportes') ?>
-    <?= $nav('/componentes.php', 'componentes', '🧰', 'Componentes') ?>
+    <?= $nav('/componentes.php', 'componentes', '🧰', 'Catálogo') ?>
     <?= $nav('/preventivos.php', 'preventivos', '📅', 'Preventivos') ?>
     <?= $nav('/alertas.php', 'alertas', '🚨', 'Centro de Alertas') ?>
 

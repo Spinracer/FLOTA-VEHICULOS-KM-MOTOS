@@ -304,7 +304,8 @@ case 'mantenimiento':
     $stmt = $db->prepare("
         SELECT m.*, v.placa, v.marca, v.modelo, v.anio, v.vin, v.km_actual,
                p.nombre AS proveedor_nombre, p.telefono AS proveedor_tel, p.email AS proveedor_email,
-               uc.nombre AS completado_por_nombre
+               uc.nombre AS completado_por_nombre,
+               m.orden_compra_id
         FROM mantenimientos m
         LEFT JOIN vehiculos v ON v.id = m.vehiculo_id
         LEFT JOIN proveedores p ON p.id = m.proveedor_id
@@ -342,6 +343,15 @@ case 'mantenimiento':
         $content .= "<tr><td><strong>Completado:</strong></td><td>{$m['completed_at']}</td><td><strong>Por:</strong></td><td>" . htmlspecialchars($m['completado_por_nombre'] ?? '—') . "</td></tr>";
     }
     $content .= '</tbody></table></div>';
+
+    // OC Vinculada
+    if (!empty($m['orden_compra_id'])) {
+        $folioOC = 'OC-' . str_pad((int)$m['orden_compra_id'], 6, '0', STR_PAD_LEFT);
+        $content .= '<div class="section"><h3>Orden de Compra Vinculada</h3>';
+        $content .= '<table class="info-table"><tbody>';
+        $content .= "<tr><td><strong>Folio OC:</strong></td><td style=\"font-weight:700;font-size:13px\">{$folioOC}</td><td><strong>ID:</strong></td><td>{$m['orden_compra_id']}</td></tr>";
+        $content .= '</tbody></table></div>';
+    }
 
     // Items / Partidas
     $stItems = $db->prepare("SELECT * FROM mantenimiento_items WHERE mantenimiento_id = ? ORDER BY id ASC");
@@ -422,6 +432,25 @@ case 'orden_compra':
         if ($oc['proveedor_email']) {
             $content .= "<tr><td><strong>Email:</strong></td><td colspan=\"3\">" . htmlspecialchars($oc['proveedor_email']) . "</td></tr>";
         }
+        $content .= '</tbody></table></div>';
+    }
+
+    // Items / Partidas de la OC
+    $stOCItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ? ORDER BY id ASC");
+    $stOCItems->execute([$id]);
+    $ocItems = $stOCItems->fetchAll();
+    if (count($ocItems)) {
+        $totalOCItems = 0;
+        $content .= '<div class="section"><h3>Partidas / Items</h3>';
+        $content .= '<table class="data-table"><thead><tr><th>#</th><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P. Unitario</th><th>Subtotal</th><th>Notas</th></tr></thead><tbody>';
+        $n = 1;
+        foreach ($ocItems as $it) {
+            $sub = (float)$it['subtotal'];
+            $totalOCItems += $sub;
+            $content .= "<tr><td>{$n}</td><td>" . htmlspecialchars($it['descripcion']) . "</td><td>" . number_format((float)$it['cantidad'], 2) . "</td><td>{$it['unidad']}</td><td>L " . number_format((float)$it['precio_unitario'], 2) . "</td><td><strong>L " . number_format($sub, 2) . "</strong></td><td>" . htmlspecialchars($it['notas'] ?? '') . "</td></tr>";
+            $n++;
+        }
+        $content .= "<tr class=\"total-row\"><td colspan=\"5\"><strong>TOTAL ({$n} partidas)</strong></td><td><strong>L " . number_format($totalOCItems, 2) . "</strong></td><td></td></tr>";
         $content .= '</tbody></table></div>';
     }
 
