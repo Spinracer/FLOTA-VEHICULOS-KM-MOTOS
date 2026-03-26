@@ -1,0 +1,6 @@
+Placa,Marca,Modelo,Anio,Tipo,Combustible,Kilometros,Color,VIN,Estado,Vencimiento Seguro,Notas,Sucursal ID,Costo Adquisicion,Aseguradora,Poliza Numero
+ABC-1234,Toyota,Hilux 2.4 4x4,2023,Camioneta,Diesel,45000,Blanco,JTFSS22P100012345,Activo,2027-06-15,Vehiculo asignado a ruta norte,1,28500.00,INS,POL-2023-0001
+DEF-5678,Honda,CR-V EX,2024,SUV,Gasolina,12000,Negro,,Activo,2027-03-20,,1,35000.00,INS,POL-2024-0045
+GHI-9012,Nissan,Frontier NP300,2022,Camioneta,Diesel,78000,Gris,1N6AD0CU5NN000123,En mantenimiento,2026-12-01,Requiere cambio de frenos,,22000.00,,
+JKL-3456,Suzuki,Vitara GLX,2024,SUV,Gasolina,5200,Rojo,,Activo,2027-09-30,,2,24500.00,Qualitas,POL-2024-0112
+MNO-7890,Hyundai,Tucson Limited,2023,SUV,Gasolina,31000,Azul,KM8J3CA46PU123456,Activo,2027-01-15,GPS instalado,1,32000.00,INS,POL-2023-0089

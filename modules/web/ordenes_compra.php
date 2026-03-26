@@ -22,8 +22,8 @@ ob_start();
 
 <div class="table-wrap">
   <table><thead><tr>
-    <th>Fecha</th><th>Solicitante</th><th>Descripción</th><th>Vehículo</th><th>Proveedor</th><th>Monto est.</th><th>Urgencia</th><th>Estado</th>
-    <?php if(can('edit')): ?><th>Acciones</th><?php endif; ?>
+    <th>Folio</th><th>Fecha</th><th>Solicitante</th><th>Descripción</th><th>Vehículo</th><th>Proveedor</th><th>Monto est.</th><th>Urgencia</th><th>Estado</th>
+    <th>Acciones</th>
   </tr></thead>
   <tbody id="tbody"></tbody></table>
   <div id="pgr"></div>
@@ -36,8 +36,9 @@ ob_start();
     <div class="form-grid">
       <input type="hidden" name="id">
       <div class="form-group full"><label>Descripción *</label><textarea name="descripcion" placeholder="Describa los artículos o servicios que necesita..." style="min-height:80px"></textarea></div>
-      <div class="form-group"><label>Vehículo (opcional)</label>
-        <select name="vehiculo_id"><option value="">— Ninguno —</option>
+      <div class="form-group"><label>Vehículo *</label>
+        <select name="vehiculo_id">
+          <option value="">— Seleccionar vehículo —</option>
           <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo'])?></option><?php endforeach; ?>
         </select>
       </div>
@@ -50,11 +51,6 @@ ob_start();
       <div class="form-group"><label>Urgencia</label>
         <select name="urgencia"><option>Normal</option><option>Baja</option><option>Alta</option><option>Urgente</option></select>
       </div>
-      <?php if($isAdmin): ?>
-      <div class="form-group"><label>Estado</label>
-        <select name="estado"><option>Pendiente</option><option>Aprobada</option><option>Rechazada</option><option>Completada</option><option>Cancelada</option></select>
-      </div>
-      <?php endif; ?>
       <div class="form-group full"><label>Notas</label><textarea name="notas" placeholder="Notas adicionales..." style="min-height:50px"></textarea></div>
       <!-- Adjuntos: Cotización -->
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
@@ -76,24 +72,51 @@ ob_start();
 
 <!-- MODAL DETALLE -->
 <div class="modal-bg" id="modal-detail">
-  <div class="modal" style="max-width:700px">
-    <div class="modal-title">📋 Detalle de Orden</div>
+  <div class="modal" style="max-width:750px">
+    <div class="modal-title" id="detail-title">📋 Detalle de Orden</div>
     <div id="detail-content" style="max-height:70vh;overflow-y:auto;font-size:14px">
       <div class="empty"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>
     </div>
-    <div id="att-detail-cot-wrap" style="margin-top:12px"></div>
-    <div id="att-detail-fac-wrap" style="margin-top:12px"></div>
+    <!-- Adjuntos visibles -->
+    <div id="att-detail-section" style="margin-top:12px">
+      <h4 style="font-size:13px;font-weight:600;margin-bottom:6px">📎 Archivos adjuntos</h4>
+      <div id="att-preview-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+      <div id="att-detail-cot-wrap"></div>
+      <div id="att-detail-fac-wrap" style="margin-top:8px"></div>
+    </div>
     <?php if($isAdmin): ?>
-    <div id="approval-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:none">
-      <h4 style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:8px">✅ Aprobación</h4>
-      <textarea id="notas-aprobacion" placeholder="Notas de aprobación/rechazo..." style="width:100%;min-height:50px;font-size:12px;margin-bottom:8px"></textarea>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="aprobar()">✅ Aprobar</button>
-        <button class="btn btn-danger btn-sm" onclick="rechazar()">❌ Rechazar</button>
+    <!-- Cambio rápido de estado -->
+    <div id="quick-status" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <h4 style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:8px">Cambiar estado</h4>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="background:#ffa502;color:#000" onclick="cambiarEstado('Pendiente')">Pendiente</button>
+        <button class="btn btn-primary btn-sm" onclick="cambiarEstado('Aprobada')">Aprobada</button>
+        <button class="btn btn-danger btn-sm" onclick="cambiarEstado('Rechazada')">Rechazada</button>
+        <button class="btn btn-sm" style="background:#3498db;color:#fff" onclick="cambiarEstado('Completada')">Completada</button>
+        <button class="btn btn-ghost btn-sm" onclick="cambiarEstado('Cancelada')">Cancelada</button>
       </div>
     </div>
+    <div id="approval-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:none">
+      <h4 style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:8px">Notas de aprobación/rechazo</h4>
+      <textarea id="notas-aprobacion" placeholder="Notas de aprobación/rechazo (opcional)..." style="width:100%;min-height:50px;font-size:12px;margin-bottom:8px"></textarea>
+    </div>
     <?php endif; ?>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cerrar</button></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cerrar</button>
+      <button class="btn btn-primary btn-sm" onclick="window.open('/print.php?type=orden_compra&id='+detailId,'_blank')">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VISTA PREVIA DE ARCHIVO -->
+<div class="modal-bg" id="modal-preview">
+  <div class="modal" style="max-width:900px;max-height:90vh">
+    <div class="modal-title" id="preview-title">Vista previa</div>
+    <div id="preview-content" style="text-align:center;overflow:auto;max-height:70vh"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-preview')">Cerrar</button>
+      <a id="preview-download" href="#" download class="btn btn-primary btn-sm">Descargar</a>
+    </div>
   </div>
 </div>
 
@@ -125,23 +148,27 @@ async function load() {
   `;
 
   const tbody = document.getElementById('tbody');
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty"><div class="empty-icon">🛒</div><div class="empty-title">Sin órdenes de compra</div></div></td></tr>'; return; }
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="10"><div class="empty"><div class="empty-icon">🛒</div><div class="empty-title">Sin órdenes de compra</div></div></td></tr>'; return; }
 
-  tbody.innerHTML = rows.map(r => `<tr>
+  tbody.innerHTML = rows.map(r => {
+    const folio = 'OC-' + String(r.id).padStart(6, '0');
+    return `<tr>
+    <td><strong style="font-family:monospace;color:var(--accent2)">${folio}</strong></td>
     <td>${r.created_at?.substring(0,10) || '—'}</td>
     <td>${r.solicitante_nombre || '—'}</td>
-    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.descripcion||'').replace(/"/g,'&quot;')}">${r.descripcion || '—'}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.descripcion||'').replace(/"/g,'&quot;')}">${r.descripcion || '—'}</td>
     <td>${r.placa ? '<strong style="color:var(--accent2)">'+r.placa+'</strong> '+r.marca : '—'}</td>
     <td>${r.proveedor_nombre || '—'}</td>
     <td>${Number(r.monto_estimado) > 0 ? 'L '+Number(r.monto_estimado).toFixed(2) : '—'}</td>
     <td><span class="badge ${UB[r.urgencia]||'badge-gray'}">${r.urgencia || 'Normal'}</span></td>
     <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
-    <?php if(can('edit')): ?><td><div class="action-btns">
+    <td><div class="action-btns">
       <button class="btn btn-ghost btn-sm" onclick="verDetalle(${r.id})" title="Ver detalle">📋</button>
-      <button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})' title="Editar">✏️</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=orden_compra&id=${r.id}','_blank')" title="Imprimir">🖨️</button>
+      <?php if(can('edit')): ?><button class="btn btn-ghost btn-sm" onclick='editar(${JSON.stringify(r)})' title="Editar">✏️</button><?php endif; ?>
       <?php if(can('delete')): ?><button class="btn btn-danger btn-sm" onclick="del(${r.id})" title="Eliminar">🗑️</button><?php endif; ?>
-    </div></td><?php endif; ?>
-  </tr>`).join('');
+    </div></td>
+  </tr>`;}).join('');
 }
 
 function abrirNuevo() {
@@ -156,7 +183,7 @@ function editar(r) {
   fillForm('modal', {
     id: r.id, descripcion: r.descripcion, vehiculo_id: r.vehiculo_id || '',
     proveedor_id: r.proveedor_id || '', monto_estimado: r.monto_estimado || '',
-    urgencia: r.urgencia || 'Normal', estado: r.estado || 'Pendiente',
+    urgencia: r.urgencia || 'Normal',
     notas: r.notas || ''
   });
   attCot.setEntityId(r.id); attCot.load();
@@ -167,6 +194,7 @@ function editar(r) {
 async function guardar() {
   const d = getForm('modal');
   if (!d.descripcion) { toast('La descripción es obligatoria', 'error'); return; }
+  if (!d.vehiculo_id) { toast('Debes seleccionar un vehículo', 'error'); return; }
   const res = await api('/api/ordenes_compra.php', d.id ? 'PUT' : 'POST', d);
   const savedId = d.id || res.id;
   if (savedId) {
@@ -190,9 +218,13 @@ async function verDetalle(id) {
   const r = await api(`/api/ordenes_compra.php?detail=${id}`);
   if (!r || !r.id) { document.getElementById('detail-content').innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-title">No encontrada</div></div>'; return; }
 
+  const folio = 'OC-' + String(r.id).padStart(6, '0');
+  document.getElementById('detail-title').innerHTML = `📋 ${folio} — Detalle de Orden`;
+
   document.getElementById('detail-content').innerHTML = `
     <table style="width:100%;border-collapse:collapse">
-      <tr><td style="color:#8892a4;width:150px;padding:6px 0">Solicitante</td><td style="padding:6px 0"><strong>${r.solicitante_nombre||'—'}</strong></td></tr>
+      <tr><td style="color:#8892a4;width:150px;padding:6px 0">Folio</td><td style="padding:6px 0"><strong style="font-family:monospace">${folio}</strong></td></tr>
+      <tr><td style="color:#8892a4">Solicitante</td><td><strong>${r.solicitante_nombre||'—'}</strong></td></tr>
       <tr><td style="color:#8892a4">Fecha</td><td>${r.created_at?.substring(0,10)||'—'}</td></tr>
       <tr><td style="color:#8892a4">Descripción</td><td>${r.descripcion||'—'}</td></tr>
       <tr><td style="color:#8892a4">Vehículo</td><td>${r.placa ? r.placa+' '+r.marca+' '+r.modelo : '—'}</td></tr>
@@ -205,32 +237,88 @@ async function verDetalle(id) {
       ${r.notas ? `<tr><td style="color:#8892a4">Notas</td><td>${r.notas}</td></tr>` : ''}
     </table>`;
 
-  // Load attachments
+  // Load and render attachments with preview
+  loadAttachmentsPreview(id);
+
   const attDetCot = new AttachmentWidget('att-detail-cot-wrap', 'oc_cotizacion', id);
   attDetCot.load();
   const attDetFac = new AttachmentWidget('att-detail-fac-wrap', 'oc_factura', id);
   attDetFac.load();
 
   <?php if($isAdmin): ?>
-  const approvalSec = document.getElementById('approval-section');
-  approvalSec.style.display = r.estado === 'Pendiente' ? '' : 'none';
+  document.getElementById('approval-section').style.display = (r.estado === 'Pendiente' || r.estado === 'Rechazada') ? '' : 'none';
   <?php endif; ?>
 }
 
+// Cargar adjuntos con vista previa visual
+async function loadAttachmentsPreview(id) {
+  const container = document.getElementById('att-preview-list');
+  container.innerHTML = '<span style="font-size:12px;color:#8892a4">Cargando archivos...</span>';
+  try {
+    const files = [];
+    for (const entidad of ['oc_cotizacion', 'oc_factura', 'ordenes_compra']) {
+      try {
+        const res = await fetch(`/api/attachments.php?entidad=${entidad}&entidad_id=${id}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.attachments) files.push(...data.attachments.map(f => ({...f, _entidad: entidad})));
+        }
+      } catch(e) {}
+    }
+    if (!files.length) {
+      container.innerHTML = '<span style="font-size:12px;color:#8892a4">Sin archivos adjuntos</span>';
+      return;
+    }
+    container.innerHTML = files.map(f => {
+      const isImg = f.mime_type && f.mime_type.startsWith('image/');
+      const icon = isImg ? '🖼️' : f.mime_type === 'application/pdf' ? '📕' : '📄';
+      const label = f._entidad === 'oc_cotizacion' ? 'Cotización' : f._entidad === 'oc_factura' ? 'Factura' : 'Adjunto';
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px;background:var(--surface2)" onclick="previewFile(${f.id},'${f.mime_type}','${(f.original_name||'').replace(/'/g,"\\'")}')">
+        <span>${icon}</span>
+        <div>
+          <div style="font-weight:500">${label}</div>
+          <div style="font-size:10px;color:#8892a4;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.original_name||'archivo'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '';
+  }
+}
+
+function previewFile(id, mime, name) {
+  document.getElementById('preview-title').textContent = name || 'Vista previa';
+  const content = document.getElementById('preview-content');
+  const downloadLink = document.getElementById('preview-download');
+  const url = `/api/attachments.php?id=${id}&download=1`;
+  downloadLink.href = url;
+
+  if (mime && mime.startsWith('image/')) {
+    content.innerHTML = `<img src="${url}" style="max-width:100%;max-height:65vh;border-radius:8px" alt="${name}">`;
+  } else if (mime === 'application/pdf') {
+    content.innerHTML = `<iframe src="${url}" style="width:100%;height:65vh;border:none;border-radius:8px"></iframe>`;
+  } else {
+    content.innerHTML = `<div style="padding:40px;text-align:center"><span style="font-size:48px">📄</span><p style="margin-top:12px;color:#8892a4">No hay vista previa disponible. Usa el botón Descargar.</p></div>`;
+  }
+  openModal('modal-preview');
+}
+
 <?php if($isAdmin): ?>
-async function aprobar() {
+async function cambiarEstado(nuevoEstado) {
   if (!detailId) return;
-  const notas = document.getElementById('notas-aprobacion').value.trim();
-  await api('/api/ordenes_compra.php', 'PUT', { id: detailId, _accion: 'aprobar', notas_aprobacion: notas });
-  toast('Orden aprobada ✅'); closeModal('modal-detail'); load();
+  const notas = document.getElementById('notas-aprobacion')?.value?.trim() || '';
+  if (nuevoEstado === 'Rechazada' && !notas) {
+    toast('Indica el motivo del rechazo', 'error');
+    document.getElementById('approval-section').style.display = '';
+    return;
+  }
+  await api('/api/ordenes_compra.php', 'PUT', { id: detailId, _accion: 'cambiar_estado', estado: nuevoEstado, notas_aprobacion: notas || undefined });
+  toast(`Estado cambiado a ${nuevoEstado}`);
+  closeModal('modal-detail'); load();
 }
-async function rechazar() {
-  if (!detailId) return;
-  const notas = document.getElementById('notas-aprobacion').value.trim();
-  if (!notas) { toast('Indica el motivo del rechazo', 'error'); return; }
-  await api('/api/ordenes_compra.php', 'PUT', { id: detailId, _accion: 'rechazar', notas_aprobacion: notas });
-  toast('Orden rechazada', 'warning'); closeModal('modal-detail'); load();
-}
+
+async function aprobar() { cambiarEstado('Aprobada'); }
+async function rechazar() { cambiarEstado('Rechazada'); }
 <?php endif; ?>
 
 document.addEventListener('DOMContentLoaded', load);
