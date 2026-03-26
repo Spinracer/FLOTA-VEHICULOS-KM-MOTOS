@@ -347,19 +347,20 @@ document.getElementById('selOCVinculada')?.addEventListener('change', async func
   try {
     const data = await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${ocId}`);
     if (data.items && data.items.length > 0) {
-      if (confirm(`La OC tiene ${data.items.length} partidas. ¿Importar como partidas de esta OT?`)) {
+      const ocFolio = 'OC-' + String(ocId).padStart(6, '0');
+      sysConfirm(`${ocFolio} tiene ${data.items.length} partidas.\n\n¿Importar como partidas de esta OT?`, async () => {
         for (const item of data.items) {
           await api(`/api/mantenimientos.php?action=items&mantenimiento_id=${mantId}`, 'POST', {
             descripcion: item.descripcion,
             cantidad: item.cantidad,
             unidad: item.unidad,
             precio_unitario: item.precio_unitario,
-            notas: 'Importado desde OC-' + String(ocId).padStart(6, '0'),
+            notas: 'Importado desde ' + ocFolio,
             component_id: item.component_id || null,
           });
         }
         toast(`${data.items.length} partidas importadas desde OC`);
-      }
+      }, { title: 'Importar partidas', confirmText: 'Importar' });
     }
   } catch(e) { console.error(e); }
 });

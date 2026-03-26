@@ -25,6 +25,30 @@ try {
             echo json_encode(['error' => 'orden_compra_id es obligatorio.']);
             exit;
         }
+
+        // Helper: auto-sync items to linked mantenimiento
+        $syncItemsToMantenimiento = function() use ($db, $ocId) {
+            $stMant = $db->prepare("SELECT id FROM mantenimientos WHERE orden_compra_id = ? LIMIT 1");
+            $stMant->execute([$ocId]);
+            $linkedMant = $stMant->fetch();
+            if ($linkedMant) {
+                $mantId = (int)$linkedMant['id'];
+                // Delete existing imported items and re-import all
+                $db->prepare("DELETE FROM mantenimiento_items WHERE mantenimiento_id = ? AND notas LIKE 'Importado desde OC-%'")->execute([$mantId]);
+                $stAllItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ?");
+                $stAllItems->execute([$ocId]);
+                $allItems = $stAllItems->fetchAll();
+                $ocFolio = 'OC-' . str_pad($ocId, 6, '0', STR_PAD_LEFT);
+                foreach ($allItems as $item) {
+                    $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
+                       ->execute([$mantId, $item['descripcion'], $item['cantidad'], $item['unidad'], $item['precio_unitario'], 'Importado desde '.$ocFolio, $item['component_id']]);
+                }
+                // Recalculate mantenimiento costo
+                $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
+                   ->execute([$mantId, $mantId]);
+            }
+        };
+
         switch ($method) {
             case 'GET':
                 $stmt = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ? ORDER BY id ASC");
@@ -54,6 +78,7 @@ try {
                 // Auto-recalcular monto_estimado
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
+                $syncItemsToMantenimiento();
                 audit_log('orden_compra_items', 'create', $newId, [], $d);
                 echo json_encode(['id' => $newId, 'ok' => true]);
                 break;
@@ -70,6 +95,7 @@ try {
                    ]);
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
+                $syncItemsToMantenimiento();
                 audit_log('orden_compra_items', 'update', (int)$d['id'], [], $d);
                 echo json_encode(['ok' => true]);
                 break;
@@ -80,6 +106,7 @@ try {
                 $db->prepare("DELETE FROM orden_compra_items WHERE id = ?")->execute([$itemId]);
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
+                $syncItemsToMantenimiento();
                 audit_log('orden_compra_items', 'delete', $itemId, [], []);
                 echo json_encode(['ok' => true]);
                 break;

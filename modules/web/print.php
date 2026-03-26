@@ -372,8 +372,9 @@ case 'mantenimiento':
         $content .= '</tbody></table></div>';
     }
 
-    // Costo total
-    $content .= '<div class="section" style="text-align:right;font-size:14px;padding:10px 0"><strong>Costo Total OT: L ' . number_format((float)$m['costo'], 2) . '</strong></div>';
+    // Costo total (use items total if available, otherwise costo field)
+    $costoTotal = isset($totalItems) && $totalItems > 0 ? $totalItems : (float)$m['costo'];
+    $content .= '<div class="section" style="text-align:right;font-size:14px;padding:10px 0"><strong>Costo Total OT: L ' . number_format($costoTotal, 2) . '</strong></div>';
 
     $content .= '<div class="signatures">';
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>IT y Seguridad</strong></p><p>Solicitante</p></div>';

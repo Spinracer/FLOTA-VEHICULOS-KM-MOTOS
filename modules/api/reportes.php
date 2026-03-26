@@ -557,6 +557,8 @@ try {
             if ($to) { $where .= " AND a.start_at <= ?"; $params[] = $to; }
             if ($vid) { $where .= " AND a.vehiculo_id = ?"; $params[] = $vid; }
             if ($opId) { $where .= " AND a.operador_id = ?"; $params[] = $opId; }
+            $depId = (int)($_GET['departamento_id'] ?? 0);
+            if ($depId) { $where .= " AND o.departamento_id = ?"; $params[] = $depId; }
 
             // Detalle de asignaciones
             $stmt = $db->prepare("SELECT a.id, a.start_at, a.end_at, v.id AS vehiculo_id, v.placa, CONCAT(v.marca,' ',v.modelo) AS vehiculo,
@@ -616,8 +618,102 @@ try {
             ]);
             break;
 
+        case 'ordenes_compra':
+            $where = "WHERE oc.deleted_at IS NULL";
+            $params = [];
+            $ocOpId = (int)($_GET['operador_id'] ?? 0);
+            $ocDepId = (int)($_GET['departamento_id'] ?? 0);
+            if ($from) { $where .= " AND oc.created_at >= ?"; $params[] = $from; }
+            if ($to) { $where .= " AND oc.created_at <= ?"; $params[] = $to . ' 23:59:59'; }
+            if ($vid) { $where .= " AND oc.vehiculo_id = ?"; $params[] = $vid; }
+            if ($ocDepId) { $where .= " AND dep2.id = ?"; $params[] = $ocDepId; }
+            if ($ocOpId) { $where .= " AND (oc.solicitante_id = ? OR EXISTS (SELECT 1 FROM mantenimientos mt WHERE mt.orden_compra_id=oc.id AND mt.operador_id=?))"; $params[] = $ocOpId; $params[] = $ocOpId; }
+
+            // Detalle
+            $stmt = $db->prepare("SELECT oc.id, oc.descripcion, oc.monto_estimado, oc.estado, oc.urgencia, oc.created_at,
+                u.nombre AS solicitante_nombre,
+                v.id AS vehiculo_id, v.placa, CONCAT(v.marca,' ',v.modelo) AS vehiculo,
+                p.nombre AS proveedor_nombre,
+                m.id AS mantenimiento_id,
+                (SELECT COUNT(*) FROM orden_compra_items WHERE orden_compra_id=oc.id) AS items_count,
+                COALESCE(dep2.nombre,'') AS departamento
+                FROM ordenes_compra oc
+                LEFT JOIN usuarios u ON u.id=oc.solicitante_id
+                LEFT JOIN vehiculos v ON v.id=oc.vehiculo_id
+                LEFT JOIN proveedores p ON p.id=oc.proveedor_id
+                LEFT JOIN mantenimientos m ON m.orden_compra_id=oc.id
+                LEFT JOIN operadores op ON op.id=(SELECT operador_id FROM asignaciones WHERE vehiculo_id=oc.vehiculo_id AND estado='Activa' LIMIT 1)
+                LEFT JOIN departamentos dep2 ON dep2.id=op.departamento_id
+                $where ORDER BY oc.created_at DESC");
+            $stmt->execute($params);
+            $detalle = $stmt->fetchAll();
+
+            // Totales
+            $totalOC = count($detalle);
+            $pendientes = 0; $aprobadas = 0; $completadas = 0;
+            $totalMonto = 0; $totalItems = 0;
+            foreach ($detalle as $r) {
+                $totalMonto += (float)($r['monto_estimado'] ?? 0);
+                $totalItems += (int)($r['items_count'] ?? 0);
+                $est = strtolower($r['estado'] ?? '');
+                if ($est === 'pendiente') $pendientes++;
+                elseif ($est === 'aprobada') $aprobadas++;
+                elseif ($est === 'completada') $completadas++;
+            }
+
+            // Formatear detalle con folios
+            $detalleFormatted = [];
+            foreach ($detalle as $r) {
+                $detalleFormatted[] = [
+                    'id' => $r['id'],
+                    'folio' => 'OC-' . str_pad($r['id'], 6, '0', STR_PAD_LEFT),
+                    'fecha' => $r['created_at'],
+                    'solicitante' => $r['solicitante_nombre'],
+                    'descripcion' => $r['descripcion'],
+                    'placa' => $r['placa'],
+                    'marca' => $r['vehiculo'],
+                    'proveedor' => $r['proveedor_nombre'],
+                    'monto' => (float)$r['monto_estimado'],
+                    'estado' => $r['estado'],
+                    'urgencia' => $r['urgencia'],
+                    'mantenimiento_folio' => $r['mantenimiento_id'] ? 'OT-' . str_pad($r['mantenimiento_id'], 6, '0', STR_PAD_LEFT) : null,
+                    'items_count' => (int)$r['items_count'],
+                    'departamento' => $r['departamento'],
+                ];
+            }
+
+            // Por vehículo
+            $porVehiculo = [];
+            foreach ($detalle as $r) {
+                if (!$r['vehiculo_id']) continue;
+                $key = $r['vehiculo_id'];
+                if (!isset($porVehiculo[$key])) {
+                    $porVehiculo[$key] = ['vehiculo_id'=>$r['vehiculo_id'], 'placa'=>$r['placa'], 'vehiculo'=>$r['vehiculo'], 'cantidad'=>0, 'monto_total'=>0];
+                }
+                $porVehiculo[$key]['cantidad']++;
+                $porVehiculo[$key]['monto_total'] += (float)($r['monto_estimado'] ?? 0);
+            }
+
+            // Por estado
+            $porEstado = [];
+            foreach ($detalle as $r) {
+                $est = $r['estado'] ?? 'Sin estado';
+                if (!isset($porEstado[$est])) {
+                    $porEstado[$est] = ['estado'=>$est, 'cantidad'=>0];
+                }
+                $porEstado[$est]['cantidad']++;
+            }
+
+            echo json_encode([
+                'totales' => ['total_oc'=>$totalOC, 'pendientes'=>$pendientes, 'aprobadas'=>$aprobadas, 'completadas'=>$completadas, 'total_monto'=>$totalMonto, 'total_items'=>$totalItems],
+                'detalle' => $detalleFormatted,
+                'por_vehiculo' => array_values($porVehiculo),
+                'por_estado' => array_values($porEstado),
+            ]);
+            break;
+
         default:
-            echo json_encode(['error' => 'Reporte no especificado. Use: combustible, mantenimiento, vehiculos, top_costosos, talleres, overrides, operador_360, historial_asignaciones']);
+            echo json_encode(['error' => 'Reporte no especificado. Use: combustible, mantenimiento, vehiculos, top_costosos, talleres, overrides, operador_360, historial_asignaciones, ordenes_compra']);
     }
 } catch (Throwable $e) {
     http_response_code(500);

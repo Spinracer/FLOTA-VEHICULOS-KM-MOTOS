@@ -101,6 +101,9 @@ ob_start();
       <textarea id="notas-aprobacion" placeholder="Notas de aprobación/rechazo (opcional)..." style="width:100%;min-height:50px;font-size:12px;margin-bottom:8px"></textarea>
     </div>
     <?php endif; ?>
+    <div id="crear-mant-section" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:none">
+      <button class="btn btn-primary btn-sm" onclick="crearMantenimientoDesdeOC()" style="background:#2ed573">🔧 Crear Orden de Trabajo desde esta OC</button>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-detail')">Cerrar</button>
       <button class="btn btn-primary btn-sm" onclick="window.open('/print.php?type=orden_compra&id='+detailId,'_blank')">🖨️ Imprimir</button>
@@ -292,6 +295,10 @@ async function verDetalle(id) {
   <?php if($isAdmin): ?>
   document.getElementById('approval-section').style.display = (r.estado === 'Pendiente' || r.estado === 'Rechazada') ? '' : 'none';
   <?php endif; ?>
+
+  // Show "Create OT" button when OC is Aprobada/Completada and has vehicle
+  const crearMantSec = document.getElementById('crear-mant-section');
+  if (crearMantSec) crearMantSec.style.display = (r.estado === 'Aprobada' || r.estado === 'Completada') && r.vehiculo_id ? '' : 'none';
 }
 
 // Cargar adjuntos con vista previa visual
@@ -381,6 +388,51 @@ function avanzarEstado(id, folio, desc, estadoActual) {
   );
 }
 <?php endif; ?>
+
+async function crearMantenimientoDesdeOC() {
+  if (!detailId) return;
+  const r = await api(`/api/ordenes_compra.php?detail=${detailId}`);
+  if (!r || !r.id) { toast('No se pudo cargar la OC', 'error'); return; }
+  const folio = 'OC-' + String(r.id).padStart(6, '0');
+  sysConfirm(
+    `${folio}\n${(r.descripcion||'').substring(0,60)}\nVehículo: ${r.placa||'—'}\nMonto: L ${Number(r.monto_estimado||0).toFixed(2)}\n\n¿Crear una Orden de Trabajo vinculada a esta OC?`,
+    async () => {
+      try {
+        const mantData = {
+          vehiculo_id: r.vehiculo_id,
+          tipo: 'Correctivo',
+          descripcion: `${folio} — ${r.descripcion || ''}`,
+          costo: r.monto_estimado || 0,
+          proveedor_id: r.proveedor_id || null,
+          orden_compra_id: r.id,
+          estado: 'Pendiente',
+          fecha: new Date().toISOString().split('T')[0],
+        };
+        const res = await api('/api/mantenimientos.php', 'POST', mantData);
+        if (res && res.id) {
+          // Import items from OC
+          const itemsData = await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${r.id}`);
+          if (itemsData.items && itemsData.items.length) {
+            for (const item of itemsData.items) {
+              await api(`/api/mantenimientos.php?action=items&mantenimiento_id=${res.id}`, 'POST', {
+                descripcion: item.descripcion,
+                cantidad: item.cantidad,
+                unidad: item.unidad,
+                precio_unitario: item.precio_unitario,
+                notas: 'Importado desde ' + folio,
+                component_id: item.component_id || null,
+              });
+            }
+          }
+          const otFolio = 'OT-' + String(res.id).padStart(6, '0');
+          toast(`${otFolio} creada desde ${folio} con ${itemsData.items?.length || 0} partidas`);
+          closeModal('modal-detail');
+        }
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    },
+    { title: 'Crear Orden de Trabajo', confirmText: 'Crear OT' }
+  );
+}
 
 // ── OC Items ──
 let currentOCId = null;
