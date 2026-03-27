@@ -273,6 +273,75 @@ try {
         exit;
     }
 
+    // ───────────── CAMBIAR ESTADO RÁPIDO ─────────────
+    if ($action === 'cambiar_estado' && $method === 'PUT') {
+        if (!in_array($rol, ['coordinador_it', 'admin'], true)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Solo administradores pueden cambiar estado directamente.']);
+            exit;
+        }
+        $d = json_decode(file_get_contents('php://input'), true);
+        $id = (int)($d['id'] ?? 0);
+        $nuevoEstado = trim($d['estado'] ?? '');
+        if (!$id || !$nuevoEstado) {
+            http_response_code(422);
+            echo json_encode(['error' => 'id y estado son obligatorios.']);
+            exit;
+        }
+        $stPrev = $db->prepare("SELECT * FROM mantenimientos WHERE id=? AND deleted_at IS NULL LIMIT 1");
+        $stPrev->execute([$id]);
+        $prev = $stPrev->fetch();
+        if (!$prev) { http_response_code(404); echo json_encode(['error' => 'Mantenimiento no encontrado.']); exit; }
+        $estadoAnterior = $prev['estado'];
+        // Admin puede hacer cualquier transición válida + reabrir (Completado/Cancelado → Pendiente)
+        $adminTransitions = [
+            'Pendiente'  => ['En proceso', 'Cancelado'],
+            'En proceso' => ['Completado', 'Cancelado', 'Pendiente'],
+            'Completado' => ['Pendiente'],
+            'Cancelado'  => ['Pendiente'],
+        ];
+        $allowed = $adminTransitions[$estadoAnterior] ?? [];
+        if (!in_array($nuevoEstado, $allowed, true)) {
+            http_response_code(409);
+            echo json_encode(['error' => "Transición no permitida: {$estadoAnterior} → {$nuevoEstado}"]);
+            exit;
+        }
+        $db->beginTransaction();
+        try {
+            $updates = "estado = ?";
+            $params = [$nuevoEstado];
+            if ($nuevoEstado === 'Completado' && $estadoAnterior !== 'Completado') {
+                $updates .= ", completed_at = NOW(), completed_by = ?";
+                $params[] = (int)($user['id'] ?? 0);
+            }
+            if (in_array($nuevoEstado, ['Pendiente'], true) && in_array($estadoAnterior, ['Completado', 'Cancelado'], true)) {
+                $updates .= ", completed_at = NULL, completed_by = NULL";
+            }
+            $params[] = $id;
+            $db->prepare("UPDATE mantenimientos SET {$updates} WHERE id = ?")->execute($params);
+            // Actualizar estado del vehículo
+            $vehiculoId = (int)$prev['vehiculo_id'];
+            if ($nuevoEstado === 'En proceso') {
+                $db->prepare("UPDATE vehiculos SET estado = 'En mantenimiento' WHERE id = ? AND estado = 'Activo'")->execute([$vehiculoId]);
+            }
+            if (in_array($nuevoEstado, ['Completado', 'Cancelado', 'Pendiente'], true) && $estadoAnterior === 'En proceso') {
+                $otherActive = $db->prepare("SELECT COUNT(*) FROM mantenimientos WHERE vehiculo_id = ? AND estado = 'En proceso' AND id != ?");
+                $otherActive->execute([$vehiculoId, $id]);
+                if ((int)$otherActive->fetchColumn() === 0) {
+                    $db->prepare("UPDATE vehiculos SET estado = 'Activo' WHERE id = ? AND estado = 'En mantenimiento'")->execute([$vehiculoId]);
+                }
+            }
+            $db->commit();
+        } catch (Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        audit_log('mantenimientos', 'estado_change', $id, ['estado' => $estadoAnterior], ['estado' => $nuevoEstado], ['via' => 'cambio_rapido', 'admin' => $user['email'] ?? '']);
+        cache_invalidate_prefix('dashboard');
+        echo json_encode(['ok' => true, 'estado_anterior' => $estadoAnterior, 'estado_nuevo' => $nuevoEstado]);
+        exit;
+    }
+
     // ───────────── CRUD principal de mantenimientos ─────────────
     switch ($method) {
         case 'GET':
@@ -349,7 +418,7 @@ try {
             $db->beginTransaction();
             try {
                 // Estado inicial siempre es Pendiente (flujo OT)
-                $estadoInicial = $d['estado'] ?? 'Pendiente';
+                $estadoInicial = 'Pendiente';
                 $ordenCompraId = ((int)($d['orden_compra_id'] ?? 0)) ?: null;
                 $stmt = $db->prepare("INSERT INTO mantenimientos (fecha,vehiculo_id,tipo,descripcion,costo,km,proximo_km,proveedor_id,estado,orden_compra_id) VALUES (?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([$d['fecha'],$d['vehiculo_id'],$d['tipo'],$d['descripcion']?:null,(float)($d['costo']??0),$d['km']?:null,$d['proximo_km']?:null,$d['proveedor_id']?:null,$estadoInicial,$ordenCompraId]);

@@ -41,22 +41,16 @@ ob_start();
   </div>
 </div>
 <div class="toolbar" id="hist-toolbar" style="margin-top:4px;display:none;">
-  <label style="font-size:12px;color:#8892a4;margin-right:6px;">Filtrar por:</label>
-  <select id="hist-mode" onchange="histModeChange()" style="max-width:160px">
-    <option value="">Todos (sin filtro)</option>
-    <option value="vehiculo">🚗 Por Vehículo</option>
-    <option value="operador">👤 Por Operador</option>
-    <option value="departamento">🏢 Por Departamento</option>
-  </select>
-  <select id="hist-vehiculo" onchange="loadReport()" style="max-width:200px;display:none">
+  <label style="font-size:12px;color:#8892a4;margin-right:6px;">Subfiltros:</label>
+  <select id="hist-vehiculo" onchange="loadReport()" style="max-width:200px">
     <option value="">— Todos los vehículos —</option>
     <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo'])?></option><?php endforeach; ?>
   </select>
-  <select id="hist-operador" onchange="loadReport()" style="max-width:200px;display:none">
+  <select id="hist-operador" onchange="loadReport()" style="max-width:200px">
     <option value="">— Todos los operadores —</option>
     <?php foreach($operadores as $op): ?><option value="<?=$op['id']?>"><?=htmlspecialchars($op['nombre'])?> (<?=$op['estado']?>)</option><?php endforeach; ?>
   </select>
-  <select id="hist-departamento" onchange="loadReport()" style="max-width:200px;display:none">
+  <select id="hist-departamento" onchange="loadReport()" style="max-width:200px">
     <option value="">— Todos los departamentos —</option>
     <?php foreach($departamentos as $dep): ?><option value="<?=$dep['id']?>"><?=htmlspecialchars($dep['nombre'])?></option><?php endforeach; ?>
   </select>
@@ -138,7 +132,7 @@ function switchReport() {
   document.getElementById('fprov').style.display = type === 'mantenimiento' ? '' : 'none';
   document.getElementById('hist-toolbar').style.display = type === 'historial_asignaciones' ? '' : 'none';
   document.getElementById('oc-audit-toolbar').style.display = type === 'ordenes_compra' ? '' : 'none';
-  if (type !== 'historial_asignaciones') { document.getElementById('hist-mode').value = ''; histModeChange(true); }
+  if (type !== 'historial_asignaciones') { document.getElementById('hist-vehiculo').value=''; document.getElementById('hist-operador').value=''; document.getElementById('hist-departamento').value=''; }
 
   // Populate grouping options based on report type
   const groupOptions = {
@@ -169,11 +163,10 @@ async function loadReport() {
     }
     qs = buildQS({report: type, operador_id: opId});
   } else if (type === 'historial_asignaciones') {
-    const mode = document.getElementById('hist-mode').value;
     const extra = {report: type};
-    if (mode === 'vehiculo') { const v = document.getElementById('hist-vehiculo').value; if (v) extra.vehiculo_id = v; }
-    if (mode === 'operador') { const o = document.getElementById('hist-operador').value; if (o) extra.operador_id = o; }
-    if (mode === 'departamento') { const d = document.getElementById('hist-departamento').value; if (d) extra.departamento_id = d; }
+    const v = document.getElementById('hist-vehiculo').value; if (v) extra.vehiculo_id = v;
+    const o = document.getElementById('hist-operador').value; if (o) extra.operador_id = o;
+    const d = document.getElementById('hist-departamento').value; if (d) extra.departamento_id = d;
     qs = buildQS(extra);
   } else if (type === 'ordenes_compra') {
     const extra = {report: type};
@@ -542,10 +535,9 @@ function exportReport(format) {
     const opId = document.getElementById('fop').value;
     if (opId) exportQs += '&operador_id=' + opId;
   } else if (type === 'historial_asignaciones') {
-    const mode = document.getElementById('hist-mode').value;
-    if (mode === 'vehiculo') { const v = document.getElementById('hist-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v; }
-    if (mode === 'operador') { const o = document.getElementById('hist-operador').value; if (o) exportQs += '&operador_id=' + o; }
-    if (mode === 'departamento') { const d = document.getElementById('hist-departamento').value; if (d) exportQs += '&departamento_id=' + d; }
+    const v = document.getElementById('hist-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v;
+    const o = document.getElementById('hist-operador').value; if (o) exportQs += '&operador_id=' + o;
+    const d = document.getElementById('hist-departamento').value; if (d) exportQs += '&departamento_id=' + d;
   } else if (type === 'ordenes_compra') {
     const v = document.getElementById('oc-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v;
     const d = document.getElementById('oc-departamento').value; if (d) exportQs += '&departamento_id=' + d;
@@ -560,13 +552,6 @@ function exportReport(format) {
 // Mantener compatibilidad con llamadas anteriores
 function exportCSV() { exportReport('csv'); }
 
-function histModeChange(silent){
-  const mode = document.getElementById('hist-mode').value;
-  document.getElementById('hist-vehiculo').style.display = mode === 'vehiculo' ? '' : 'none';
-  document.getElementById('hist-operador').style.display = mode === 'operador' ? '' : 'none';
-  document.getElementById('hist-departamento').style.display = mode === 'departamento' ? '' : 'none';
-  if (!silent) loadReport();
-}
 document.addEventListener('DOMContentLoaded', loadReport);
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Reportes y Exportaciones','reportes',$content); ?>

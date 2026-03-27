@@ -7,6 +7,7 @@ $vehiculos   = $db->query("SELECT id,placa,marca,modelo FROM vehiculos WHERE del
 $proveedores = $db->query("SELECT id,nombre FROM proveedores ORDER BY nombre")->fetchAll();
 $tiposMantenimiento = catalogo_items('tipos_mantenimiento');
 $unidades = $db->query("SELECT clave,nombre FROM catalogo_unidades WHERE activo=1 ORDER BY nombre")->fetchAll();
+$isAdmin = in_array(current_user()['rol'], ['coordinador_it','admin']);
 ob_start();
 ?>
 <div class="toolbar">
@@ -61,7 +62,7 @@ ob_start();
       <div class="form-group"><label>OC vinculada</label>
         <select name="orden_compra_id" id="selOCVinculada"><option value="">— Sin OC —</option></select>
       </div>
-      <div class="form-group"><label>Estado</label><select name="estado" id="selEstadoOT"><option>Pendiente</option><option>En proceso</option><option>Completado</option><option>Cancelado</option></select></div>
+      <div class="form-group" id="grpEstado" style="display:none"><label>Estado</label><select name="estado" id="selEstadoOT"><option>Pendiente</option><option>En proceso</option><option>Completado</option><option>Cancelado</option></select></div>
       <div class="form-group" id="grpExitKm" style="display:none"><label>KM Salida *</label><input name="exit_km" type="number" step="0.1" placeholder="KM al salir del taller"></div>
       <div class="form-group full" id="grpResumen" style="display:none"><label>Resumen de trabajo *</label><textarea name="resumen" placeholder="Describa los trabajos realizados..."></textarea></div>
       <div class="form-group full"><label>Descripción</label><textarea name="descripcion" placeholder="Detalles del servicio..."></textarea></div>
@@ -146,7 +147,7 @@ async function load(){
     <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
     <td>${r.proveedor_nombre||'—'}</td>
-    <td><span class="badge ${EB[r.estado]||'badge-gray'}">${r.estado}</span></td>
+    <td><span class="badge ${EB[r.estado]||'badge-gray'}" ${<?= $isAdmin ? 'true' : 'false' ?> ? 'onclick="avanzarEstadoOT('+r.id+',\\''+r.estado+'\\',\\''+((r.placa||'')+(r.marca?' '+r.marca:''))+'\\')" style="cursor:pointer" title="Clic para cambiar estado"' : ''}>${r.estado}</span></td>
     <td>${apBadge}</td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       ${approveBtn}
@@ -161,13 +162,16 @@ const debouncedLoad = debounce(load, 300);
 function abrirNuevo(){
   document.getElementById('mtitle').textContent='🔧 Nueva Orden de Trabajo';
   document.getElementById('inputCostoOT').removeAttribute('readonly');
+  document.getElementById('grpEstado').style.display='none';
   resetForm('modal');openModal('modal');
+  document.querySelector('#modal [name=estado]').value='Pendiente';
   attMant.reset();
   toggleCierreFields();
 }
 function editar(r){
   document.getElementById('mtitle').textContent='✏️ Editar OT #'+r.id;
   document.getElementById('inputCostoOT').setAttribute('readonly','');
+  document.getElementById('grpEstado').style.display=<?= $isAdmin ? "''" : "'none'" ?>;
   fillForm('modal',{id:r.id,fecha:r.fecha,vehiculo_id:r.vehiculo_id,tipo:r.tipo,costo:r.costo,km:r.km,exit_km:r.exit_km||'',proximo_km:r.proximo_km,proveedor_id:r.proveedor_id,estado:r.estado,resumen:r.resumen||'',descripcion:r.descripcion,orden_compra_id:r.orden_compra_id||''});
   openModal('modal');
   attMant.setEntityId(r.id);
@@ -409,6 +413,16 @@ async function loadOCsForVehicle(vehiculoId, selectedOcId) {
 document.getElementById('selOCVinculada')?.addEventListener('change', async function() {
   const ocId = this.value;
   const mantId = document.querySelector('#modal [name=id]').value;
+  // Auto-fill monto from OC
+  if (ocId) {
+    try {
+      const ocData = await api(`/api/ordenes_compra.php?detail=${ocId}`);
+      if (ocData && ocData.monto_estimado) {
+        const costoInput = document.getElementById('inputCostoOT');
+        costoInput.value = Number(ocData.monto_estimado).toFixed(2);
+      }
+    } catch(e) { console.error(e); }
+  }
   if (!ocId || !mantId) return;
   try {
     const data = await api(`/api/ordenes_compra.php?action=items&orden_compra_id=${ocId}`);
@@ -444,6 +458,27 @@ async function loadComponents(vehiculoId) {
     });
   } catch(e) { console.error(e); }
 }
+
+// ═══ Avanzar estado OT desde la tabla (clic en badge) ═══
+<?php if($isAdmin): ?>
+const OT_FLOW = { 'Pendiente': 'En proceso', 'En proceso': 'Completado', 'Completado': 'Pendiente', 'Cancelado': 'Pendiente' };
+function avanzarEstadoOT(id, estadoActual, vehiculo) {
+  const siguiente = OT_FLOW[estadoActual];
+  if (!siguiente) { toast('Estado sin transición disponible', 'warning'); return; }
+  const folio = 'OT-' + String(id).padStart(6, '0');
+  sysConfirm(
+    `${folio}\nVehículo: ${vehiculo}\n\n¿Cambiar estado de "${estadoActual}" a "${siguiente}"?`,
+    async () => {
+      try {
+        await api('/api/mantenimientos.php?action=cambiar_estado', 'PUT', { id, estado: siguiente });
+        toast(`${folio} → ${siguiente}`);
+        load();
+      } catch(e) { toast('Error: ' + (e.message||'Error'), 'error'); }
+    },
+    { title: 'Cambiar estado de OT', confirmText: `Sí, pasar a ${siguiente}`, danger: (siguiente === 'Pendiente' && (estadoActual === 'Completado' || estadoActual === 'Cancelado')) }
+  );
+}
+<?php endif; ?>
 
 document.addEventListener('DOMContentLoaded', () => { load(); checkPendingApprovals(); loadComponents(); });
 </script>

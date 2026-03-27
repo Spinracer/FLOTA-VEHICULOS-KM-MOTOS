@@ -51,6 +51,7 @@ const MOD_LABELS = {
   vehiculos:'Vehículos', asignaciones:'Asignaciones', mantenimientos:'Mantenimientos',
   combustible:'Combustible', incidentes:'Incidentes', recordatorios:'Recordatorios',
   operadores:'Operadores', proveedores:'Proveedores',
+  ordenes_compra:'Órdenes de Compra', importacion:'Importación Masiva',
   preventivos:'Preventivos', reportes:'Reportes',
   usuarios:'Usuarios', auditoria:'Auditoría', sucursales:'Sucursales', notificaciones:'Notificaciones'
 };

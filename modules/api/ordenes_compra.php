@@ -26,8 +26,14 @@ try {
             exit;
         }
 
-        // Helper: auto-sync items to linked mantenimiento
+        // Helper: auto-sync items to linked mantenimiento (only when OC is Aprobada)
         $syncItemsToMantenimiento = function() use ($db, $ocId) {
+            // Check OC estado — only sync if Aprobada
+            $stOC = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
+            $stOC->execute([$ocId]);
+            $ocEstado = $stOC->fetchColumn();
+            if ($ocEstado !== 'Aprobada') return; // Don't sync if Pendiente, Completada, Cancelada, etc.
+
             $stMant = $db->prepare("SELECT id FROM mantenimientos WHERE orden_compra_id = ? LIMIT 1");
             $stMant->execute([$ocId]);
             $linkedMant = $stMant->fetch();
@@ -46,6 +52,8 @@ try {
                 // Recalculate mantenimiento costo
                 $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
                    ->execute([$mantId, $mantId]);
+                // Audit the sync
+                audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $ocId, 'items_synced' => count($allItems)]);
             }
         };
 
@@ -244,6 +252,10 @@ try {
                 echo json_encode(['error' => 'Estado no válido.']);
                 break;
             }
+            // Get previous estado for audit
+            $stPrev = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
+            $stPrev->execute([$id]);
+            $estadoAnterior = $stPrev->fetchColumn() ?: '';
             $updates = "estado = ?";
             $params = [$nuevoEstado];
             if ($nuevoEstado === 'Aprobada' || $nuevoEstado === 'Rechazada') {
@@ -254,7 +266,28 @@ try {
             $params[] = $id;
             $st = $db->prepare("UPDATE ordenes_compra SET {$updates} WHERE id = ? AND deleted_at IS NULL");
             $st->execute($params);
-            audit_log('ordenes_compra', 'cambiar_estado', $id, [], ['estado' => $nuevoEstado]);
+            audit_log('ordenes_compra', 'estado_change', $id, ['estado' => $estadoAnterior], ['estado' => $nuevoEstado], ['via' => 'cambio_estado', 'admin' => current_user()['email'] ?? '']);
+            // When OC becomes Aprobada, auto-sync items to linked mantenimiento
+            if ($nuevoEstado === 'Aprobada') {
+                $stMant = $db->prepare("SELECT id FROM mantenimientos WHERE orden_compra_id = ? LIMIT 1");
+                $stMant->execute([$id]);
+                $linkedMant = $stMant->fetch();
+                if ($linkedMant) {
+                    $mantId = (int)$linkedMant['id'];
+                    $db->prepare("DELETE FROM mantenimiento_items WHERE mantenimiento_id = ? AND notas LIKE 'Importado desde OC-%'")->execute([$mantId]);
+                    $stItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ?");
+                    $stItems->execute([$id]);
+                    $items = $stItems->fetchAll();
+                    $ocFolio = 'OC-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+                    foreach ($items as $item) {
+                        $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
+                           ->execute([$mantId, $item['descripcion'], $item['cantidad'], $item['unidad'], $item['precio_unitario'], 'Importado desde '.$ocFolio, $item['component_id']]);
+                    }
+                    $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
+                       ->execute([$mantId, $mantId]);
+                    audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $id, 'items_synced' => count($items), 'trigger' => 'oc_aprobada']);
+                }
+            }
             echo json_encode(['ok' => true]);
             break;
         }
