@@ -11,7 +11,7 @@ ob_start();
 <div class="toolbar">
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input type="text" id="search-comb" placeholder="Buscar por placa, proveedor..." oninput="load()">
+    <input type="text" id="search-comb" placeholder="Buscar por placa, proveedor..." oninput="debouncedLoad()">
   </div>
   <select id="filter-veh" onchange="load()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
@@ -184,6 +184,7 @@ async function load() {
       <?php endif; ?>
     </tr>`).join('');
 }
+const debouncedLoad = debounce(load, 300);
 function abrirNuevo() {
   document.getElementById('modal-comb-title').textContent = '⛽ Registrar Carga';
   resetForm('modal-comb');

@@ -202,10 +202,11 @@ case 'asignacion':
     } catch (Throwable $e) { /* table may not exist yet */ }
 
     // Signature block
+    $responsable = htmlspecialchars(current_user()['nombre'] ?? 'Responsable de Flota');
     $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>IT y Seguridad</strong></p><p>Responsable de Flota</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Aprobación</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Colaborador</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Entrega:</strong> ' . $responsable . '</p><p>Responsable de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Recibe:</strong> ' . htmlspecialchars($a['operador_nombre']) . '</p><p>Operador / Conductor</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Vo.Bo.:</strong> Administración</p><p>Gerencia</p></div>';
     $content .= '</div>';
     break;
 
@@ -304,8 +305,7 @@ case 'mantenimiento':
     $stmt = $db->prepare("
         SELECT m.*, v.placa, v.marca, v.modelo, v.anio, v.vin, v.km_actual,
                p.nombre AS proveedor_nombre, p.telefono AS proveedor_tel, p.email AS proveedor_email,
-               uc.nombre AS completado_por_nombre,
-               m.orden_compra_id
+               uc.nombre AS completado_por_nombre
         FROM mantenimientos m
         LEFT JOIN vehiculos v ON v.id = m.vehiculo_id
         LEFT JOIN proveedores p ON p.id = m.proveedor_id
@@ -344,15 +344,6 @@ case 'mantenimiento':
     }
     $content .= '</tbody></table></div>';
 
-    // OC Vinculada
-    if (!empty($m['orden_compra_id'])) {
-        $folioOC = 'OC-' . str_pad((int)$m['orden_compra_id'], 6, '0', STR_PAD_LEFT);
-        $content .= '<div class="section"><h3>Orden de Compra Vinculada</h3>';
-        $content .= '<table class="info-table"><tbody>';
-        $content .= "<tr><td><strong>Folio OC:</strong></td><td style=\"font-weight:700;font-size:13px\">{$folioOC}</td><td><strong>ID:</strong></td><td>{$m['orden_compra_id']}</td></tr>";
-        $content .= '</tbody></table></div>';
-    }
-
     // Items / Partidas
     $stItems = $db->prepare("SELECT * FROM mantenimiento_items WHERE mantenimiento_id = ? ORDER BY id ASC");
     $stItems->execute([$id]);
@@ -372,109 +363,13 @@ case 'mantenimiento':
         $content .= '</tbody></table></div>';
     }
 
-    // Costo total (use items total if available, otherwise costo field)
-    $costoTotal = isset($totalItems) && $totalItems > 0 ? $totalItems : (float)$m['costo'];
-    $content .= '<div class="section" style="text-align:right;font-size:14px;padding:10px 0"><strong>Costo Total OT: L ' . number_format($costoTotal, 2) . '</strong></div>';
+    // Costo total
+    $content .= '<div class="section" style="text-align:right;font-size:14px;padding:10px 0"><strong>Costo Total OT: L ' . number_format((float)$m['costo'], 2) . '</strong></div>';
 
     $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>IT y Seguridad</strong></p><p>Solicitante</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Aprobación</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Colaborador</strong></p><p>' . htmlspecialchars($m['proveedor_nombre'] ?? 'Taller') . '</p></div>';
-    $content .= '</div>';
-    break;
-
-// ─── PDF ORDEN DE COMPRA ─────────────────────────────
-case 'orden_compra':
-    if ($id <= 0) die('ID de orden requerido.');
-    $stmt = $db->prepare("
-        SELECT oc.*, u.nombre AS solicitante_nombre,
-               ua.nombre AS aprobador_nombre,
-               v.placa, v.marca, v.modelo, v.anio,
-               p.nombre AS proveedor_nombre, p.telefono AS proveedor_tel, p.email AS proveedor_email
-        FROM ordenes_compra oc
-        LEFT JOIN usuarios u ON u.id = oc.solicitante_id
-        LEFT JOIN usuarios ua ON ua.id = oc.aprobado_por
-        LEFT JOIN vehiculos v ON v.id = oc.vehiculo_id
-        LEFT JOIN proveedores p ON p.id = oc.proveedor_id
-        WHERE oc.id = ? AND oc.deleted_at IS NULL
-    ");
-    $stmt->execute([$id]);
-    $oc = $stmt->fetch();
-    if (!$oc) die('Orden de compra no encontrada.');
-
-    $title = 'Orden de Compra';
-    $folio = 'OC-' . str_pad($id, 6, '0', STR_PAD_LEFT);
-
-    $estadoBadge = ['Pendiente'=>'🔵','Aprobada'=>'🟢','Rechazada'=>'🔴','Completada'=>'🟣','Cancelada'=>'⚫'][$oc['estado']] ?? '⚪';
-    $urgBadge = ['Baja'=>'🔵','Normal'=>'🟢','Alta'=>'🟠','Urgente'=>'🔴'][$oc['urgencia']] ?? '🟢';
-
-    $content .= '<div class="section"><h3>Datos de la Orden</h3>';
-    $content .= '<table class="info-table"><tbody>';
-    $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>Fecha:</strong></td><td>" . ($oc['created_at'] ? date('d/m/Y', strtotime($oc['created_at'])) : '—') . "</td></tr>";
-    $content .= "<tr><td><strong>Solicitante:</strong></td><td>" . htmlspecialchars($oc['solicitante_nombre'] ?? '—') . "</td><td><strong>Estado:</strong></td><td>{$estadoBadge} {$oc['estado']}</td></tr>";
-    $content .= "<tr><td><strong>Urgencia:</strong></td><td>{$urgBadge} " . ($oc['urgencia'] ?? 'Normal') . "</td><td><strong>Monto Estimado:</strong></td><td>" . (number_format((float)($oc['monto_estimado'] ?? 0), 2) > 0 ? '<strong>L ' . number_format((float)$oc['monto_estimado'], 2) . '</strong>' : '—') . "</td></tr>";
-    $content .= '</tbody></table></div>';
-
-    $content .= '<div class="section"><h3>Descripción</h3>';
-    $content .= '<div style="border:1px solid #ddd;padding:10px;min-height:60px;font-size:12px;line-height:1.6">' . nl2br(htmlspecialchars($oc['descripcion'] ?? '')) . '</div>';
-    $content .= '</div>';
-
-    if ($oc['vehiculo_id']) {
-        $content .= '<div class="section"><h3>Vehículo Asociado</h3>';
-        $content .= '<table class="info-table"><tbody>';
-        $content .= "<tr><td><strong>Placa:</strong></td><td style=\"font-weight:700\">{$oc['placa']}</td><td><strong>Marca/Modelo:</strong></td><td>{$oc['marca']} {$oc['modelo']} " . ($oc['anio'] ?? '') . "</td></tr>";
-        $content .= '</tbody></table></div>';
-    }
-
-    if ($oc['proveedor_id']) {
-        $content .= '<div class="section"><h3>Proveedor</h3>';
-        $content .= '<table class="info-table"><tbody>';
-        $content .= "<tr><td><strong>Nombre:</strong></td><td>" . htmlspecialchars($oc['proveedor_nombre']) . "</td><td><strong>Teléfono:</strong></td><td>" . htmlspecialchars($oc['proveedor_tel'] ?? '—') . "</td></tr>";
-        if ($oc['proveedor_email']) {
-            $content .= "<tr><td><strong>Email:</strong></td><td colspan=\"3\">" . htmlspecialchars($oc['proveedor_email']) . "</td></tr>";
-        }
-        $content .= '</tbody></table></div>';
-    }
-
-    // Items / Partidas de la OC
-    $stOCItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ? ORDER BY id ASC");
-    $stOCItems->execute([$id]);
-    $ocItems = $stOCItems->fetchAll();
-    if (count($ocItems)) {
-        $totalOCItems = 0;
-        $content .= '<div class="section"><h3>Partidas / Items</h3>';
-        $content .= '<table class="data-table"><thead><tr><th>#</th><th>Descripción</th><th>Cant.</th><th>Unidad</th><th>P. Unitario</th><th>Subtotal</th><th>Notas</th></tr></thead><tbody>';
-        $n = 1;
-        foreach ($ocItems as $it) {
-            $sub = (float)$it['subtotal'];
-            $totalOCItems += $sub;
-            $content .= "<tr><td>{$n}</td><td>" . htmlspecialchars($it['descripcion']) . "</td><td>" . number_format((float)$it['cantidad'], 2) . "</td><td>{$it['unidad']}</td><td>L " . number_format((float)$it['precio_unitario'], 2) . "</td><td><strong>L " . number_format($sub, 2) . "</strong></td><td>" . htmlspecialchars($it['notas'] ?? '') . "</td></tr>";
-            $n++;
-        }
-        $content .= "<tr class=\"total-row\"><td colspan=\"5\"><strong>TOTAL ({$n} partidas)</strong></td><td><strong>L " . number_format($totalOCItems, 2) . "</strong></td><td></td></tr>";
-        $content .= '</tbody></table></div>';
-    }
-
-    if ($oc['notas']) {
-        $content .= '<div class="section"><h3>Notas</h3>';
-        $content .= '<div style="border:1px solid #ddd;padding:8px;font-size:11px">' . nl2br(htmlspecialchars($oc['notas'])) . '</div>';
-        $content .= '</div>';
-    }
-
-    if ($oc['aprobado_por']) {
-        $content .= '<div class="section"><h3>Aprobación</h3>';
-        $content .= '<table class="info-table"><tbody>';
-        $content .= "<tr><td><strong>Aprobado por:</strong></td><td>" . htmlspecialchars($oc['aprobador_nombre'] ?? '—') . "</td><td><strong>Fecha:</strong></td><td>" . ($oc['fecha_aprobacion'] ? date('d/m/Y H:i', strtotime($oc['fecha_aprobacion'])) : '—'). "</td></tr>";
-        if ($oc['notas_aprobacion']) {
-            $content .= "<tr><td><strong>Notas:</strong></td><td colspan=\"3\">" . htmlspecialchars($oc['notas_aprobacion']) . "</td></tr>";
-        }
-        $content .= '</tbody></table></div>';
-    }
-
-    $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>IT y Seguridad</strong></p><p>' . htmlspecialchars($oc['solicitante_nombre'] ?? 'Solicitante') . '</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Aprobación Financiera</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Ejecutó</strong></p><p>' . htmlspecialchars($m['proveedor_nombre'] ?? 'Taller') . '</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>Coordinación</p></div>';
     $content .= '</div>';
     break;
 
@@ -563,10 +458,11 @@ case 'pase_salida':
     }
 
     // Bloque de firmas físicas (siempre presente para impresión)
+    $encargado = htmlspecialchars($a['creado_por_nombre'] ?? current_user()['nombre'] ?? 'Encargado');
     $content .= '<div class="signatures" style="margin-top:40px">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>IT y Seguridad</strong></p><p>Responsable de Flota</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Aprobación</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Colaborador</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizado por:</strong></p><p>' . $encargado . '</p><p style="font-size:10px;color:#888">Encargado de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Responsable del Vehículo:</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p><p style="font-size:10px;color:#888">Conductor / Operador</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Guardia de Seguridad:</strong></p><p>_________________________</p><p style="font-size:10px;color:#888">Nombre y Firma</p></div>';
     $content .= '</div>';
 
     // Nota al pie
@@ -715,7 +611,6 @@ async function saveAsAttachment() {
   if (type === 'asignacion' || type === 'pase_salida') { entidad = 'asignaciones'; }
   else if (type === 'mantenimiento') { entidad = 'mantenimientos'; }
   else if (type === 'combustible') { entidad = 'combustible'; }
-  else if (type === 'orden_compra') { entidad = 'ordenes_compra'; }
   else if (type === 'combustible_lote') {
     alert('Para lotes, guarda cada registro individual.');
     return;

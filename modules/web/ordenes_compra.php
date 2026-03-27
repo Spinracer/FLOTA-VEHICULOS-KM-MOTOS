@@ -8,7 +8,7 @@ $isAdmin = in_array(current_user()['rol'], ['coordinador_it','admin']);
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por descripción, solicitante, placa, proveedor..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por descripción, solicitante, placa, proveedor..." oninput="debouncedLoad()"></div>
   <select id="fest" onchange="load()" style="max-width:160px">
     <option value="">Todos los estados</option>
     <option>Pendiente</option><option>Aprobada</option><option>Rechazada</option><option>Completada</option><option>Cancelada</option>
@@ -217,6 +217,7 @@ async function load() {
     </div></td>
   </tr>`;}).join('');
 }
+const debouncedLoad = debounce(load, 300);
 
 function abrirNuevo() {
   document.getElementById('mtitle').textContent = '🛒 Nueva Orden de Compra';
@@ -314,7 +315,7 @@ async function loadAttachmentsPreview(id) {
           const data = await res.json();
           if (data.attachments) files.push(...data.attachments.map(f => ({...f, _entidad: entidad})));
         }
-      } catch(e) {}
+      } catch(e) { console.error(e); }
     }
     if (!files.length) {
       container.innerHTML = '<span style="font-size:12px;color:#8892a4">Sin archivos adjuntos</span>';
@@ -447,7 +448,7 @@ async function loadOCComponents() {
     const sel = document.getElementById('selOCComponent');
     sel.innerHTML = '<option value="">— Sin componente —</option>' +
       ocComponents.map(c => `<option value="${c.id}">${c.nombre} (${c.tipo})</option>`).join('');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function verItemsOC(ocId, estado) {

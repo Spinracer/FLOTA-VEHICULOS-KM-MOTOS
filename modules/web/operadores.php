@@ -4,7 +4,7 @@ require_login();
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar operador..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar operador..." oninput="debouncedLoad()"></div>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Operador</button>
   <button class="btn btn-ghost" onclick="openDeptModal()" title="Administrar departamentos">🏢 Departamentos</button><?php endif; ?>
 </div>
@@ -134,6 +134,7 @@ async function load(){
     </tr>`;
   }).join('');
 }
+const debouncedLoad = debounce(load, 300);
 async function abrirNuevo(){document.getElementById('mtitle').textContent='👤 Nuevo Operador';resetForm('modal');attOp.reset();await loadDepartamentos();openModal('modal');}
 async function editar(r){document.getElementById('mtitle').textContent='✏️ Editar Operador';await loadDepartamentos(r.departamento_id);fillForm('modal',{id:r.id,nombre:r.nombre,licencia:r.licencia,categoria_lic:r.categoria_lic,venc_licencia:r.venc_licencia,telefono:r.telefono,email:r.email,estado:r.estado,notas:r.notas,dni:r.dni,departamento_id:r.departamento_id});attOp.setEntityId(r.id);attOp.load();openModal('modal');}
 async function guardar(){const d=getForm('modal');if(!d.nombre){toast('El nombre es obligatorio','error');return;}if(!d.departamento_id){toast('El departamento es obligatorio','error');return;}const res=await api('/api/operadores.php',d.id?'PUT':'POST',d);const savedId=d.id||res.id;if(attOp.hasPending()&&savedId){await attOp.uploadPending(savedId);}toast(d.id?'Actualizado':'Operador registrado');closeModal('modal');load();}

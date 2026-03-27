@@ -4,7 +4,7 @@ require_login();
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="sq" placeholder="Buscar sucursal..." oninput="loadSuc()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="sq" placeholder="Buscar sucursal..." oninput="debouncedLoadSuc()"></div>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNueva()">+ Nueva Sucursal</button><?php endif; ?>
   <button class="btn btn-ghost" onclick="verDashboard()">📊 Dashboard Comparativo</button>
 </div>
@@ -43,11 +43,11 @@ async function loadSuc() {
   try {
     const vData = await api('/api/vehiculos.php?per=1000&page=1&q=');
     vData.rows.forEach(v => { const s = v.sucursal_id || 0; vehCounts[s] = (vehCounts[s] || 0) + 1; });
-  } catch(e){}
+  } catch(e) { console.error(e); }
   try {
     const oData = await api('/api/operadores.php?per=1000&page=1&q=');
     oData.rows.forEach(o => { const s = o.sucursal_id || 0; opCounts[s] = (opCounts[s] || 0) + 1; });
-  } catch(e){}
+  } catch(e) { console.error(e); }
 
   tbody.innerHTML = data.rows.map(r => `<tr>
     <td><strong style="color:var(--accent)">${r.nombre}</strong></td>
@@ -64,6 +64,7 @@ async function loadSuc() {
     </div></td><?php endif; ?>
   </tr>`).join('');
 }
+const debouncedLoadSuc = debounce(loadSuc, 300);
 function abrirNueva(){document.getElementById('msuc-title').textContent='🏢 Nueva Sucursal';resetForm('msuc');openModal('msuc');}
 function editarSuc(r){document.getElementById('msuc-title').textContent='✏️ Editar Sucursal';fillForm('msuc',{id:r.id,nombre:r.nombre,ciudad:r.ciudad||'',direccion:r.direccion||'',telefono:r.telefono||'',responsable:r.responsable||'',activo:r.activo});openModal('msuc');}
 async function guardarSuc(){const d=getForm('msuc');if(!d.nombre){toast('Nombre es obligatorio','error');return;}await api('/api/sucursales.php',d.id?'PUT':'POST',d);toast(d.id?'Actualizada':'Sucursal creada');closeModal('msuc');loadSuc();}

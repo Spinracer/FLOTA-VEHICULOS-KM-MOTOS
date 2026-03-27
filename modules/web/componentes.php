@@ -5,7 +5,7 @@ ob_start();
 ?>
 <!-- ═══════════════ TOOLBAR ═══════════════ -->
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar componente..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar componente..." oninput="debouncedLoad()"></div>
   <select id="fTipo" onchange="load()" style="max-width:180px">
     <option value="">Todos los tipos</option>
     <option value="part">⚙️ Refacción</option>
@@ -337,6 +337,7 @@ function load() {
   if (currentTab === 'catalog') loadCatalog();
   else loadVehicle();
 }
+const debouncedLoad = debounce(load, 300);
 
 document.addEventListener('DOMContentLoaded', () => {
   loadVehicleSelect();
@@ -409,7 +410,7 @@ async function checkVencimientos() {
     const data = await api('/api/componentes.php?section=alertas_vencimiento&dias=30');
     const badge = document.getElementById('badgeVenc');
     if (data.rows.length > 0) { badge.textContent = data.rows.length; badge.style.display = ''; }
-  } catch(e){}
+  } catch(e) { console.error(e); }
 }
 async function verAlertasVenc() {
   const data = await api('/api/componentes.php?section=alertas_vencimiento&dias=60');

@@ -13,7 +13,7 @@ ob_start();
 <div class="toolbar">
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
-    <input type="text" id="search-veh" placeholder="Buscar por placa, marca, modelo..." oninput="loadVehiculos()">
+    <input type="text" id="search-veh" placeholder="Buscar por placa, marca, modelo..." oninput="debouncedLoadVehiculos()">
   </div>
   <select id="fsuc" onchange="loadVehiculos()" style="max-width:180px">
     <option value="">Todas las sucursales</option>
@@ -153,6 +153,8 @@ let currentVehIdForTags = 0; // ID del vehículo actual en el modal para gestion
 const tagColors = ['#e8ff47','#47ffe8','#ff6b6b','#a29bfe','#ffa502','#2ed573','#1e90ff','#fd79a8'];
 function tagColor(str) { let h=0; for(let i=0;i<str.length;i++) h=str.charCodeAt(i)+((h<<5)-h); return tagColors[Math.abs(h)%tagColors.length]; }
 
+const debouncedLoadVehiculos = debounce(loadVehiculos, 300);
+
 async function loadVehiculos() {
   const q = document.getElementById('search-veh').value;
   const sucId = document.getElementById('fsuc').value;
@@ -190,7 +192,7 @@ async function loadVehiculos() {
         <?php endif; ?>
       </tr>`;
     }).join('');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 function abrirNuevo() {
@@ -256,7 +258,7 @@ async function agregarEtiqueta() {
     input.value = '';
     loadTagsModal(currentVehIdForTags);
     toast('Etiqueta agregada');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function eliminarEtiqueta(tagId) {
@@ -264,7 +266,7 @@ async function eliminarEtiqueta(tagId) {
     await api(`/api/vehiculos.php?action=remove_tag&id=${tagId}`, 'DELETE');
     loadTagsModal(currentVehIdForTags);
     toast('Etiqueta eliminada', 'warning');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function guardar() {
@@ -285,7 +287,7 @@ async function guardar() {
     toast(data.id ? 'Vehículo actualizado' : 'Vehículo registrado');
     closeModal('modal-veh');
     loadVehiculos();
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function eliminar(id) {
@@ -294,7 +296,7 @@ async function eliminar(id) {
       await api(`/api/vehiculos.php?id=${id}`, 'DELETE');
       toast('Vehículo eliminado', 'warning');
       loadVehiculos();
-    } catch(e) {}
+    } catch(e) { console.error(e); }
   });
 }
 

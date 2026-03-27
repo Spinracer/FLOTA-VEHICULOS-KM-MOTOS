@@ -107,9 +107,9 @@ async function guardar(){
   const d=getForm('modal');
   if(!d.nombre||!d.email){toast('Nombre y email son obligatorios','error');return;}
   if(!d.id&&!d.password){toast('La contraseña es obligatoria para nuevos usuarios','error');return;}
-  try{await api('/api/usuarios.php',d.id?'PUT':'POST',d);toast(d.id?'Usuario actualizado':'Usuario creado');closeModal('modal');load();}catch(e){}
+  try{await api('/api/usuarios.php',d.id?'PUT':'POST',d);toast(d.id?'Usuario actualizado':'Usuario creado');closeModal('modal');load();}catch(e){ console.error(e); }
 }
-async function del(id){confirmDelete('¿Eliminar este usuario?',async()=>{try{await api(`/api/usuarios.php?id=${id}`,'DELETE');toast('Usuario eliminado','warning');load();}catch(e){}});}
+async function del(id){confirmDelete('¿Eliminar este usuario?',async()=>{try{await api(`/api/usuarios.php?id=${id}`,'DELETE');toast('Usuario eliminado','warning');load();}catch(e){ console.error(e); }});}
 document.addEventListener('DOMContentLoaded',load);
 </script>
 <?php $content=ob_get_clean(); echo render_layout('Gestión de Usuarios','usuarios',$content); ?>

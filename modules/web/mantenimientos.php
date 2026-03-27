@@ -11,7 +11,7 @@ ob_start();
 ?>
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span>
-    <input type="text" id="s" placeholder="Buscar por placa, tipo..." oninput="load()"></div>
+    <input type="text" id="s" placeholder="Buscar por placa, tipo..." oninput="debouncedLoad()"></div>
   <select id="fv" onchange="load()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
     <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'])?></option><?php endforeach; ?>
@@ -34,8 +34,8 @@ ob_start();
 <div class="toolbar" style="padding-top:0;gap:8px;flex-wrap:wrap">
   <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Desde <input type="date" id="ffrom" onchange="load()" style="max-width:140px"></label>
   <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Hasta <input type="date" id="fto" onchange="load()" style="max-width:140px"></label>
-  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo mín <input type="number" id="fcmin" step="0.01" min="0" oninput="load()" placeholder="0" style="max-width:100px"></label>
-  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo máx <input type="number" id="fcmax" step="0.01" min="0" oninput="load()" placeholder="∞" style="max-width:100px"></label>
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo mín <input type="number" id="fcmin" step="0.01" min="0" oninput="debouncedLoad()" placeholder="0" style="max-width:100px"></label>
+  <label style="font-size:12px;color:#8892a4;display:flex;align-items:center;gap:4px">Costo máx <input type="number" id="fcmax" step="0.01" min="0" oninput="debouncedLoad()" placeholder="∞" style="max-width:100px"></label>
 </div>
 <div class="table-wrap">
   <table><thead><tr><th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Descripción</th><th>Costo</th><th>Items</th><th>KM</th><th>Proveedor</th><th>Estado</th><th>Aprob.</th><?php if(can('edit')): ?><th>Acciones</th><?php endif; ?></tr></thead>
@@ -156,6 +156,7 @@ async function load(){
     </div></td><?php endif; ?>
   </tr>`;}).join('');
 }
+const debouncedLoad = debounce(load, 300);
 
 function abrirNuevo(){
   document.getElementById('mtitle').textContent='🔧 Nueva Orden de Trabajo';
@@ -287,7 +288,7 @@ async function checkPendingApprovals() {
       cnt.textContent = rows.length;
       btn.style.display = rows.length > 0 ? '' : 'none';
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function verPendientes() {
@@ -295,27 +296,92 @@ async function verPendientes() {
     const data = await api('/api/mantenimientos.php?action=pending_approvals');
     const rows = data.rows || [];
     if (!rows.length) { toast('No hay aprobaciones pendientes'); return; }
-    const list = rows.map(r => `OT #${r.id} — ${r.placa} — ${r.tipo} — L ${Number(r.costo).toFixed(2)}`).join('\n');
-    alert('Aprobaciones pendientes:\n\n' + list);
+    const listHtml = rows.map(r =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface2);margin-bottom:6px">
+        <span><strong style="color:var(--accent2)">OT #${r.id}</strong> — ${r.placa} — ${r.tipo}</span>
+        <span style="color:var(--green);font-weight:600">L ${Number(r.costo).toFixed(2)}</span>
+      </div>`
+    ).join('');
+    document.getElementById('sys-confirm-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'sys-confirm-modal';
+    modal.className = 'modal-bg open';
+    modal.innerHTML = `<div class="modal" style="max-width:520px">
+      <div class="modal-title" style="margin-bottom:12px">Aprobaciones pendientes (${rows.length})</div>
+      <div style="max-height:320px;overflow-y:auto;margin-bottom:16px">${listHtml}</div>
+      <div class="modal-actions" style="justify-content:center">
+        <button class="btn btn-primary" id="sys-confirm-ok">Cerrar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#sys-confirm-ok').onclick = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   } catch(e) { toast('Error al cargar pendientes','error'); }
 }
 
-async function aprobar(mantId) {
-  const decision = prompt('Escriba "aprobar" para aprobar o "rechazar" para rechazar la OT #' + mantId);
-  if (!decision) return;
-  const dec = decision.trim().toLowerCase();
-  if (dec !== 'aprobar' && dec !== 'rechazar') { toast('Escriba "aprobar" o "rechazar"','error'); return; }
-  const comentario = prompt('Comentario (opcional):') || '';
-  try {
-    await api('/api/mantenimientos.php?action=aprobaciones', 'POST', {
-      mantenimiento_id: mantId,
-      decision: dec === 'aprobar' ? 'aprobado' : 'rechazado',
-      comentario: comentario
-    });
-    toast(dec === 'aprobar' ? 'OT aprobada' : 'OT rechazada');
-    load();
-    checkPendingApprovals();
-  } catch(e) { toast('Error: ' + (e.message || 'Error desconocido'),'error'); }
+function aprobar(mantId) {
+  document.getElementById('sys-confirm-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'sys-confirm-modal';
+  modal.className = 'modal-bg open';
+  modal.innerHTML = `<div class="modal" style="max-width:460px;text-align:center">
+    <div class="modal-title" style="margin-bottom:16px">Aprobar / Rechazar OT #${mantId}</div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:16px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:10px 18px;border-radius:8px;background:var(--surface2);border:2px solid transparent;transition:border .2s" id="lbl-aprobar">
+        <input type="radio" name="sys-appr-dec" value="aprobar" checked style="accent-color:var(--green)"> <span style="color:var(--green);font-weight:600">Aprobar</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:10px 18px;border-radius:8px;background:var(--surface2);border:2px solid transparent;transition:border .2s" id="lbl-rechazar">
+        <input type="radio" name="sys-appr-dec" value="rechazar" style="accent-color:var(--red,#f44)"> <span style="color:var(--red,#f44);font-weight:600">Rechazar</span>
+      </label>
+    </div>
+    <div style="text-align:left;margin-bottom:16px">
+      <label style="font-size:12px;color:var(--text2);margin-bottom:4px;display:block">Comentario (opcional)</label>
+      <textarea id="sys-appr-comment" placeholder="Motivo de la decision..." style="width:100%;min-height:70px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);padding:10px;font-size:13px;resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn btn-ghost" id="sys-appr-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="sys-appr-ok">Confirmar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  // Highlight selected radio label
+  const radios = modal.querySelectorAll('input[name="sys-appr-dec"]');
+  const lblAprobar = modal.querySelector('#lbl-aprobar');
+  const lblRechazar = modal.querySelector('#lbl-rechazar');
+  function updateRadioStyle() {
+    const val = modal.querySelector('input[name="sys-appr-dec"]:checked')?.value;
+    lblAprobar.style.borderColor = val === 'aprobar' ? 'var(--green)' : 'transparent';
+    lblRechazar.style.borderColor = val === 'rechazar' ? 'var(--red,#f44)' : 'transparent';
+    const okBtn = modal.querySelector('#sys-appr-ok');
+    if (val === 'rechazar') {
+      okBtn.className = 'btn btn-danger';
+      okBtn.textContent = 'Rechazar';
+    } else {
+      okBtn.className = 'btn btn-primary';
+      okBtn.textContent = 'Aprobar';
+    }
+  }
+  radios.forEach(r => r.addEventListener('change', updateRadioStyle));
+  updateRadioStyle();
+
+  modal.querySelector('#sys-appr-cancel').onclick = () => modal.remove();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#sys-appr-ok').onclick = async () => {
+    const dec = modal.querySelector('input[name="sys-appr-dec"]:checked')?.value;
+    const comentario = modal.querySelector('#sys-appr-comment').value.trim();
+    modal.remove();
+    try {
+      await api('/api/mantenimientos.php?action=aprobaciones', 'POST', {
+        mantenimiento_id: mantId,
+        decision: dec === 'aprobar' ? 'aprobado' : 'rechazado',
+        comentario: comentario
+      });
+      toast(dec === 'aprobar' ? 'OT aprobada' : 'OT rechazada');
+      load();
+      checkPendingApprovals();
+    } catch(e) { toast('Error: ' + (e.message || 'Error desconocido'), 'error'); }
+  };
 }
 
 // ═══ OC vinculada ═══
@@ -337,7 +403,7 @@ async function loadOCsForVehicle(vehiculoId, selectedOcId) {
         return `<option value="${oc.id}" ${oc.id == selectedOcId ? 'selected' : ''}>${folio} — ${desc} (L ${Number(oc.monto_estimado||0).toFixed(0)}) [${oc.items_count} items]</option>`;
       }).join('');
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 document.getElementById('selOCVinculada')?.addEventListener('change', async function() {
@@ -376,7 +442,7 @@ async function loadComponents(vehiculoId) {
     (data.rows || []).forEach(c => {
       sel.innerHTML += `<option value="${c.id}">${TIPO_COMP[c.tipo]||'📦'} ${c.nombre}</option>`;
     });
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 document.addEventListener('DOMContentLoaded', () => { load(); checkPendingApprovals(); loadComponents(); });

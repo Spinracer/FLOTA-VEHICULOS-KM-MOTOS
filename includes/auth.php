@@ -62,14 +62,16 @@ function session_init(): void {
         $name     = getenv('SESSION_NAME') ?: 'FLOTACONTROL';
         $lifetime = (int)(getenv('SESSION_LIFETIME') ?: 7200);
         session_name($name);
+        // Detect HTTPS even behind reverse proxies (Cloudflare, Codespaces, nginx)
         $isSecure  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                   || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443;
+                   || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443
+                   || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
         session_set_cookie_params([
             'lifetime' => $lifetime,
             'path'     => '/',
             'secure'   => $isSecure,
             'httponly' => true,
-            'samesite' => 'Strict',
+            'samesite' => 'Lax',
         ]);
         session_start();
     }

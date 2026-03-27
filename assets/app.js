@@ -53,6 +53,32 @@ async function api(url, method = 'GET', data = null) {
   }
 }
 
+// ── LOADING BAR ──────────────────────────────────
+(function(){
+  const bar = document.createElement('div');
+  bar.id = 'api-loading-bar';
+  bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;background:var(--accent,#e8ff47);z-index:99999;transition:width .3s ease;width:0;opacity:0;pointer-events:none';
+  document.body?.appendChild(bar) || document.addEventListener('DOMContentLoaded', () => document.body.appendChild(bar));
+  let count = 0;
+  const origApi = window.api;
+  window.api = async function(...args) {
+    count++;
+    bar.style.opacity = '1';
+    bar.style.width = '70%';
+    try {
+      const result = await origApi.apply(this, args);
+      return result;
+    } finally {
+      count--;
+      if (count <= 0) {
+        count = 0;
+        bar.style.width = '100%';
+        setTimeout(() => { bar.style.opacity = '0'; bar.style.width = '0'; }, 300);
+      }
+    }
+  };
+})();
+
 // ── MODAL ──────────────────────────────────────
 function openModal(id) {
   const m = document.getElementById(id);
