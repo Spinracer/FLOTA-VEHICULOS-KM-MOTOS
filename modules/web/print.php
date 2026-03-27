@@ -333,6 +333,10 @@ case 'mantenimiento':
     $content .= "<tr><td><strong>Tipo:</strong></td><td>{$m['tipo']}</td><td><strong>Estado:</strong></td><td>{$estadoBadge} {$m['estado']}</td></tr>";
     $content .= "<tr><td><strong>KM Entrada:</strong></td><td>" . ($m['km'] ? number_format((float)$m['km'], 0) . ' km' : '—') . "</td><td><strong>KM Salida:</strong></td><td>" . ($m['exit_km'] ? number_format((float)$m['exit_km'], 0) . ' km' : '—') . "</td></tr>";
     $content .= "<tr><td><strong>Taller:</strong></td><td>" . htmlspecialchars($m['proveedor_nombre'] ?? '—') . "</td><td><strong>Próx. servicio:</strong></td><td>" . ($m['proximo_km'] ? number_format((float)$m['proximo_km'], 0) . ' km' : '—') . "</td></tr>";
+    if (!empty($m['orden_compra_id'])) {
+        $ocFolio = 'OC-' . str_pad($m['orden_compra_id'], 6, '0', STR_PAD_LEFT);
+        $content .= "<tr><td><strong>OC Vinculada:</strong></td><td colspan=\"3\"><strong>{$ocFolio}</strong></td></tr>";
+    }
     if ($m['descripcion']) {
         $content .= "<tr><td><strong>Descripción:</strong></td><td colspan=\"3\">" . htmlspecialchars($m['descripcion']) . "</td></tr>";
     }

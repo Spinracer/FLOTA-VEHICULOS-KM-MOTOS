@@ -48,6 +48,9 @@ function importacion_campos_destino(): array {
         'costo_adquisicion'  => ['label' => 'Costo Adquisición',  'required' => false, 'type' => 'decimal'],
         'aseguradora'        => ['label' => 'Aseguradora',        'required' => false, 'type' => 'text'],
         'poliza_numero'      => ['label' => 'Póliza Número',      'required' => false, 'type' => 'text'],
+        'numero_chasis'      => ['label' => 'No. Chasis',         'required' => false, 'type' => 'text'],
+        'numero_motor'       => ['label' => 'No. Motor',          'required' => false, 'type' => 'text'],
+        'rtn'                => ['label' => 'RTN',                'required' => false, 'type' => 'text'],
     ];
 }
 
@@ -388,7 +391,7 @@ function importacion_parsear_fecha(string $valor): ?string {
  * @param string $fileName Nombre original del archivo
  * @return array Resultado con estadísticas y errores
  */
-function importacion_ejecutar(array $rows, array $headers, array $mapping, int $userId, string $fileName): array {
+function importacion_ejecutar(array $rows, array $headers, array $mapping, int $userId, string $fileName, bool $updateExisting = false): array {
     $db = getDB();
     $campos = importacion_campos_destino();
 
@@ -398,6 +401,7 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
     $resultado = [
         'total'        => count($rows),
         'creados'      => 0,
+        'actualizados' => 0,
         'errores'      => 0,
         'detalle'      => [],
         'import_run_id' => null,
@@ -414,6 +418,15 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
     $placasStmt = $db->query("SELECT UPPER(placa) AS placa FROM vehiculos WHERE deleted_at IS NULL");
     foreach ($placasStmt->fetchAll() as $p) {
         $placasExistentes[$p['placa']] = true;
+    }
+
+    // Pre-cargar VINs existentes para actualización por VIN
+    $vinsExistentes = [];
+    if ($updateExisting) {
+        $vinStmt = $db->query("SELECT id, UPPER(TRIM(vin)) AS vin FROM vehiculos WHERE deleted_at IS NULL AND vin IS NOT NULL AND vin != ''");
+        foreach ($vinStmt->fetchAll() as $v) {
+            $vinsExistentes[$v['vin']] = (int)$v['id'];
+        }
     }
 
     // Control de duplicados dentro del mismo archivo
@@ -439,16 +452,74 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
         $data = $validacion['data'];
         $placa = $data['placa'] ?? '';
 
-        // Verificar duplicado en BD
+        // Verificar duplicado en BD — si updateExisting, intentar actualizar por VIN
+        $vin = isset($data['vin']) ? strtoupper(trim($data['vin'])) : '';
         if (isset($placasExistentes[$placa])) {
-            $resultado['errores']++;
-            $resultado['detalle'][] = [
-                'fila'    => $fila,
-                'tipo'    => 'duplicado_bd',
-                'errores' => ["Placa '$placa' ya existe en el sistema"],
-                'placa'   => $placa,
-            ];
-            continue;
+            if (!$updateExisting) {
+                $resultado['errores']++;
+                $resultado['detalle'][] = [
+                    'fila'    => $fila,
+                    'tipo'    => 'duplicado_bd',
+                    'errores' => ["Placa '$placa' ya existe en el sistema"],
+                    'placa'   => $placa,
+                ];
+                continue;
+            }
+            // updateExisting: buscar por placa y actualizar
+            $existId = $db->prepare("SELECT id FROM vehiculos WHERE UPPER(placa) = ? AND deleted_at IS NULL LIMIT 1");
+            $existId->execute([$placa]);
+            $existRow = $existId->fetch();
+            if ($existRow) {
+                try {
+                    $setCols = [];
+                    $setVals = [];
+                    foreach ($data as $col => $val) {
+                        if ($col === 'placa') continue;
+                        if ($val === '' || $val === null) continue;
+                        $setCols[] = "$col = ?";
+                        $setVals[] = $val;
+                    }
+                    if (!empty($setCols)) {
+                        $setVals[] = (int)$existRow['id'];
+                        $db->prepare("UPDATE vehiculos SET " . implode(', ', $setCols) . " WHERE id = ?")->execute($setVals);
+                        audit_log('vehiculos', 'update', (int)$existRow['id'], [], array_merge($data, ['_via' => 'importacion_update', '_import_run' => $runId]));
+                    }
+                    $resultado['actualizados']++;
+                    $placasEnArchivo[$placa] = $fila;
+                    continue;
+                } catch (Throwable $e) {
+                    $resultado['errores']++;
+                    $resultado['detalle'][] = ['fila' => $fila, 'tipo' => 'error_bd', 'errores' => ["Error actualización: " . $e->getMessage()], 'placa' => $placa];
+                    continue;
+                }
+            }
+        }
+
+        // Si tiene VIN y updateExisting, verificar si el VIN ya existe
+        if ($updateExisting && $vin !== '' && isset($vinsExistentes[$vin])) {
+            try {
+                $existVehId = $vinsExistentes[$vin];
+                $setCols = [];
+                $setVals = [];
+                foreach ($data as $col => $val) {
+                    if ($val === '' || $val === null) continue;
+                    $setCols[] = "$col = ?";
+                    $setVals[] = $val;
+                }
+                if (!empty($setCols)) {
+                    $setVals[] = $existVehId;
+                    $db->prepare("UPDATE vehiculos SET " . implode(', ', $setCols) . " WHERE id = ?")->execute($setVals);
+                    audit_log('vehiculos', 'update', $existVehId, [], array_merge($data, ['_via' => 'importacion_update_vin', '_import_run' => $runId]));
+                }
+                $resultado['actualizados']++;
+                $placasExistentes[$placa] = true;
+                $placasEnArchivo[$placa] = $fila;
+                continue;
+            } catch (Throwable $e) {
+                $resultado['errores']++;
+                $resultado['detalle'][] = ['fila' => $fila, 'tipo' => 'error_bd', 'errores' => ["Error actualización VIN: " . $e->getMessage()], 'placa' => $placa];
+                continue;
+            }
         }
 
         // Verificar duplicado dentro del archivo
@@ -468,8 +539,8 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
             $db->beginTransaction();
 
             $insertStmt = $db->prepare("INSERT INTO vehiculos
-                (placa, marca, modelo, anio, tipo, combustible, km_actual, color, vin, estado, venc_seguro, notas, sucursal_id, costo_adquisicion, aseguradora, poliza_numero)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                (placa, marca, modelo, anio, tipo, combustible, km_actual, color, vin, numero_chasis, numero_motor, rtn, estado, venc_seguro, notas, sucursal_id, costo_adquisicion, aseguradora, poliza_numero)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $insertStmt->execute([
                 $placa,
@@ -481,6 +552,9 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
                 !empty($data['km_actual'])           ? (float)$data['km_actual'] : 0,
                 !empty($data['color'])              ? $data['color']       : null,
                 !empty($data['vin'])                ? $data['vin']         : null,
+                !empty($data['numero_chasis'])      ? $data['numero_chasis'] : null,
+                !empty($data['numero_motor'])       ? $data['numero_motor']  : null,
+                !empty($data['rtn'])                ? $data['rtn']           : null,
                 !empty($data['estado'])             ? $data['estado']      : 'Activo',
                 !empty($data['venc_seguro'])        ? $data['venc_seguro'] : null,
                 !empty($data['notas'])              ? $data['notas']       : null,
@@ -525,11 +599,11 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
     }
 
     // Actualizar registro de importación
-    $estado = $resultado['errores'] > 0 && $resultado['creados'] === 0 ? 'fallido' : 'completado';
+    $estado = $resultado['errores'] > 0 && $resultado['creados'] === 0 && $resultado['actualizados'] === 0 ? 'fallido' : 'completado';
     $detalleJson = !empty($resultado['detalle']) ? json_encode($resultado['detalle'], JSON_UNESCAPED_UNICODE) : null;
 
     $updateStmt = $db->prepare("UPDATE import_runs SET creados=?, errores=?, estado=?, detalle_errores=?, completed_at=NOW() WHERE id=?");
-    $updateStmt->execute([$resultado['creados'], $resultado['errores'], $estado, $detalleJson, $runId]);
+    $updateStmt->execute([$resultado['creados'] + $resultado['actualizados'], $resultado['errores'], $estado, $detalleJson, $runId]);
 
     // Invalidar caché
     cache_invalidate_prefix('dashboard');

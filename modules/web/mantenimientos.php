@@ -147,7 +147,7 @@ async function load(){
     <td><button class="btn btn-ghost btn-sm" onclick="verItems(${r.id},'${r.estado}')" title="Ver partidas">📋 ${r.items_count||0}</button></td>
     <td>${r.km?Number(r.km).toLocaleString()+' km':'—'}</td>
     <td>${r.proveedor_nombre||'—'}</td>
-    <td><span class="badge ${EB[r.estado]||'badge-gray'}"<?php if($isAdmin): ?> onclick="avanzarEstadoOT(${r.id},'${r.estado}','${(r.placa||'').replace(/'/g,'')} ${(r.marca||'').replace(/'/g,'')}')" style="cursor:pointer" title="Clic para cambiar estado"<?php endif; ?>>${r.estado}</span></td>
+    <td><span class="badge ${EB[r.estado]||'badge-gray'}"<?php if($isAdmin): ?> onclick="avanzarEstadoOT(${r.id},&quot;${r.estado}&quot;,&quot;${(r.placa||'')} ${(r.marca||'')}&quot;)" style="cursor:pointer" title="Clic para cambiar estado"<?php endif; ?>>${r.estado}</span></td>
     <td>${apBadge}</td>
     <?php if(can('edit')): ?><td><div class="action-btns">
       ${approveBtn}

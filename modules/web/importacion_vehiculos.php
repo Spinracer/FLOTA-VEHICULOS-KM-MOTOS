@@ -120,6 +120,14 @@ ob_start();
 
       <div id="mapping-errors" class="hidden mt-4 p-3 bg-danger/10 border border-danger/30 rounded-lg text-danger text-sm"></div>
 
+      <div style="margin-top:16px;padding:12px;background:var(--bg2,#1a1e2e);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="chk-update-existing" style="width:18px;height:18px;accent-color:var(--accent)">
+        <div>
+          <label for="chk-update-existing" style="font-weight:600;font-size:13px;cursor:pointer">Actualizar vehículos existentes</label>
+          <p style="font-size:11px;color:var(--text2);margin:2px 0 0">Si la placa o VIN ya existe, actualiza los datos en lugar de reportar error. Similar a Snipe-IT.</p>
+        </div>
+      </div>
+
       <div class="flex justify-between mt-6">
         <button onclick="goToStep1()" class="btn-secondary">← Archivo</button>
         <div class="flex gap-3">
@@ -136,7 +144,7 @@ ob_start();
       <h2 class="text-lg font-heading font-bold mb-4" id="result-title">Resultado de importación</h2>
 
       <!-- KPIs -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6" id="result-kpis">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6" id="result-kpis">
         <div class="bg-surface2 rounded-xl p-4 text-center">
           <div class="text-3xl font-heading font-bold text-accent" id="kpi-total">0</div>
           <div class="text-xs text-muted mt-1">Total filas</div>
@@ -144,6 +152,10 @@ ob_start();
         <div class="bg-surface2 rounded-xl p-4 text-center">
           <div class="text-3xl font-heading font-bold text-success" id="kpi-creados">0</div>
           <div class="text-xs text-muted mt-1">Creados</div>
+        </div>
+        <div class="bg-surface2 rounded-xl p-4 text-center">
+          <div class="text-3xl font-heading font-bold" style="color:var(--accent2,#47ffe8)" id="kpi-actualizados">0</div>
+          <div class="text-xs text-muted mt-1">Actualizados</div>
         </div>
         <div class="bg-surface2 rounded-xl p-4 text-center">
           <div class="text-3xl font-heading font-bold text-danger" id="kpi-errores">0</div>
@@ -451,7 +463,10 @@ function autoDetectMapping(header, campos) {
     'combustible': 'combustible', 'fuel': 'combustible',
     'km': 'km_actual', 'kilometros': 'km_actual', 'kilometraje': 'km_actual', 'km_actual': 'km_actual', 'odometro': 'km_actual',
     'color': 'color',
-    'vin': 'vin', 'chasis': 'vin', 'nro_chasis': 'vin', 'numero_chasis': 'vin',
+    'vin': 'vin', 'serie': 'vin', 'no_serie': 'vin', 'numero_serie': 'vin',
+    'chasis': 'numero_chasis', 'nro_chasis': 'numero_chasis', 'numero_chasis': 'numero_chasis', 'no_chasis': 'numero_chasis', 'chassis': 'numero_chasis',
+    'motor': 'numero_motor', 'nro_motor': 'numero_motor', 'numero_motor': 'numero_motor', 'no_motor': 'numero_motor', 'engine': 'numero_motor',
+    'rtn': 'rtn', 'nit': 'rtn', 'ruc': 'rtn', 'tax_id': 'rtn',
     'estado': 'estado', 'status': 'estado',
     'vencimiento_seguro': 'venc_seguro', 'venc_seguro': 'venc_seguro', 'seguro': 'venc_seguro',
     'notas': 'notas', 'observaciones': 'notas', 'notes': 'notas', 'comentarios': 'notas',
@@ -511,6 +526,7 @@ async function ejecutarImportacion() {
   document.getElementById('errors-detail').classList.add('hidden');
   document.getElementById('kpi-total').textContent = '...';
   document.getElementById('kpi-creados').textContent = '...';
+  document.getElementById('kpi-actualizados').textContent = '...';
   document.getElementById('kpi-errores').textContent = '...';
 
   try {
@@ -522,7 +538,7 @@ async function ejecutarImportacion() {
         'X-CSRF-Token': getCsrfToken(),
         'X-Requested-With': 'XMLHttpRequest'
       },
-      body: JSON.stringify({ mapping, sheet_index: currentSheet })
+      body: JSON.stringify({ mapping, sheet_index: currentSheet, update_existing: document.getElementById('chk-update-existing').checked })
     });
 
     const data = await res.json();
@@ -533,6 +549,7 @@ async function ejecutarImportacion() {
     // KPIs
     document.getElementById('kpi-total').textContent = data.total;
     document.getElementById('kpi-creados').textContent = data.creados;
+    document.getElementById('kpi-actualizados').textContent = data.actualizados || 0;
     document.getElementById('kpi-errores').textContent = data.errores;
 
     // Título

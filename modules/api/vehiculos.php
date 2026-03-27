@@ -182,12 +182,13 @@ try {
                 break;
             }
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
-            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,estado,operador_id,venc_seguro,notas,sucursal_id,tiene_gata,tiene_herramientas,tiene_llanta_repuesto,tiene_bac_flota,revision_ok,tiene_luces,tiene_liquidos,tiene_motor_ok,tiene_parabrisas,tiene_documentacion,tiene_frenos,tiene_espejos,detalles_checklist,costo_adquisicion,aseguradora,poliza_numero)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO vehiculos (placa,marca,modelo,anio,tipo,combustible,km_actual,color,vin,numero_chasis,numero_motor,rtn,estado,operador_id,venc_seguro,notas,sucursal_id,tiene_gata,tiene_herramientas,tiene_llanta_repuesto,tiene_bac_flota,revision_ok,tiene_luces,tiene_liquidos,tiene_motor_ok,tiene_parabrisas,tiene_documentacion,tiene_frenos,tiene_espejos,detalles_checklist,costo_adquisicion,aseguradora,poliza_numero)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
+                $d['numero_chasis'] ?: null, $d['numero_motor'] ?: null, $d['rtn'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
                 $d['venc_seguro'] ?: null, $d['notas'] ?: null,
                 $d['sucursal_id'] ?: null,
@@ -225,11 +226,12 @@ try {
             $kmNuevo = isset($d['km_actual']) ? (float)$d['km_actual'] : 0;
             $allowOverride = can('manage_permissions') && !empty($d['override_reason']);
             odometro_validar_km($db, (int)$d['id'], $kmNuevo, $allowOverride, trim((string)($d['override_reason'] ?? '')) ?: null);
-            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=?,tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,tiene_luces=?,tiene_liquidos=?,tiene_motor_ok=?,tiene_parabrisas=?,tiene_documentacion=?,tiene_frenos=?,tiene_espejos=?,detalles_checklist=?,costo_adquisicion=?,aseguradora=?,poliza_numero=? WHERE id=?");
+            $stmt = $db->prepare("UPDATE vehiculos SET placa=?,marca=?,modelo=?,anio=?,tipo=?,combustible=?,km_actual=?,color=?,vin=?,numero_chasis=?,numero_motor=?,rtn=?,estado=?,operador_id=?,venc_seguro=?,notas=?,sucursal_id=?,tiene_gata=?,tiene_herramientas=?,tiene_llanta_repuesto=?,tiene_bac_flota=?,revision_ok=?,tiene_luces=?,tiene_liquidos=?,tiene_motor_ok=?,tiene_parabrisas=?,tiene_documentacion=?,tiene_frenos=?,tiene_espejos=?,detalles_checklist=?,costo_adquisicion=?,aseguradora=?,poliza_numero=? WHERE id=?");
             $stmt->execute([
                 strtoupper(trim($d['placa'])), $d['marca'], $d['modelo'],
                 $d['anio'] ?: null, $d['tipo'], $d['combustible'],
                 $d['km_actual'] ?: 0, $d['color'] ?: null, $d['vin'] ?: null,
+                $d['numero_chasis'] ?: null, $d['numero_motor'] ?: null, $d['rtn'] ?: null,
                 $d['estado'], $d['operador_id'] ?: null,
                 $d['venc_seguro'] ?: null, $d['notas'] ?: null,
                 $d['sucursal_id'] ?: null,

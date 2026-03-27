@@ -70,6 +70,9 @@ ob_start();
       <div class="form-group"><label>KM Actual</label><input name="km_actual" type="number" placeholder="45000"></div>
       <div class="form-group"><label>Color</label><input name="color" placeholder="Blanco"></div>
       <div class="form-group"><label>No. Serie / VIN</label><input name="vin" placeholder="1HGCM82633A004352"></div>
+      <div class="form-group"><label>No. Chasis</label><input name="numero_chasis" placeholder="Número de chasis"></div>
+      <div class="form-group"><label>No. Motor</label><input name="numero_motor" placeholder="Número de motor"></div>
+      <div class="form-group"><label>RTN</label><input name="rtn" placeholder="0801-1990-00001"></div>
       <div class="form-group"><label>Estado</label>
         <select name="estado">
           <?php foreach($estadosVehiculo as $ev): ?><option value="<?=htmlspecialchars($ev['nombre'])?>"><?=htmlspecialchars($ev['nombre'])?></option><?php endforeach; ?>
@@ -212,6 +215,7 @@ function editar(v) {
     id: v.id, placa: v.placa, marca: v.marca, modelo: v.modelo,
     anio: v.anio, tipo: v.tipo, combustible: v.combustible,
     km_actual: v.km_actual, color: v.color, vin: v.vin,
+    numero_chasis: v.numero_chasis || '', numero_motor: v.numero_motor || '', rtn: v.rtn || '',
     estado: v.estado, operador_id: v.operador_id,
     venc_seguro: v.venc_seguro, sucursal_id: v.sucursal_id || '', notas: v.notas,
     detalles_checklist: v.detalles_checklist || '',

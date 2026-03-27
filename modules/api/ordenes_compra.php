@@ -26,35 +26,34 @@ try {
             exit;
         }
 
-        // Helper: auto-sync items to linked mantenimiento (only when OC is Aprobada)
+        // Helper: auto-sync items to linked mantenimiento
+        // Syncs when OC is Aprobada OR when there's already a linked mantenimiento
         $syncItemsToMantenimiento = function() use ($db, $ocId) {
-            // Check OC estado — only sync if Aprobada
-            $stOC = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
-            $stOC->execute([$ocId]);
-            $ocEstado = $stOC->fetchColumn();
-            if ($ocEstado !== 'Aprobada') return; // Don't sync if Pendiente, Completada, Cancelada, etc.
-
-            $stMant = $db->prepare("SELECT id FROM mantenimientos WHERE orden_compra_id = ? LIMIT 1");
+            $stMant = $db->prepare("SELECT id, estado FROM mantenimientos WHERE orden_compra_id = ? AND deleted_at IS NULL LIMIT 1");
             $stMant->execute([$ocId]);
             $linkedMant = $stMant->fetch();
-            if ($linkedMant) {
-                $mantId = (int)$linkedMant['id'];
-                // Delete existing imported items and re-import all
-                $db->prepare("DELETE FROM mantenimiento_items WHERE mantenimiento_id = ? AND notas LIKE 'Importado desde OC-%'")->execute([$mantId]);
-                $stAllItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ?");
-                $stAllItems->execute([$ocId]);
-                $allItems = $stAllItems->fetchAll();
-                $ocFolio = 'OC-' . str_pad($ocId, 6, '0', STR_PAD_LEFT);
-                foreach ($allItems as $item) {
-                    $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
-                       ->execute([$mantId, $item['descripcion'], $item['cantidad'], $item['unidad'], $item['precio_unitario'], 'Importado desde '.$ocFolio, $item['component_id']]);
-                }
-                // Recalculate mantenimiento costo
-                $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
-                   ->execute([$mantId, $mantId]);
-                // Audit the sync
-                audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $ocId, 'items_synced' => count($allItems)]);
+            if (!$linkedMant) return; // No linked mantenimiento, nothing to sync
+
+            $mantId = (int)$linkedMant['id'];
+            $mantEstado = $linkedMant['estado'];
+            // Don't sync if mantenimiento is Completado (closed)
+            if ($mantEstado === 'Completado') return;
+
+            // Delete existing imported items and re-import all
+            $db->prepare("DELETE FROM mantenimiento_items WHERE mantenimiento_id = ? AND notas LIKE 'Importado desde OC-%'")->execute([$mantId]);
+            $stAllItems = $db->prepare("SELECT * FROM orden_compra_items WHERE orden_compra_id = ?");
+            $stAllItems->execute([$ocId]);
+            $allItems = $stAllItems->fetchAll();
+            $ocFolio = 'OC-' . str_pad($ocId, 6, '0', STR_PAD_LEFT);
+            foreach ($allItems as $item) {
+                $db->prepare("INSERT INTO mantenimiento_items (mantenimiento_id, descripcion, cantidad, unidad, precio_unitario, notas, component_id) VALUES (?,?,?,?,?,?,?)")
+                   ->execute([$mantId, $item['descripcion'], $item['cantidad'], $item['unidad'], $item['precio_unitario'], 'Importado desde '.$ocFolio, $item['component_id']]);
             }
+            // Recalculate mantenimiento costo
+            $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
+               ->execute([$mantId, $mantId]);
+            // Audit the sync
+            audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $ocId, 'items_synced' => count($allItems)]);
         };
 
         switch ($method) {

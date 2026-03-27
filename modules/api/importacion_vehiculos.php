@@ -117,6 +117,7 @@ try {
             $d = json_decode(file_get_contents('php://input'), true);
             $mapping = $d['mapping'] ?? [];
             $sheetIndex = (int)($d['sheet_index'] ?? 0);
+            $updateExisting = !empty($d['update_existing']);
 
             if (empty($mapping)) {
                 http_response_code(400);
@@ -161,7 +162,8 @@ try {
                 $fileData['headers'],
                 $mapping,
                 (int)($_SESSION['user_id'] ?? 0),
-                $importFile['name']
+                $importFile['name'],
+                $updateExisting
             );
 
             // Limpiar archivo temporal
@@ -169,12 +171,13 @@ try {
             unset($_SESSION['import_file']);
 
             echo json_encode([
-                'ok'        => true,
-                'total'     => $resultado['total'],
-                'creados'   => $resultado['creados'],
-                'errores'   => $resultado['errores'],
-                'detalle'   => $resultado['detalle'],
-                'run_id'    => $resultado['import_run_id'],
+                'ok'           => true,
+                'total'        => $resultado['total'],
+                'creados'      => $resultado['creados'],
+                'actualizados' => $resultado['actualizados'] ?? 0,
+                'errores'      => $resultado['errores'],
+                'detalle'      => $resultado['detalle'],
+                'run_id'       => $resultado['import_run_id'],
             ]);
             break;
 
