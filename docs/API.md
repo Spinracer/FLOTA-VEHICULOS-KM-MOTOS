@@ -350,6 +350,157 @@ Respuesta: `{ "ok": true, "deleted": 1 }`
 
 ---
 
+## Importación de Vehículos (`/api/importacion_vehiculos.php`) — v3.1.0
+
+### GET - Consultar importaciones previas
+```
+GET /api/importacion_vehiculos.php?action=list&page=1&per=25
+```
+Respuesta: `{ "total": 10, "rows": [ { "id": 1, "fecha": "2026-01-15 10:30:00", "archivo": "vehiculos_batch_001.csv", "usuario_id": 1, "resultado": "success", "insertados": 15, "actualizados": 8, "errores": 0, "update_key_field": "placa" } ] }`
+
+### POST - Ejecutar importación
+Enviar como `multipart/form-data`:
+- `archivo` (file): Archivo CSV o XLSX con vehículos
+- `mapping` (JSON string): Mapeo de columnas a campos BD
+  ```json
+  {
+    "0": "placa",
+    "1": "marca",
+    "2": "modelo",
+    "3": "tipo",
+    "4": "numero_vin",
+    "5": "numero_chasis",
+    "6": "numero_motor"
+  }
+  ```
+- `update_existing` (boolean, default: false): Si true, actualiza vehículos existentes
+- `update_key_field` (string, default: "placa"): Campo para detectar duplicados cuando update_existing=true
+  - Valores permitidos: `placa`, `vin`, `numero_chasis`, `numero_motor` (alias: `c` para numero_chasis, `m` para numero_motor)
+
+**Ejemplo cURL:**
+```bash
+curl -X POST http://localhost:8080/api/importacion_vehiculos.php?action=import \
+  -F "archivo=@vehiculos.csv" \
+  -F "mapping={\"0\":\"placa\",\"1\":\"marca\",\"2\":\"modelo\"}" \
+  -F "update_existing=true" \
+  -F "update_key_field=vin"
+```
+
+**Respuesta exitosa:**
+```json
+{
+  "ok": true,
+  "resultado": "success",
+  "importacion_id": 42,
+  "insertados": 15,
+  "actualizados": 8,
+  "errores": 0,
+  "mensaje": "15 vehículos insertados, 8 actualizados",
+  "detalles_errores": []
+}
+```
+
+**Respuesta con errores (parcial):**
+```json
+{
+  "ok": true,
+  "resultado": "partial",
+  "importacion_id": 43,
+  "insertados": 14,
+  "actualizados": 7,
+  "errores": 2,
+  "mensaje": "2 filas tienen errores (duplicado o formato inválido)",
+  "detalles_errores": [
+    { "fila": 5, "placa": "ABC-999", "error": "Vehículo ya existe (VIN duplicado)" },
+    { "fila": 12, "placa": "XYZ-123", "error": "Tipo no válido" }
+  ]
+}
+```
+
+### Opciones de Campo Clave (update_key_field)
+
+| Campo | Descripción | Ejemplo |
+|-------|-------------|---------|
+| `placa` | Búsqueda exacta de placa (default) | ABC-123 |
+| `vin` | Número de Identificación del Vehículo | 1HGCM82633A123456 |
+| `numero_chasis` | Número de Chasis | CHASIS-12345-67890 |
+| `numero_motor` | Número de Motor | MOTOR-98765-43210 |
+
+**Comportamiento:**
+- Si `update_existing=false`, ignora `update_key_field`
+- Si `update_existing=true` y campo no está en mapeo, falla con error
+- Duplicados se detectan con búsqueda CASE INSENSITIVE (excepto placa que es EXACTA)
+- Si hay duplicados en el import mismo, se rechaza la fila completa
+- Si actualiza, reemplaza SOLO campos mapeados (merge parcial)
+
+### GET - Ver detalles de importación
+```
+GET /api/importacion_vehiculos.php?action=view&importacion_id=42
+```
+Respuesta: `{ "importacion": {...}, "detalles": [{ "fila": 1, "placa": "ABC-123", "estado": "insertado", "vehiculo_id": 45 }, ...] }`
+
+### DELETE - Deshacer importación
+```
+DELETE /api/importacion_vehiculos.php?importacion_id=42
+```
+Respuesta: `{ "ok": true, "eliminados": 15, "mensaje": "Importación deshecha" }`
+> ⚠️ **Advertencia**: Elimina SOLO los vehículos insertados en esa importación, no revierte actualizaciones.
+
+---
+
+## Ordenar Compra - Items Sincronizados (`/api/ordenes_compra.php`) — v3.1.0
+
+### Sincronización automática OC ↔ OT
+
+Cuando agregas, modificas o eliminas un componente en una **Orden de Compra**:
+
+**Condiciones para Sincronizar (todo debe cumplirse):**
+1. ✅ Estado OC = `Aprobada` (otro estado = NO sincroniza)
+2. ✅ Estado OT ≠ `Completada` (aunque OC no esté completada)
+3. ✅ El componente/item debe existir en BD
+
+**POST - Agregar componente a OC**
+```json
+{ "orden_compra_id": 1, "componente_id": 5, "cantidad": 3, "descripcion": "Filtro aire", "precio_unitario": 250 }
+```
+Si OC está Aprobada, automáticamente sincroniza a la OT (agrega o reemplaza item similar).
+
+**PUT - Modificar componente en OC**
+```json
+{ "id": 42, "cantidad": 5, "precio_unitario": 250 }
+```
+Re-sincroniza a OT si condiciones son met.
+
+**DELETE - Eliminar componente de OC**
+```
+DELETE /api/ordenes_compra.php?action=items&id=42
+```
+Si OC está Aprobada, automáticamente remueve componente de OT.
+
+**Respuesta con sync:**
+```json
+{
+  "ok": true,
+  "item_id": 42,
+  "sincronizado": true,
+  "mantenimiento_id": 15,
+  "mensaje": "Componente agregado a OC y sincronizado a OT #15"
+}
+```
+
+**Respuesta sin sync:**
+```json
+{
+  "ok": true,
+  "item_id": 42,
+  "sincronizado": false,
+  "razon": "OC no está en estado Aprobada (estado actual: Pendiente)",
+  "mensaje": "Componente agregado a OC pero NO sincronizado"
+}
+```
+
+---
+
 ## Reportes — Nuevos tipos
 
 ### GET - Reporte Overrides

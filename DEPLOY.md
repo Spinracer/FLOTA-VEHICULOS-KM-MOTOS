@@ -69,7 +69,51 @@ App disponible en: `http://127.0.0.1:8080`
 - Configurar backup periódico de DB
 - Monitorear logs de aplicación y web server
 
-## 6) Verificación rápida
+## 6) Nuevas Features v3.1.0 (Marzo 2026)
+
+### Importación de Vehículos con Selector de Campo Clave
+
+En el módulo **Vehículos → Importar**, ahora puedes:
+
+1. **Marcar opción:** "Actualizar vehículos existentes"
+2. **Elegir campo clave** para detectar duplicados:
+   - **Placa** (por defecto, búsqueda exacta)
+   - **VIN** (Número de Identificación del Vehículo)
+   - **Número Chasis**
+   - **Número Motor**
+
+**Ejemplo API Request:**
+```json
+POST /api/importacion_vehiculos.php?action=import
+{
+  "mapping": {
+    "0": "placa",
+    "1": "marca",
+    "2": "numero_vin"
+  },
+  "update_existing": true,
+  "update_key_field": "vin"
+}
+```
+
+### Sincronización Inteligente OC ↔ OT
+
+Cuando agregas componentes a una **Orden de Compra (OC)**:
+- ✅ Se sincronizan automáticamente a la **Orden de Trabajo (OT)** asociada
+- ✅ **Solo si** la OC está en estado `Aprobada`
+- ✅ La sincronización se **detiene** si la OT está `Completada`
+- ✅ Los ítems se **reemplazan** (sin duplicación)
+
+### Campo "Próximo KM" Opcional
+
+El campo `proximo_km` en **Mantenimientos** es ahora **OPCIONAL**, permitiendo:
+- Registrar reparaciones correctivas sin KM programado
+- Servicios que no tienen intervalo de mantenimiento definido
+- Mayor flexibilidad en registros de reparación
+
+---
+
+## 7) Verificación rápida
 
 - `GET /` debe responder 200
 - Login debe redirigir a dashboard
@@ -80,3 +124,9 @@ App disponible en: `http://127.0.0.1:8080`
 - Operadores debe permitir abrir historial consolidado (📚)
 - En Combustible debe pedirse conductor, método de pago y número de recibo
 - Operaciones CRUD deben registrar actividad en `audit_logs`
+
+**Nuevas verificaciones v3.1.0:**
+- Importar vehículos → checkbox UPDATE visible
+- Selector de campo clave (VIN/Chasis/Motor) disponible
+- OC → agregar componente → se sincroniza a OT solo si Aprobada
+- Mantenimiento → campo KM próximo acepta NULL sin error
