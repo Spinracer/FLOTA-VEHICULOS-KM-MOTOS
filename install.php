@@ -147,6 +147,9 @@ $tables = [
   km_actual      DECIMAL(10,1) NOT NULL DEFAULT 0,
   color          VARCHAR(40)  NULL,
   vin            VARCHAR(50)  NULL,
+  numero_chasis  VARCHAR(50)  NULL,
+  numero_motor   VARCHAR(50)  NULL,
+  rtn            VARCHAR(20)  NULL,
   estado         ENUM('Activo','En mantenimiento','Fuera de servicio') NOT NULL DEFAULT 'Activo',
   operador_id    INT          NULL,
   venc_seguro    DATE         NULL,
@@ -752,7 +755,26 @@ foreach ($incSeguroCols as [$col, $def]) {
   }
 }
 
-// 3.5 Módulo 14: Tabla sucursales + columna sucursal_id
+// 3.5 Migración: campos chasis, motor, RTN en vehículos
+$vehNewCols = [
+  ['numero_chasis', "VARCHAR(50) NULL AFTER vin"],
+  ['numero_motor',  "VARCHAR(50) NULL AFTER numero_chasis"],
+  ['rtn',           "VARCHAR(20) NULL AFTER numero_motor"],
+];
+foreach ($vehNewCols as [$col, $def]) {
+  try {
+    if (!$existsColumn('vehiculos', $col)) {
+      $pdo->exec("ALTER TABLE vehiculos ADD COLUMN {$col} {$def}");
+      step("Vehículos: {$col}", true);
+    } else {
+      step("Vehículos: {$col}", true, 'Ya existe');
+    }
+  } catch (Exception $e) {
+    step("Vehículos: {$col}", false, $e->getMessage());
+  }
+}
+
+// 3.6 Módulo 14: Tabla sucursales + columna sucursal_id
 try {
   $pdo->exec("CREATE TABLE IF NOT EXISTS sucursales (
     id         INT AUTO_INCREMENT PRIMARY KEY,

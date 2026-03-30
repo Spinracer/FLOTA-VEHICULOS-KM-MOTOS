@@ -15,7 +15,7 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $db = getDB();
 
-$MODULOS  = ['vehiculos','asignaciones','mantenimientos','combustible','incidentes','recordatorios','operadores','proveedores','preventivos','reportes','usuarios','auditoria','sucursales','notificaciones'];
+$MODULOS  = ['vehiculos','asignaciones','mantenimientos','combustible','incidentes','recordatorios','operadores','proveedores','ordenes_compra','importacion','preventivos','reportes','usuarios','auditoria','sucursales','notificaciones'];
 $PERMISOS = ['view','create','edit','delete'];
 
 try {

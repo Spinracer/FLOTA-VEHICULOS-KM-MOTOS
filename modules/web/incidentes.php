@@ -6,7 +6,7 @@ $vehiculos = $db->query("SELECT id,placa,marca,modelo FROM vehiculos ORDER BY pl
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por placa, tipo, aseguradora, póliza..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por placa, tipo, aseguradora, póliza..." oninput="debouncedLoad()"></div>
   <select id="fv" onchange="load()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
     <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'])?></option><?php endforeach; ?>
@@ -152,6 +152,7 @@ async function load(){
     </div></td><?php endif; ?>
   </tr>`).join('');
 }
+const debouncedLoad = debounce(load, 300);
 
 function abrirNuevo(){
   document.getElementById('mtitle').textContent='⚠️ Reportar Incidente';

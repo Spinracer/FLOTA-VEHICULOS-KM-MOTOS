@@ -5,6 +5,7 @@ $db = getDB();
 $vehiculos = $db->query("SELECT id,placa,marca,modelo FROM vehiculos WHERE deleted_at IS NULL ORDER BY placa")->fetchAll();
 $proveedores = $db->query("SELECT id,nombre FROM proveedores ORDER BY nombre")->fetchAll();
 $operadores = $db->query("SELECT id,nombre,estado FROM operadores ORDER BY nombre")->fetchAll();
+$departamentos = $db->query("SELECT id,nombre FROM departamentos WHERE activo=1 ORDER BY nombre")->fetchAll();
 ob_start();
 ?>
 <div class="toolbar">
@@ -17,6 +18,7 @@ ob_start();
     <option value="overrides">🔓 Overrides Admin</option>
     <option value="operador_360">👤 Perfil Operador 360</option>
     <option value="historial_asignaciones">📋 Historial Asignaciones</option>
+    <option value="ordenes_compra">🛒 Auditoría Órdenes de Compra</option>
   </select>
   <select id="fv" onchange="loadReport()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
@@ -39,19 +41,29 @@ ob_start();
   </div>
 </div>
 <div class="toolbar" id="hist-toolbar" style="margin-top:4px;display:none;">
-  <label style="font-size:12px;color:#8892a4;margin-right:6px;">Filtrar por:</label>
-  <select id="hist-mode" onchange="histModeChange()" style="max-width:160px">
-    <option value="">Todos (sin filtro)</option>
-    <option value="vehiculo">🚗 Por Vehículo</option>
-    <option value="operador">👤 Por Operador</option>
-  </select>
-  <select id="hist-vehiculo" onchange="loadReport()" style="max-width:200px;display:none">
+  <label style="font-size:12px;color:#8892a4;margin-right:6px;">Subfiltros:</label>
+  <select id="hist-vehiculo" onchange="loadReport()" style="max-width:200px">
     <option value="">— Todos los vehículos —</option>
     <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo'])?></option><?php endforeach; ?>
   </select>
-  <select id="hist-operador" onchange="loadReport()" style="max-width:200px;display:none">
+  <select id="hist-operador" onchange="loadReport()" style="max-width:200px">
     <option value="">— Todos los operadores —</option>
     <?php foreach($operadores as $op): ?><option value="<?=$op['id']?>"><?=htmlspecialchars($op['nombre'])?> (<?=$op['estado']?>)</option><?php endforeach; ?>
+  </select>
+  <select id="hist-departamento" onchange="loadReport()" style="max-width:200px">
+    <option value="">— Todos los departamentos —</option>
+    <?php foreach($departamentos as $dep): ?><option value="<?=$dep['id']?>"><?=htmlspecialchars($dep['nombre'])?></option><?php endforeach; ?>
+  </select>
+</div>
+<div class="toolbar" id="oc-audit-toolbar" style="margin-top:4px;display:none;">
+  <label style="font-size:12px;color:#8892a4;margin-right:6px;">Subfiltros:</label>
+  <select id="oc-vehiculo" onchange="loadReport()" style="max-width:200px">
+    <option value="">— Todos los vehículos —</option>
+    <?php foreach($vehiculos as $v): ?><option value="<?=$v['id']?>"><?=htmlspecialchars($v['placa'].' '.$v['marca'].' '.$v['modelo'])?></option><?php endforeach; ?>
+  </select>
+  <select id="oc-departamento" onchange="loadReport()" style="max-width:200px">
+    <option value="">— Todos los departamentos —</option>
+    <?php foreach($departamentos as $dep): ?><option value="<?=$dep['id']?>"><?=htmlspecialchars($dep['nombre'])?></option><?php endforeach; ?>
   </select>
 </div>
 <div class="toolbar" id="group-toolbar" style="margin-top:4px;display:none;">
@@ -87,7 +99,7 @@ function getFilters() {
   const f = {
     from: document.getElementById('from-date').value,
     to: document.getElementById('to-date').value,
-    vehiculo_id: (type === 'historial_asignaciones' || type === 'operador_360') ? '' : document.getElementById('fv').value,
+    vehiculo_id: (type === 'historial_asignaciones' || type === 'operador_360' || type === 'ordenes_compra') ? '' : document.getElementById('fv').value,
   };
   if (type === 'combustible') {
     const op = document.getElementById('fop').value;
@@ -116,10 +128,11 @@ function switchReport() {
   const grpSelect = document.getElementById('group-by');
   fop.style.display = (type === 'operador_360' || type === 'combustible') ? '' : 'none';
   fop.querySelector('option[value=""]').textContent = type === 'operador_360' ? 'Seleccione operador' : 'Todos los operadores';
-  fv.style.display  = (type === 'operador_360' || type === 'historial_asignaciones') ? 'none' : '';
+  fv.style.display  = (type === 'operador_360' || type === 'historial_asignaciones' || type === 'ordenes_compra') ? 'none' : '';
   document.getElementById('fprov').style.display = type === 'mantenimiento' ? '' : 'none';
   document.getElementById('hist-toolbar').style.display = type === 'historial_asignaciones' ? '' : 'none';
-  if (type !== 'historial_asignaciones') { document.getElementById('hist-mode').value = ''; histModeChange(true); }
+  document.getElementById('oc-audit-toolbar').style.display = type === 'ordenes_compra' ? '' : 'none';
+  if (type !== 'historial_asignaciones') { document.getElementById('hist-vehiculo').value=''; document.getElementById('hist-operador').value=''; document.getElementById('hist-departamento').value=''; }
 
   // Populate grouping options based on report type
   const groupOptions = {
@@ -150,10 +163,15 @@ async function loadReport() {
     }
     qs = buildQS({report: type, operador_id: opId});
   } else if (type === 'historial_asignaciones') {
-    const mode = document.getElementById('hist-mode').value;
     const extra = {report: type};
-    if (mode === 'vehiculo') { const v = document.getElementById('hist-vehiculo').value; if (v) extra.vehiculo_id = v; }
-    if (mode === 'operador') { const o = document.getElementById('hist-operador').value; if (o) extra.operador_id = o; }
+    const v = document.getElementById('hist-vehiculo').value; if (v) extra.vehiculo_id = v;
+    const o = document.getElementById('hist-operador').value; if (o) extra.operador_id = o;
+    const d = document.getElementById('hist-departamento').value; if (d) extra.departamento_id = d;
+    qs = buildQS(extra);
+  } else if (type === 'ordenes_compra') {
+    const extra = {report: type};
+    const v = document.getElementById('oc-vehiculo').value; if (v) extra.vehiculo_id = v;
+    const d = document.getElementById('oc-departamento').value; if (d) extra.departamento_id = d;
     qs = buildQS(extra);
   } else {
     qs = buildQS({report: type});
@@ -453,6 +471,43 @@ async function loadReport() {
       <td>${r.km_recorridos!=null?Number(r.km_recorridos).toLocaleString()+' km':'—'}</td>
       <td><span class="badge ${EB2[r.estado]||'badge-gray'}">${r.estado}</span></td>
     </tr>`).join('');
+  } else if (type === 'ordenes_compra') {
+    const t = data.totales || {};
+    const OC_EB = {'Pendiente':'badge-yellow','Aprobada':'badge-green','Rechazada':'badge-red','Completada':'badge-blue','Cancelada':'badge-gray'};
+    kpis.innerHTML = `
+      <div class="kpi-card yellow"><div class="kpi-icon">🛒</div><div class="kpi-label">Total OC</div><div class="kpi-value">${t.total||0}</div></div>
+      <div class="kpi-card orange"><div class="kpi-icon">⏳</div><div class="kpi-label">Pendientes</div><div class="kpi-value">${t.pendientes||0}</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-label">Aprobadas</div><div class="kpi-value">${t.aprobadas||0}</div></div>
+      <div class="kpi-card blue"><div class="kpi-icon">📦</div><div class="kpi-label">Completadas</div><div class="kpi-value">${t.completadas||0}</div></div>
+      <div class="kpi-card cyan"><div class="kpi-icon">💰</div><div class="kpi-label">Monto Total</div><div class="kpi-value">L ${Number(t.monto_total||0).toFixed(0)}</div></div>
+      <div class="kpi-card gray"><div class="kpi-icon">📋</div><div class="kpi-label">Total Items</div><div class="kpi-value">${t.total_items||0}</div></div>`;
+    thead.innerHTML = '<tr><th>Folio</th><th>Fecha</th><th>Solicitante</th><th>Descripción</th><th>Placa</th><th>Proveedor</th><th>Monto</th><th>Items</th><th>Estado</th><th>OT Vinculada</th></tr>';
+    tbody.innerHTML = (data.rows||[]).map(r => `<tr>
+      <td><strong style="color:var(--accent)">${r.folio||'—'}</strong></td>
+      <td>${r.fecha||'—'}</td>
+      <td>${r.solicitante||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.descripcion||'').replace(/"/g,'&quot;')}">${r.descripcion||'—'}</td>
+      <td>${r.placa||'—'}</td>
+      <td>${r.proveedor||'—'}</td>
+      <td><strong>L ${Number(r.monto||0).toFixed(2)}</strong></td>
+      <td>${r.items||0}</td>
+      <td><span class="badge ${OC_EB[r.estado]||'badge-gray'}">${r.estado||'—'}</span></td>
+      <td>${r.mantenimiento_id ? '<span class="badge badge-blue">OT-' + String(r.mantenimiento_id).padStart(6,'0') + '</span>' : '—'}</td>
+    </tr>`).join('');
+    let extraHtml = '';
+    if (data.por_vehiculo && data.por_vehiculo.length) {
+      extraHtml += `<div class="table-wrap" style="margin-top:16px">
+        <div style="font-size:13px;font-weight:600;color:#47ffe8;margin-bottom:8px">🚗 Resumen por Vehículo</div>
+        <table><thead><tr><th>Placa</th><th>Vehículo</th><th>Órdenes</th><th>Monto Total</th></tr></thead>
+        <tbody>${data.por_vehiculo.map(r=>`<tr><td><strong style="color:var(--accent)">${r.placa}</strong></td><td>${r.vehiculo||''}</td><td>${r.ordenes}</td><td><strong>L ${Number(r.monto_total||0).toFixed(2)}</strong></td></tr>`).join('')}</tbody></table></div>`;
+    }
+    if (data.por_estado && data.por_estado.length) {
+      extraHtml += `<div class="table-wrap" style="margin-top:16px">
+        <div style="font-size:13px;font-weight:600;color:#e8ff47;margin-bottom:8px">📊 Resumen por Estado</div>
+        <table><thead><tr><th>Estado</th><th>Cantidad</th></tr></thead>
+        <tbody>${data.por_estado.map(r=>`<tr><td><span class="badge ${OC_EB[r.estado]||'badge-gray'}">${r.estado}</span></td><td><strong>${r.count}</strong></td></tr>`).join('')}</tbody></table></div>`;
+    }
+    document.getElementById('extra-tables').innerHTML = extraHtml;
   }
 }
 
@@ -470,6 +525,7 @@ function exportReport(format) {
     operador_360: 'asignaciones',
     asignaciones: 'asignaciones',
     historial_asignaciones: 'historial_asignaciones',
+    ordenes_compra: 'ordenes_compra',
     incidentes: 'incidentes'
   };
   const exportType = exportMap[type] || type;
@@ -479,9 +535,12 @@ function exportReport(format) {
     const opId = document.getElementById('fop').value;
     if (opId) exportQs += '&operador_id=' + opId;
   } else if (type === 'historial_asignaciones') {
-    const mode = document.getElementById('hist-mode').value;
-    if (mode === 'vehiculo') { const v = document.getElementById('hist-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v; }
-    if (mode === 'operador') { const o = document.getElementById('hist-operador').value; if (o) exportQs += '&operador_id=' + o; }
+    const v = document.getElementById('hist-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v;
+    const o = document.getElementById('hist-operador').value; if (o) exportQs += '&operador_id=' + o;
+    const d = document.getElementById('hist-departamento').value; if (d) exportQs += '&departamento_id=' + d;
+  } else if (type === 'ordenes_compra') {
+    const v = document.getElementById('oc-vehiculo').value; if (v) exportQs += '&vehiculo_id=' + v;
+    const d = document.getElementById('oc-departamento').value; if (d) exportQs += '&departamento_id=' + d;
   }
   if (format === 'pdf') {
     window.open(`/api/reportes.php?${exportQs}`, '_blank');
@@ -493,12 +552,6 @@ function exportReport(format) {
 // Mantener compatibilidad con llamadas anteriores
 function exportCSV() { exportReport('csv'); }
 
-function histModeChange(silent){
-  const mode = document.getElementById('hist-mode').value;
-  document.getElementById('hist-vehiculo').style.display = mode === 'vehiculo' ? '' : 'none';
-  document.getElementById('hist-operador').style.display = mode === 'operador' ? '' : 'none';
-  if (!silent) loadReport();
-}
 document.addEventListener('DOMContentLoaded', loadReport);
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Reportes y Exportaciones','reportes',$content); ?>

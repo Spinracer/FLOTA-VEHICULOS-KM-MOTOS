@@ -13,7 +13,7 @@ ob_start();
 
 <!-- ═══════════════ TOOLBAR ═══════════════ -->
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar alerta..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar alerta..." oninput="debouncedLoad()"></div>
   <select id="fTipo" onchange="load()" style="max-width:160px">
     <option value="">Todos los tipos</option>
     <option value="vencimiento">📅 Vencimiento</option>
@@ -169,6 +169,7 @@ async function load() {
   </tr>`).join('');
   loadStats();
 }
+const debouncedLoad = debounce(load, 300);
 
 async function escanear() {
   toast('Escaneando alertas...','info');
@@ -275,12 +276,12 @@ async function loadSelects() {
     const vData = await api('/api/vehiculos.php?per=500');
     const selV = document.getElementById('selVeh');
     vData.rows.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.textContent = `${v.placa} — ${v.marca}`; selV.appendChild(o); });
-  } catch(e){}
+  } catch(e) { console.error(e); }
   try {
     const uData = await api('/api/usuarios.php?per=500');
     const selU = document.getElementById('selResp');
     (uData.rows||[]).forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.nombre; selU.appendChild(o); });
-  } catch(e){}
+  } catch(e) { console.error(e); }
 }
 
 document.addEventListener('DOMContentLoaded', () => { loadSelects(); loadStats(); load(); });

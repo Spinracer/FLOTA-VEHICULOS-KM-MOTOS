@@ -7,7 +7,7 @@ $operadores = $db->query("SELECT o.id,o.nombre,o.estado,o.departamento_id,COALES
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por placa, operador..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar por placa, operador..." oninput="debouncedLoad()"></div>
   <select id="fv" onchange="load();loadCalendar()" style="max-width:180px">
     <option value="">Todos los vehículos</option>
     <?php foreach($vehiculos as $v): ?><option value="<?= $v['id'] ?>"><?= htmlspecialchars($v['placa'].' '.$v['marca']) ?></option><?php endforeach; ?>
@@ -231,7 +231,7 @@ async function loadCalendar() {
       ev._raw = ev.extendedProps;
       fcInstance.addEvent(ev);
     });
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 // ── Dynamic checklist plantillas ──
@@ -271,7 +271,7 @@ async function loadPlantillas() {
     (data.plantillas || []).forEach(p => {
       sel.innerHTML += `<option value="${p.id}">${p.nombre} (${p.tipo})</option>`;
     });
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 async function loadPlantillaItems() {
   const sel = document.getElementById('plantilla-select');
@@ -317,7 +317,7 @@ async function addCustomItem() {
     if (vid) {
       try {
         await api('/api/asignaciones.php?action=save_vehicle_item', 'POST', { vehiculo_id: parseInt(vid), label, requerido: req ? 1 : 0 });
-      } catch(e) {}
+      } catch(e) { console.error(e); }
     }
   }
   document.getElementById('new-item-label').value = '';
@@ -430,7 +430,7 @@ async function autoFillChecklist() {
       </label>`).join('');
       area.appendChild(g);
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function enviarLinkFirmaEntrega() {
@@ -455,7 +455,7 @@ async function enviarLinkFirmaEntrega() {
     if (dynChecks.length) {
       const items = [];
       dynChecks.forEach(cb => items.push({ label: cb.dataset.label, checked: cb.checked ? 1 : 0, observacion: null }));
-      try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) {}
+      try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) { console.error(e); }
     }
     // Generate firma link
     const lr = await api('/api/asignaciones.php?action=firma_link', 'POST', { id: res.id, momento: 'entrega' });
@@ -504,7 +504,7 @@ async function saveNewAndGetId() {
     if (dynChecks.length) {
       const items = [];
       dynChecks.forEach(cb => items.push({ label: cb.dataset.label, checked: cb.checked ? 1 : 0, observacion: null }));
-      try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) {}
+      try { await api('/api/asignaciones.php?action=checklist_respuestas', 'POST', { asignacion_id: res.id, momento: 'entrega', items }); } catch(e) { console.error(e); }
     }
   }
   // Generate firma link if digital — operator will sign via external link
@@ -516,7 +516,7 @@ async function saveNewAndGetId() {
         await navigator.clipboard.writeText(link);
         toast('Link de firma de entrega copiado al portapapeles ✅');
       }
-    } catch(e) {}
+    } catch(e) { console.error(e); }
   }
   toast('Asignación creada');
   closeModal('modal-new');
@@ -636,6 +636,7 @@ async function load(){
       <?php endif; ?>
     </tr>`}).join('');
 }
+const debouncedLoad = debounce(load, 300);
 
 function openNew(){
   resetForm('modal-new');

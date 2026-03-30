@@ -6,7 +6,7 @@ ob_start();
 ?>
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span>
-    <input type="text" id="s" placeholder="Buscar en auditoría..." oninput="load()"></div>
+    <input type="text" id="s" placeholder="Buscar en auditoría..." oninput="debouncedLoad()"></div>
   <select id="fEntidad" onchange="load()" style="max-width:180px">
     <option value="">Todas las entidades</option>
   </select>
@@ -85,6 +85,7 @@ async function load() {
     <td><button class="btn btn-ghost btn-sm" onclick='verDetalle(${JSON.stringify(r).replace(/'/g,"&#39;")})'>👁️</button></td>
   </tr>`).join('');
 }
+const debouncedLoad = debounce(load, 300);
 
 function verDetalle(r) {
   let html = `<div style="display:grid;grid-template-columns:120px 1fr;gap:6px 12px;margin-bottom:16px">

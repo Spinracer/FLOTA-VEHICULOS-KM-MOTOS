@@ -32,7 +32,7 @@ if [ ! -f "$LOCK_FILE" ]; then
     echo "[entrypoint] Primera ejecución. Ejecutando install.php..."
 
     # Create upload subdirectories
-    for subdir in vehiculos incidentes mantenimientos combustible operadores oc_cotizacion oc_factura vehiculo_documentos; do
+    for subdir in vehiculos incidentes mantenimientos combustible operadores oc_cotizacion oc_factura vehiculo_documentos importaciones; do
         mkdir -p "/var/www/html/uploads/$subdir"
     done
     chown -R www-data:www-data /var/www/html/uploads
@@ -48,6 +48,16 @@ if [ ! -f "$LOCK_FILE" ]; then
 else
     echo "[entrypoint] Sistema ya instalado (.installed.lock existe). Saltando install.php."
 fi
+
+# ─── Run migrations (safe, idempotent) ───
+echo "[entrypoint] Ejecutando migraciones seguras..."
+cd /var/www/html
+for migration in scripts/migrate_*.php; do
+    if [ -f "$migration" ]; then
+        echo "[entrypoint] Ejecutando $migration..."
+        php "$migration" 2>&1 || echo "[entrypoint] ADVERTENCIA: $migration tuvo errores"
+    fi
+done
 
 # ─── Fix permissions ───
 chown -R www-data:www-data /var/www/html/uploads 2>/dev/null || true

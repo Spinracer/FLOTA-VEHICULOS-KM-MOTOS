@@ -160,7 +160,7 @@ async function loadStatus() {
       document.getElementById('2fa-actions-off').classList.remove('hidden');
       document.getElementById('2fa-actions-on').classList.add('hidden');
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 
   if (isAdmin) loadStats();
 }
@@ -196,7 +196,7 @@ async function loadStats() {
         <td class="py-2 text-xs text-muted">${details}</td>
       </tr>`;
     }).join('');
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 async function setup2FA() {

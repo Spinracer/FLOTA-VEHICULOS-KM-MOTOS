@@ -36,7 +36,7 @@ COPY . /var/www/html/
 
 # Upload directories
 RUN mkdir -p /var/www/html/uploads \
-    && for subdir in vehiculos incidentes mantenimientos combustible operadores oc_cotizacion oc_factura vehiculo_documentos; do \
+    && for subdir in vehiculos incidentes mantenimientos combustible operadores oc_cotizacion oc_factura vehiculo_documentos importaciones; do \
         mkdir -p /var/www/html/uploads/$subdir; \
     done \
     && chown -R www-data:www-data /var/www/html/uploads

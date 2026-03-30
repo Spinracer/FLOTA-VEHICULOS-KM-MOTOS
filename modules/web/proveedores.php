@@ -4,7 +4,7 @@ require_login();
 ob_start();
 ?>
 <div class="toolbar">
-  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar proveedor..." oninput="load()"></div>
+  <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar proveedor..." oninput="debouncedLoad()"></div>
   <select id="faut" onchange="load()" style="max-width:240px">
     <option value="">Todos</option>
     <option value="1">Solo talleres autorizados</option>
@@ -56,6 +56,7 @@ async function load(){
     </div></td><?php endif; ?>
   </tr>`).join('');
 }
+const debouncedLoad = debounce(load, 300);
 function abrirNuevo(){document.getElementById('mtitle').textContent='🏪 Nuevo Proveedor';resetForm('modal');openModal('modal');}
 function editar(r){document.getElementById('mtitle').textContent='✏️ Editar Proveedor';fillForm('modal',{id:r.id,nombre:r.nombre,tipo:r.tipo,es_taller_autorizado:r.es_taller_autorizado,telefono:r.telefono,email:r.email,direccion:r.direccion,notas:r.notas});openModal('modal');}
 async function guardar(){const d=getForm('modal');if(!d.nombre){toast('El nombre es obligatorio','error');return;}await api('/api/proveedores.php',d.id?'PUT':'POST',d);toast(d.id?'Actualizado':'Proveedor registrado');closeModal('modal');load();}
