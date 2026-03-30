@@ -1,0 +1,369 @@
+{
+  "search_summary": "Búsqueda exhaustiva de archivos relacionados con ordenes_compra, orden_compra_items, componentes e integración con mantenimientos",
+  "search_date": "2026-03-30",
+  "search_terms": ["ordenes_compra", "orden_compra_items", "componentes", "oc_", "abastecimiento"],
+
+  "1_TABLAS_EN_INSTALL.PHP": {
+    "ordenes_compra": {
+      "file": "install.php",
+      "line_range": "1500-1520",
+      "description": "Tabla principal de órdenes de compra",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "solicitante_id": "INT NOT NULL - Usuario que solicita",
+        "vehiculo_id": "INT NULL - Vehículo relacionado",
+        "proveedor_id": "INT NULL - Proveedor asociado",
+        "descripcion": "TEXT NOT NULL",
+        "monto_estimado": "DECIMAL(12,2) NULL",
+        "urgencia": "VARCHAR(30) DEFAULT 'Normal'",
+        "estado": "VARCHAR(30) DEFAULT 'Pendiente' - Valores: Pendiente, Aprobada, Rechazada, Completada, Cancelada",
+        "aprobado_por": "INT NULL - Usuario que aprueba",
+        "fecha_aprobacion": "DATETIME NULL",
+        "notas_aprobacion": "TEXT NULL",
+        "created_at": "DATETIME AUTO",
+        "updated_at": "DATETIME AUTO",
+        "deleted_at": "DATETIME NULL - Soft delete"
+      },
+      "indexes": ["idx_oc_solicitante", "idx_oc_estado", "idx_oc_deleted"]
+    },
+    "orden_compra_items": {
+      "file": "scripts/migrate_catalogo_oc_ot.php (líneas 19-31) & install.php",
+      "description": "Tabla de partidas/líneas dentro de cada orden de compra",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "orden_compra_id": "INT NOT NULL - FK a ordenes_compra(id)",
+        "descripcion": "VARCHAR(255) NOT NULL",
+        "cantidad": "DECIMAL(10,2) DEFAULT 1",
+        "unidad": "VARCHAR(20) DEFAULT 'PZA'",
+        "precio_unitario": "DECIMAL(10,2) DEFAULT 0",
+        "subtotal": "DECIMAL(12,2) GENERATED - (cantidad * precio_unitario)",
+        "notas": "TEXT NULL",
+        "component_id": "INT NULL - FK a components(id) para vincular con inventario",
+        "created_at": "DATETIME AUTO"
+      },
+      "indexes": ["idx_oci_oc"],
+      "foreign_keys": ["fk_oci_oc -> ordenes_compra(id) ON DELETE CASCADE"]
+    },
+    "components": {
+      "file": "install.php (sección 3.0 - Tablas base)",
+      "description": "Catálogo maestro de componentes/repuestos",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "nombre": "VARCHAR(150) NOT NULL",
+        "tipo": "ENUM('tool','safety','document','card','accessory','part','consumable','service') DEFAULT 'part'",
+        "descripcion": "TEXT NULL",
+        "activo": "TINYINT(1) DEFAULT 1 - Para soft-delete",
+        "stock": "INT DEFAULT 0 COMMENT 'Stock consolidado (añadido en migración 3.16)'",
+        "stock_minimo": "INT DEFAULT 0 COMMENT 'Stock mínimo para alertas (añadido en migración 3.16)'",
+        "created_at": "DATETIME AUTO"
+      },
+      "indexes": ["idx_components_tipo"],
+      "seed_data": "12 componentes base (gata, herramientas, triángulo, chaleco, extintor, botiquín, cables, tarjeta, póliza, verificación, llanta, herramienta)"
+    },
+    "vehicle_components": {
+      "file": "install.php (sección 3.0)",
+      "description": "Inventario de componentes por vehículo",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "vehiculo_id": "INT NOT NULL - FK a vehiculos(id)",
+        "component_id": "INT NOT NULL - FK a components(id)",
+        "cantidad": "INT DEFAULT 1",
+        "estado": "ENUM('Bueno','Regular','Malo','Faltante') DEFAULT 'Bueno'",
+        "numero_serie": "VARCHAR(100) NULL",
+        "proveedor": "VARCHAR(150) NULL",
+        "fecha_instalacion": "DATE NULL",
+        "fecha_vencimiento": "DATE NULL COMMENT 'Para alertas de vencimiento'",
+        "notas": "TEXT NULL",
+        "created_at": "DATETIME AUTO",
+        "updated_at": "DATETIME AUTO"
+      },
+      "indexes": ["idx_vc_vehiculo", "idx_vc_component", "idx_vc_estado"],
+      "foreign_keys": ["fk_vc_vehiculo", "fk_vc_component"]
+    },
+    "componente_movimientos": {
+      "file": "install.php (sección 3.16)",
+      "description": "Log de movimientos de inventario (entrada/salida/transferencia)",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "component_id": "INT NOT NULL - FK a components(id)",
+        "vehiculo_id": "INT NULL - Vehículo involucrado",
+        "tipo": "ENUM('Entrada','Salida','Transferencia','Ajuste') DEFAULT 'Entrada'",
+        "cantidad": "INT DEFAULT 1",
+        "referencia": "VARCHAR(150) NULL - OT, factura, etc.",
+        "notas": "TEXT NULL",
+        "usuario_id": "INT NULL - FK a usuarios(id)",
+        "created_at": "DATETIME AUTO"
+      },
+      "indexes": ["idx_cmov_component", "idx_cmov_vehiculo", "idx_cmov_fecha"]
+    },
+    "mantenimiento_items": {
+      "file": "install.php (sección 3.0)",
+      "description": "Partidas de mantenimiento, puede vincularse a órdenes de compra vía component_id",
+      "new_columns_objective3": {
+        "component_id": "INT NULL - Referencia a componente del inventario (añadido en 3.14)",
+        "notas": "TEXT NULL - Usado para 'Importado desde OC-XXXXXX' en sincronización"
+      }
+    },
+    "mantenimientos": {
+      "file": "install.php (sección 3.0)",
+      "description": "Tabla de órdenes de trabajo/mantenimiento",
+      "new_columns_for_oc_integration": {
+        "orden_compra_id": "INT NULL - Agregado en migración scripts/migrate_catalogo_oc_ot.php",
+        "index": "idx_mant_oc (orden_compra_id)",
+        "fk": "fk_mant_oc -> ordenes_compra(id) ON DELETE SET NULL"
+      }
+    }
+  },
+
+  "2_API_ENDPOINTS_ORDENES_COMPRA": {
+    "main_endpoint": "/api/ordenes_compra.php",
+    "file": "modules/api/ordenes_compra.php",
+    "base_url": "/api/ordenes_compra.php",
+    "operations": {
+      "GET": {
+        "list": {
+          "params": "?q=&estado=&solicitante_id=&page=1&per=25",
+          "returns": "Array of órdenes_compra with joined data (usuarios, vehículos, proveedores)"
+        },
+        "detail": {
+          "params": "?detail=ID",
+          "returns": "Single orden_compra with full details and JOINs"
+        },
+        "items": {
+          "params": "?action=items&orden_compra_id=ID",
+          "returns": "Array of orden_compra_items for the specified OC",
+          "subtotal": "Incluye total calculado de sumatorio subtotal"
+        }
+      },
+      "POST": {
+        "create_oc": {
+          "endpoint": "/api/ordenes_compra.php",
+          "body": "{ solicitante_id, vehiculo_id, proveedor_id, descripcion, monto_estimado, urgencia, notas }",
+          "audit": "Logged as 'ordenes_compra' 'create'"
+        },
+        "create_item": {
+          "endpoint": "/api/ordenes_compra.php?action=items&orden_compra_id=ID",
+          "body": "{ descripcion, cantidad, unidad, precio_unitario, notas, component_id }",
+          "triggers": "Auto-sync a mantenimientos vinculado si existe"
+        }
+      },
+      "PUT": {
+        "update_oc": {
+          "endpoint": "/api/ordenes_compra.php",
+          "body": "{ id, vehiculo_id, proveedor_id, descripcion, monto_estimado, urgencia, notas }",
+          "audit": "Logged as 'ordenes_compra' 'update'"
+        },
+        "approve_reject": {
+          "endpoint": "/api/ordenes_compra.php",
+          "body": "{ id, _accion: 'cambiar_estado', estado, notas_aprobacion }",
+          "valid_states": "Pendiente → Aprobada | Rechazada | Completada | Cancelada",
+          "triggers": "Actualiza aprobado_por, fecha_aprobacion; sincroniza mantenimiento si existe"
+        },
+        "update_item": {
+          "endpoint": "/api/ordenes_compra.php?action=items&orden_compra_id=ID",
+          "body": "{ id, descripcion, cantidad, unidad, precio_unitario, notas, component_id }",
+          "triggers": "Auto-sync a mantenimientos"
+        }
+      },
+      "DELETE": {
+        "delete_oc": {
+          "endpoint": "/api/ordenes_compra.php?id=ID",
+          "action": "Soft-delete (SET deleted_at = NOW())"
+        },
+        "delete_item": {
+          "endpoint": "/api/ordenes_compra.php?action=items&orden_compra_id=ID&item_id=ID",
+          "action": "Hard delete from orden_compra_items",
+          "triggers": "Auto-recalculates monto_estimado; auto-sync a mantenimientos"
+        }
+      }
+    }
+  },
+
+  "3_API_ENDPOINTS_COMPONENTES": {
+    "main_endpoint": "/api/componentes.php",
+    "file": "modules/api/componentes.php",
+    "sections": {
+      "catalog": {
+        "GET": "Listar catálogo maestro con filtros (q, tipo, activo, page, per)",
+        "POST": "Crear componente en catálogo",
+        "PUT": "Editar componente (incluyendo stock_minimo)",
+        "DELETE": "Desactivar componente (soft-delete via activo=0)"
+      },
+      "vehicle": {
+        "GET": "Listar componentes de un vehículo (section=vehicle&vehiculo_id=X)",
+        "POST": "Asignar componente a vehículo",
+        "PUT": "Actualizar estado/datos de componente asignado",
+        "DELETE": "Quitar componente de vehículo"
+      },
+      "movimientos": {
+        "GET": "Historial de movimientos de inventario con filtros",
+        "POST": "Registrar nuevo movimiento (Entrada/Salida/Transferencia/Ajuste)",
+        "updates_stock": "Automáticamente actualiza stock consolidado en components"
+      },
+      "alertas_vencimiento": {
+        "GET": "Componentes por vencer en X días (?dias=30)",
+        "uses": "vehicle_components.fecha_vencimiento"
+      }
+    }
+  },
+
+  "4_SYNC_LOGIC_OC_TO_MANTENIMIENTOS": {
+    "file": "modules/api/ordenes_compra.php",
+    "function": "syncItemsToMantenimiento()",
+    "line_range": "19-39 (definition), called after POST/PUT/DELETE items",
+    "logic": {
+      "trigger": "When items are created/updated/deleted on an OC that has a linked mantenimiento",
+      "linkage": "SELECT FROM mantenimientos WHERE orden_compra_id = ? AND deleted_at IS NULL LIMIT 1",
+      "process": [
+        "1. Find linked mantenimiento record via orden_compra_id",
+        "2. Check if mantenimiento.estado != 'Completado' (closed OTs are not synced)",
+        "3. Delete existing items marked with 'Importado desde OC-XXXXXX' pattern",
+        "4. Re-import ALL current orden_compra_items to mantenimiento_items",
+        "5. Set notas = 'Importado desde OC-' + folio for each item",
+        "6. Preserve component_id linkage (orden_compra_items.component_id → mantenimiento_items.component_id)",
+        "7. Recalculate mantenimientos.costo = SUM(mantenimiento_items.subtotal)",
+        "8. Log the sync action via audit_log('mantenimientos', 'oc_sync', ...)"
+      ],
+      "bi_directional": "Sync is ONE-WAY: OC → mantenimiento. No back-sync from mantenimiento to OC."
+    }
+  },
+
+  "5_UPLOAD_DIRECTORIES_FOR_OC": {
+    "locations": [
+      "uploads/oc_cotizacion/",
+      "uploads/oc_factura/"
+    ],
+    "setup": "Docker/entrypoint.sh and Dockerfile create these subdirectories during container init",
+    "usage": "Attachment storage for quotations and invoices linked to órdenes_compra via attachments table"
+  },
+
+  "6_WEB_MODULES_INTEGRATION": {
+    "ordenes_compra_web": {
+      "file": "modules/web/ordenes_compra.php",
+      "integrations": [
+        "Line 311: Attachment handling for 'oc_cotizacion', 'oc_factura', 'ordenes_compra'",
+        "Lines 415-549: Item CRUD operations via API",
+        "Lines 367-384: State change operations (Pendiente→Aprobada→Completada, etc.)",
+        "Lines 180-246: List/search/create UI interactions"
+      ]
+    },
+    "mantenimientos_web": {
+      "file": "modules/web/mantenimientos.php",
+      "integrations": [
+        "Line 419: Fetch OC detail via api('/api/ordenes_compra.php?detail=...')",
+        "Line 428: Fetch OC items via api('/api/ordenes_compra.php?action=items&...')",
+        "Likely UI modal/section for viewing linked OC and its items"
+      ]
+    },
+    "permisos_web": {
+      "file": "modules/web/permisos.php",
+      "integrations": [
+        "Adds 'ordenes_compra' to module list with label 'Órdenes de Compra'"
+      ]
+    },
+    "reportes_web": {
+      "file": "modules/web/reportes.php",
+      "integrations": [
+        "Lines 21, 528: Register 'ordenes_compra' report type",
+        "Lines 102, 131, 134: UI logic for OC audit report (no vehiculo_id filter)",
+        "Lines 171, 474, 541: Report generation and export logic for OC audit"
+      ]
+    }
+  },
+
+  "7_PERMISOS_Y_AUDITORIA": {
+    "permissions": {
+      "modules_with_oc_enabled": ["ordenes_compra"],
+      "default_permisos": "['view','create','edit','delete'] for coordinador_it, admin, soporte, taller, operador",
+      "file": "install.php line 669"
+    },
+    "audit_logging": {
+      "tables": "audit_logs",
+      "logged_entities": [
+        "ordenes_compra (create, update, estado_change, delete)",
+        "orden_compra_items (create, update, delete)",
+        "mantenimientos (oc_sync when sync occurs)"
+      ]
+    }
+  },
+
+  "8_MIGRATION_SCRIPTS": {
+    "migrate_catalogo_oc_ot": {
+      "file": "scripts/migrate_catalogo_oc_ot.php",
+      "idempotent": true,
+      "steps": [
+        "1. Create orden_compra_items table",
+        "2. Add mantenimientos.orden_compra_id column and FK",
+        "3. Establish bidirectional index/constraint"
+      ],
+      "run_command": "docker exec flotacontrol-app php /var/www/html/scripts/migrate_catalogo_oc_ot.php"
+    }
+  },
+
+  "9_KEY_RELATIONSHIPS": {
+    "ordenes_compra_hierarchy": {
+      "ordenes_compra.solicitante_id": "→ usuarios.id",
+      "ordenes_compra.aprobado_por": "→ usuarios.id",
+      "ordenes_compra.vehiculo_id": "→ vehiculos.id (optional)",
+      "ordenes_compra.proveedor_id": "→ proveedores.id (optional)"
+    },
+    "orden_compra_items_hierarchy": {
+      "orden_compra_items.orden_compra_id": "→ ordenes_compra.id (FK CASCADE)",
+      "orden_compra_items.component_id": "→ components.id (optional)"
+    },
+    "mantenimientos_oc_link": {
+      "mantenimientos.orden_compra_id": "→ ordenes_compra.id (FK SET NULL)",
+      "effect": "One OC can link to zero or one mantenimiento. One mantenimiento can link to zero or one OC."
+    },
+    "vehicle_components_hierarchy": {
+      "vehicle_components.vehiculo_id": "→ vehiculos.id",
+      "vehicle_components.component_id": "→ components.id"
+    },
+    "assignment_snapshots": {
+      "assignment_component_snapshots.component_id": "→ components.id",
+      "captures": "State of vehicle components at delivery/return points"
+    }
+  },
+
+  "10_ESTADO_WORKFLOW_ORDENES_COMPRA": {
+    "valid_states": {
+      "Pendiente": "Initial state when OC is created",
+      "Aprobada": "OC approved by authorized user (soporte/coordinador)",
+      "Rechazada": "OC rejected, typically cannot be re-opened",
+      "Completada": "OC fulfilled/closed",
+      "Cancelada": "OC cancelled"
+    },
+    "state_transitions": {
+      "Pendiente": ["Aprobada", "Rechazada"],
+      "Aprobada": ["Completada", "Cancelada"],
+      "Rechazada": ["final state - no transitions"],
+      "Completada": ["final state - no transitions"],
+      "Cancelada": ["final state - no transitions"]
+    },
+    "approval_logic": "mantenimientos API checks approval flags; OC approval updates fecha_aprobacion and aprobado_por"
+  },
+
+  "11_FILES_SUMMARY": {
+    "core_api": [
+      "modules/api/ordenes_compra.php - Main OC CRUD & items management",
+      "modules/api/componentes.php - Components catalog & inventory",
+      "modules/api/mantenimientos.php - Contains OC query joins for detail retrieval"
+    ],
+    "web_ui": [
+      "modules/web/ordenes_compra.php - UI for OC management",
+      "modules/web/componentes.php - UI for components/inventory",
+      "modules/web/mantenimientos.php - OC integration in maintenance UI",
+      "modules/web/reportes.php - OC audit report generation"
+    ],
+    "routing": [
+      "api/ordenes_compra.php - Routes to modules/api/ordenes_compra.php",
+      "api/componentes.php - Routes to modules/api/componentes.php",
+      "ordenes_compra.php - Routes to modules/web/ordenes_compra.php",
+      "componentes.php - Routes to modules/web/componentes.php"
+    ],
+    "setup_scripts": [
+      "install.php - Full database schema (lines 1500-1530 for OC table, 3.0 for components)",
+      "scripts/migrate_catalogo_oc_ot.php - OC↔mantenimiento integration migration"
+    ]
+  }
+}

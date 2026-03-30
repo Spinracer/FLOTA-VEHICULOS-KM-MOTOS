@@ -157,13 +157,15 @@ try {
             );
 
             // Ejecutar importación
+            $updateKeyField = trim($d['update_key_field'] ?? 'placa');
             $resultado = importacion_ejecutar(
                 $fileData['rows'],
                 $fileData['headers'],
                 $mapping,
                 (int)($_SESSION['user_id'] ?? 0),
                 $importFile['name'],
-                $updateExisting
+                $updateExisting,
+                $updateKeyField
             );
 
             // Limpiar archivo temporal

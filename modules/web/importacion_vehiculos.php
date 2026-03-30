@@ -121,11 +121,31 @@ ob_start();
       <div id="mapping-errors" class="hidden mt-4 p-3 bg-danger/10 border border-danger/30 rounded-lg text-danger text-sm"></div>
 
       <div style="margin-top:16px;padding:12px;background:var(--bg2,#1a1e2e);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px">
-        <input type="checkbox" id="chk-update-existing" style="width:18px;height:18px;accent-color:var(--accent)">
-        <div>
+        <input type="checkbox" id="chk-update-existing" style="width:18px;height:18px;accent-color:var(--accent)" onchange="toggleUpdateMode()">
+        <div style="flex:1">
           <label for="chk-update-existing" style="font-weight:600;font-size:13px;cursor:pointer">Actualizar vehículos existentes</label>
-          <p style="font-size:11px;color:var(--text2);margin:2px 0 0">Si la placa o VIN ya existe, actualiza los datos en lugar de reportar error. Similar a Snipe-IT.</p>
+          <p style="font-size:11px;color:var(--text2);margin:2px 0 0">Si la placa o campo clave ya existe, actualiza los datos en lugar de reportar error. Similar a Snipe-IT.</p>
         </div>
+      </div>
+
+      <!-- Selector de campo clave (mostrar solo si update active) -->
+      <div id="updateModeOptions" style="display:none;margin-top:12px;padding:12px;background:var(--bg2,#1a1e2e);border:1px solid var(--border);border-radius:8px">
+        <label style="font-weight:600;font-size:13px;display:block;margin-bottom:8px">Usar como clave de identificación (solo uno):</label>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="radio" name="update-key-field" value="vin" style="accent-color:var(--accent)"> VIN
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="radio" name="update-key-field" value="numero_chasis" style="accent-color:var(--accent)"> Chasis
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="radio" name="update-key-field" value="numero_motor" style="accent-color:var(--accent)"> Motor
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="radio" name="update-key-field" value="placa" style="accent-color:var(--accent)" checked> Placa (por defecto)
+          </label>
+        </div>
+        <p style="font-size:11px;color:var(--text2);margin:8px 0 0">El campo seleccionado se usará para buscar vehículos existentes y decidir si actualizar.</p>
       </div>
 
       <div class="flex justify-between mt-6">
@@ -395,9 +415,9 @@ async function changeSheet() {
   }
 }
 
-// ── Navegación entre pasos ──
 function setStep(n) {
   document.querySelectorAll('.step-panel').forEach(p => p.classList.add('hidden'));
+
   document.getElementById('step-' + n).classList.remove('hidden');
   document.querySelectorAll('.step-indicator').forEach(s => {
     const sn = parseInt(s.dataset.step);
@@ -405,6 +425,12 @@ function setStep(n) {
     if (sn < n) s.classList.add('done');
     if (sn === n) s.classList.add('active');
   });
+}
+
+function toggleUpdateMode() {
+  const isChecked = document.getElementById('chk-update-existing').checked;
+  const optionsDiv = document.getElementById('updateModeOptions');
+  optionsDiv.style.display = isChecked ? 'block' : 'none';
 }
 
 function goToStep1() { setStep(1); }
@@ -530,6 +556,9 @@ async function ejecutarImportacion() {
   document.getElementById('kpi-errores').textContent = '...';
 
   try {
+    const updateMode = document.getElementById('chk-update-existing').checked;
+    const keyField = updateMode ? document.querySelector('input[name="update-key-field"]:checked').value : 'placa';
+    
     const res = await fetch('/api/importacion_vehiculos.php?action=import', {
       method: 'POST',
       credentials: 'include',
@@ -538,7 +567,7 @@ async function ejecutarImportacion() {
         'X-CSRF-Token': getCsrfToken(),
         'X-Requested-With': 'XMLHttpRequest'
       },
-      body: JSON.stringify({ mapping, sheet_index: currentSheet, update_existing: document.getElementById('chk-update-existing').checked })
+      body: JSON.stringify({ mapping, sheet_index: currentSheet, update_existing: updateMode, update_key_field: keyField })
     });
 
     const data = await res.json();

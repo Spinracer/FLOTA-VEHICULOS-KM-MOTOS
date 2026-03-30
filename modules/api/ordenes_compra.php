@@ -27,8 +27,20 @@ try {
         }
 
         // Helper: auto-sync items to linked mantenimiento
-        // Syncs when OC is Aprobada OR when there's already a linked mantenimiento
+        // ONLY syncs when:
+        // 1. OC is NOT in estado 'Completada' (completed orders stop syncing)
+        // 2. Linked mantenimiento exists and is NOT 'Completado' (completed maintenance stops receiving)
         $syncItemsToMantenimiento = function() use ($db, $ocId) {
+            // Get OC estado
+            $stOc = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? AND deleted_at IS NULL LIMIT 1");
+            $stOc->execute([$ocId]);
+            $ocEstado = $stOc->fetchColumn();
+            if (!$ocEstado) return; // OC not found
+            
+            // Only sync if OC is NOT Completada (stop syncing when order is fully completed)
+            if ($ocEstado === 'Completada') return;
+            
+            // Find linked mantenimiento
             $stMant = $db->prepare("SELECT id, estado FROM mantenimientos WHERE orden_compra_id = ? AND deleted_at IS NULL LIMIT 1");
             $stMant->execute([$ocId]);
             $linkedMant = $stMant->fetch();
@@ -53,7 +65,7 @@ try {
             $db->prepare("UPDATE mantenimientos SET costo = (SELECT COALESCE(SUM(subtotal),0) FROM mantenimiento_items WHERE mantenimiento_id = ?) WHERE id = ?")
                ->execute([$mantId, $mantId]);
             // Audit the sync
-            audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $ocId, 'items_synced' => count($allItems)]);
+            audit_log('mantenimientos', 'oc_sync', $mantId, [], ['oc_id' => $ocId, 'items_synced' => count($allItems), 'trigger' => 'item_update']);
         };
 
         switch ($method) {
@@ -85,7 +97,15 @@ try {
                 // Auto-recalcular monto_estimado
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
-                $syncItemsToMantenimiento();
+                
+                // Only sync if OC is in Aprobada (not Pendiente, Rechazada, Completada, Cancelada)
+                $stOcStatus = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
+                $stOcStatus->execute([$ocId]);
+                $ocStatus = $stOcStatus->fetchColumn();
+                if ($ocStatus === 'Aprobada') {
+                    $syncItemsToMantenimiento();
+                }
+                
                 audit_log('orden_compra_items', 'create', $newId, [], $d);
                 echo json_encode(['id' => $newId, 'ok' => true]);
                 break;
@@ -102,7 +122,15 @@ try {
                    ]);
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
-                $syncItemsToMantenimiento();
+                
+                // Only sync if OC is in Aprobada
+                $stOcStatus = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
+                $stOcStatus->execute([$ocId]);
+                $ocStatus = $stOcStatus->fetchColumn();
+                if ($ocStatus === 'Aprobada') {
+                    $syncItemsToMantenimiento();
+                }
+                
                 audit_log('orden_compra_items', 'update', (int)$d['id'], [], $d);
                 echo json_encode(['ok' => true]);
                 break;
@@ -113,7 +141,15 @@ try {
                 $db->prepare("DELETE FROM orden_compra_items WHERE id = ?")->execute([$itemId]);
                 $db->prepare("UPDATE ordenes_compra SET monto_estimado = (SELECT COALESCE(SUM(subtotal),0) FROM orden_compra_items WHERE orden_compra_id = ?) WHERE id = ?")
                    ->execute([$ocId, $ocId]);
-                $syncItemsToMantenimiento();
+                
+                // Only sync if OC is in Aprobada
+                $stOcStatus = $db->prepare("SELECT estado FROM ordenes_compra WHERE id = ? LIMIT 1");
+                $stOcStatus->execute([$ocId]);
+                $ocStatus = $stOcStatus->fetchColumn();
+                if ($ocStatus === 'Aprobada') {
+                    $syncItemsToMantenimiento();
+                }
+                
                 audit_log('orden_compra_items', 'delete', $itemId, [], []);
                 echo json_encode(['ok' => true]);
                 break;

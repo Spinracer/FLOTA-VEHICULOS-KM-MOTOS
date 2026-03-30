@@ -389,11 +389,19 @@ function importacion_parsear_fecha(string $valor): ?string {
  * @param array $mapping Mapeo headerIndex => campoDestino
  * @param int $userId ID del usuario que importa
  * @param string $fileName Nombre original del archivo
+ * @param bool $updateExisting Si actualizar vehículos existentes
+ * @param string $updateKeyField Campo clave para búsqueda: 'placa', 'vin', 'numero_chasis', 'numero_motor'
  * @return array Resultado con estadísticas y errores
  */
-function importacion_ejecutar(array $rows, array $headers, array $mapping, int $userId, string $fileName, bool $updateExisting = false): array {
+function importacion_ejecutar(array $rows, array $headers, array $mapping, int $userId, string $fileName, bool $updateExisting = false, string $updateKeyField = 'placa'): array {
     $db = getDB();
     $campos = importacion_campos_destino();
+
+    // Validar updateKeyField
+    $keyFieldsValidos = ['placa', 'vin', 'numero_chasis', 'numero_motor'];
+    if (!in_array($updateKeyField, $keyFieldsValidos)) {
+        $updateKeyField = 'placa';
+    }
 
     // Extender timeout para importaciones grandes
     set_time_limit(300);
@@ -413,23 +421,25 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
     $runId = (int)$db->lastInsertId();
     $resultado['import_run_id'] = $runId;
 
-    // Pre-cargar placas existentes para detección de duplicados
+    // Pre-cargar claves existentes para búsqueda de duplicados/actualizaciones
+    $keyFieldsExistentes = [];
+    if ($updateExisting) {
+        $colName = $updateKeyField === 'placa' ? 'placa' : $updateKeyField;
+        $keyStmt = $db->query("SELECT id, UPPER(TRIM(" . $colName . ")) AS key_val FROM vehiculos WHERE deleted_at IS NULL AND " . $colName . " IS NOT NULL AND " . $colName . " != ''");
+        foreach ($keyStmt->fetchAll() as $row) {
+            $keyFieldsExistentes[strtoupper($row['key_val'] ?? '')] = (int)$row['id'];
+        }
+    }
+
+    // Siempre pre-cargar placas para verificación de duplicados de placa (como backup)
     $placasExistentes = [];
     $placasStmt = $db->query("SELECT UPPER(placa) AS placa FROM vehiculos WHERE deleted_at IS NULL");
     foreach ($placasStmt->fetchAll() as $p) {
         $placasExistentes[$p['placa']] = true;
     }
 
-    // Pre-cargar VINs existentes para actualización por VIN
-    $vinsExistentes = [];
-    if ($updateExisting) {
-        $vinStmt = $db->query("SELECT id, UPPER(TRIM(vin)) AS vin FROM vehiculos WHERE deleted_at IS NULL AND vin IS NOT NULL AND vin != ''");
-        foreach ($vinStmt->fetchAll() as $v) {
-            $vinsExistentes[$v['vin']] = (int)$v['id'];
-        }
-    }
-
     // Control de duplicados dentro del mismo archivo
+    $keysEnArchivo = [];
     $placasEnArchivo = [];
 
     foreach ($rows as $i => $row) {
@@ -465,62 +475,51 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
                 ];
                 continue;
             }
-            // updateExisting: buscar por placa y actualizar
+
+            // updateExisting: buscar por campo clave dinámico y actualizar
+            if ($updateExisting && !empty($data[$updateKeyField])) {
+                $keyValue = strtoupper(trim($data[$updateKeyField]));
+                if (isset($keyFieldsExistentes[$keyValue])) {
+                    try {
+                        $existVehId = $keyFieldsExistentes[$keyValue];
+                        $setCols = [];
+                        $setVals = [];
+                        foreach ($data as $col => $val) {
+                            if ($val === '' || $val === null) continue;
+                            $setCols[] = "$col = ?";
+                            $setVals[] = $val;
+                        }
+                        if (!empty($setCols)) {
+                            $setVals[] = $existVehId;
+                            $db->prepare("UPDATE vehiculos SET " . implode(', ', $setCols) . " WHERE id = ?")->execute($setVals);
+                            audit_log('vehiculos', 'update', $existVehId, [], array_merge($data, ['_via' => 'importacion_update', '_import_run' => $runId, 'key_field' => $updateKeyField]));
+                        }
+                        $resultado['actualizados']++;
+                        $keysEnArchivo[$keyValue] = $fila;
+                        $placasEnArchivo[$placa] = $fila;
+                        continue;
+                    } catch (Throwable $e) {
+                        $resultado['errores']++;
+                        $resultado['detalle'][] = ['fila' => $fila, 'tipo' => 'error_bd', 'errores' => ["Error actualización: " . $e->getMessage()], 'placa' => $placa];
+                        continue;
+                    }
+                }
+            }
+
+            // Verificar si placa ya existe (siempre, como fallback)
             $existId = $db->prepare("SELECT id FROM vehiculos WHERE UPPER(placa) = ? AND deleted_at IS NULL LIMIT 1");
             $existId->execute([$placa]);
             $existRow = $existId->fetch();
-            if ($existRow) {
-                try {
-                    $setCols = [];
-                    $setVals = [];
-                    foreach ($data as $col => $val) {
-                        if ($col === 'placa') continue;
-                        if ($val === '' || $val === null) continue;
-                        $setCols[] = "$col = ?";
-                        $setVals[] = $val;
-                    }
-                    if (!empty($setCols)) {
-                        $setVals[] = (int)$existRow['id'];
-                        $db->prepare("UPDATE vehiculos SET " . implode(', ', $setCols) . " WHERE id = ?")->execute($setVals);
-                        audit_log('vehiculos', 'update', (int)$existRow['id'], [], array_merge($data, ['_via' => 'importacion_update', '_import_run' => $runId]));
-                    }
-                    $resultado['actualizados']++;
-                    $placasEnArchivo[$placa] = $fila;
-                    continue;
-                } catch (Throwable $e) {
-                    $resultado['errores']++;
-                    $resultado['detalle'][] = ['fila' => $fila, 'tipo' => 'error_bd', 'errores' => ["Error actualización: " . $e->getMessage()], 'placa' => $placa];
-                    continue;
-                }
-            }
-        }
-
-        // Si tiene VIN y updateExisting, verificar si el VIN ya existe
-        if ($updateExisting && $vin !== '' && isset($vinsExistentes[$vin])) {
-            try {
-                $existVehId = $vinsExistentes[$vin];
-                $setCols = [];
-                $setVals = [];
-                foreach ($data as $col => $val) {
-                    if ($val === '' || $val === null) continue;
-                    $setCols[] = "$col = ?";
-                    $setVals[] = $val;
-                }
-                if (!empty($setCols)) {
-                    $setVals[] = $existVehId;
-                    $db->prepare("UPDATE vehiculos SET " . implode(', ', $setCols) . " WHERE id = ?")->execute($setVals);
-                    audit_log('vehiculos', 'update', $existVehId, [], array_merge($data, ['_via' => 'importacion_update_vin', '_import_run' => $runId]));
-                }
-                $resultado['actualizados']++;
-                $placasExistentes[$placa] = true;
-                $placasEnArchivo[$placa] = $fila;
-                continue;
-            } catch (Throwable $e) {
+            if ($existRow && !$updateExisting) {
                 $resultado['errores']++;
-                $resultado['detalle'][] = ['fila' => $fila, 'tipo' => 'error_bd', 'errores' => ["Error actualización VIN: " . $e->getMessage()], 'placa' => $placa];
+                $resultado['detalle'][] = [
+                    'fila'    => $fila,
+                    'tipo'    => 'duplicado_bd',
+                    'errores' => ["Placa '$placa' ya existe. Activa 'Actualizar vehículos existentes' si deseas hacer merge."],
+                    'placa'   => $placa,
+                ];
                 continue;
             }
-        }
 
         // Verificar duplicado dentro del archivo
         if (isset($placasEnArchivo[$placa])) {
