@@ -372,8 +372,8 @@ case 'mantenimiento':
 
     $content .= '<div class="signatures">';
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable de Flota</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Ejecutó</strong></p><p>' . htmlspecialchars($m['proveedor_nombre'] ?? 'Taller') . '</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>Coordinación</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>IT y Seguridad</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Autorización Financiera</p></div>';
     $content .= '</div>';
     break;
 

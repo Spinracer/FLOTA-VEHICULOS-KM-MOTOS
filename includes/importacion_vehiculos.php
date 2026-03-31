@@ -13,6 +13,89 @@ require_once __DIR__ . '/cache.php';
 require_once __DIR__ . '/xlsx_reader.php';
 
 /**
+ * Validación Cruzada VIN/Chasis/Motor
+ * Verifica que los identificadores de vehículos sean consistentes en la BD
+ * @param array $data Datos del vehículo a validar
+ * @return array ['valid' => bool, 'errors' => array]
+ */
+function importacion_validar_identificadores_cruzados(array $data): array {
+    $db = getDB();
+    $errors = [];
+    
+    $vin = isset($data['vin']) ? strtoupper(trim($data['vin'])) : '';
+    $chasis = isset($data['numero_chasis']) ? strtoupper(trim($data['numero_chasis'])) : '';
+    $motor = isset($data['numero_motor']) ? strtoupper(trim($data['numero_motor'])) : '';
+    $placa = isset($data['placa']) ? strtoupper(trim($data['placa'])) : '';
+    
+    // Si no hay identificadores adicionales, no hay validación cruzada
+    if (!$vin && !$chasis && !$motor) {
+        return ['valid' => true, 'errors' => []];
+    }
+    
+    // Validar que VIN sea alfanumérico si existe
+    if ($vin && !preg_match('/^[A-Z0-9]{10,20}$/', $vin)) {
+        $errors[] = "VIN inválido: debe tener 10-20 caracteres alfanuméricos";
+    }
+    
+    // Validar que Chasis sea alfanumérico si existe
+    if ($chasis && !preg_match('/^[A-Z0-9]{5,30}$/', $chasis)) {
+        $errors[] = "Chasis inválido: debe tener 5-30 caracteres alfanuméricos";
+    }
+    
+    // Validar que Motor sea alfanumérico si existe
+    if ($motor && !preg_match('/^[A-Z0-9]{3,30}$/', $motor)) {
+        $errors[] = "Motor inválido: debe tener 3-30 caracteres alfanuméricos";
+    }
+    
+    // Búsqueda cruzada en BD
+    if ($vin) {
+        $stmt = $db->prepare("SELECT placa, numero_chasis, numero_motor FROM vehiculos WHERE UPPER(vin) = ? AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute([$vin]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($found) {
+            // Validar consistencia
+            if ($found['numero_chasis'] && $chasis && $found['numero_chasis'] !== $chasis) {
+                $errors[] = "Inconsistencia: VIN '$vin' asociado a Chasis '{$found['numero_chasis']}' pero se intenta ingresar '$chasis'";
+            }
+            if ($found['numero_motor'] && $motor && $found['numero_motor'] !== $motor) {
+                $errors[] = "Inconsistencia: VIN '$vin' asociado a Motor '{$found['numero_motor']}' pero se intenta ingresar '$motor'";
+            }
+        }
+    }
+    
+    if ($chasis && !$vin) {
+        $stmt = $db->prepare("SELECT placa, vin, numero_motor FROM vehiculos WHERE UPPER(numero_chasis) = ? AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute([$chasis]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($found && $found['vin'] && $vin && $found['vin'] !== $vin) {
+            $errors[] = "Inconsistencia: Chasis '$chasis' asociado a VIN '{$found['vin']}' pero se intenta ingresar '$vin'";
+        }
+    }
+    
+    if ($motor && !$vin && !$chasis) {
+        $stmt = $db->prepare("SELECT placa, vin, numero_chasis FROM vehiculos WHERE UPPER(numero_motor) = ? AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute([$motor]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($found) {
+            if ($found['vin'] && $vin && $found['vin'] !== $vin) {
+                $errors[] = "Inconsistencia: Motor '$motor' asociado a VIN '{$found['vin']}' pero se intenta ingresar '$vin'";
+            }
+            if ($found['numero_chasis'] && $chasis && $found['numero_chasis'] !== $chasis) {
+                $errors[] = "Inconsistencia: Motor '$motor' asociado a Chasis '{$found['numero_chasis']}' pero se intenta ingresar '$chasis'";
+            }
+        }
+    }
+    
+    return [
+        'valid' => empty($errors),
+        'errors' => $errors
+    ];
+}
+
+/**
  * Extensiones de archivo permitidas para importación
  */
 function importacion_extensiones_permitidas(): array {
@@ -459,6 +542,19 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
             continue;
         }
 
+        // Validación cruzada VIN/Chasis/Motor
+        $validacion_cruzada = importacion_validar_identificadores_cruzados($validacion['data']);
+        if (!$validacion_cruzada['valid']) {
+            $resultado['errores']++;
+            $resultado['detalle'][] = [
+                'fila'    => $fila,
+                'tipo'    => 'validacion_identificadores',
+                'errores' => $validacion_cruzada['errors'],
+                'placa'   => $validacion['data']['placa'] ?? '—',
+            ];
+            continue;
+        }
+
         $data = $validacion['data'];
         $placa = $data['placa'] ?? '';
 
@@ -520,6 +616,7 @@ function importacion_ejecutar(array $rows, array $headers, array $mapping, int $
                 ];
                 continue;
             }
+        }
 
         // Verificar duplicado dentro del archivo
         if (isset($placasEnArchivo[$placa])) {

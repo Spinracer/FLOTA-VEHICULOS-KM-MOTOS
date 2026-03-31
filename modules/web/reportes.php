@@ -268,6 +268,36 @@ async function loadReport() {
         <tbody>${data.detalle.map(r=>`<tr><td>${r.fecha}</td><td><strong style="color:var(--accent)">${r.placa||'—'}</strong></td><td>${r.tipo||'—'}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.descripcion||'—'}</td><td><strong>L ${Number(r.costo).toFixed(2)}</strong></td><td>${r.km||'—'}</td><td>${r.proveedor}</td><td><span class="badge ${r.estado==='Completado'?'badge-green':r.estado==='En proceso'?'badge-orange':'badge-gray'}">${r.estado}</span></td></tr>`).join('')}</tbody></table></div>`;
     }
     document.getElementById('extra-tables').innerHTML = extraHtml;
+  } else if (type === 'importaciones') {
+    const t = data.totales || {};
+    kpis.innerHTML = `
+      <div class="kpi-card cyan"><div class="kpi-icon">📥</div><div class="kpi-label">Importaciones</div><div class="kpi-value">${t.total_importaciones||0}</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-label">Exitosas</div><div class="kpi-value">${t.exitosas||0}</div></div>
+      <div class="kpi-card yellow"><div class="kpi-icon">🆕</div><div class="kpi-label">Insertados</div><div class="kpi-value">${t.total_insertados||0}</div></div>
+      <div class="kpi-card orange"><div class="kpi-icon">🔄</div><div class="kpi-label">Actualizados</div><div class="kpi-value">${t.total_actualizados||0}</div></div>
+      <div class="kpi-card red"><div class="kpi-icon">⚠️</div><div class="kpi-label">Errores</div><div class="kpi-value">${t.total_errores||0}</div></div>
+      <div class="kpi-card gray"><div class="kpi-icon">👥</div><div class="kpi-label">Usuarios Activos</div><div class="kpi-value">${t.usuarios_activos||0}</div></div>`;
+    const detalle = data.detalle || [];
+    thead.innerHTML = '<tr><th>Usuario</th><th>Resultado</th><th>Archivo</th><th>Insertados</th><th>Actualizados</th><th>Errores</th><th>Campo</th><th>Duración</th><th>Fecha</th></tr>';
+    tbody.innerHTML = detalle.map(r => `<tr>
+      <td>${r.usuario_nombre||'—'}</td>
+      <td>${r.resultado||'—'}</td>
+      <td>${r.archivo || '—'}</td>
+      <td>${r.insertados||0}</td>
+      <td>${r.actualizados||0}</td>
+      <td>${r.errores||0}</td>
+      <td>${r.campo_actualizar || 'placa'}</td>
+      <td>${r.duracion||0}s</td>
+      <td>${r.created_at || '—'}</td>
+    </tr>`).join('');
+    let extraHtml = '';
+    if (data.usuarios && data.usuarios.length) {
+      extraHtml += `<div class="table-wrap" style="margin-top:16px">
+        <div style="font-size:13px;font-weight:600;color:#47ffe8;margin-bottom:8px">👤 Resumen por Usuario</div>
+        <table><thead><tr><th>Usuario</th><th>Importaciones</th><th>Insertados</th><th>Actualizados</th><th>Última</th></tr></thead>
+        <tbody>${data.usuarios.map(u=>`<tr><td>${u.nombre}</td><td>${u.importaciones}</td><td>${u.total_insertados||0}</td><td>${u.total_actualizados||0}</td><td>${u.ultima_importacion||'—'}</td></tr>`).join('')}</tbody></table></div>`;
+    }
+    document.getElementById('extra-tables').innerHTML = extraHtml;
   } else if (type === 'vehiculos') {
     const t = data.totales || {};
     kpis.innerHTML = `
@@ -550,8 +580,25 @@ function exportReport(format) {
 }
 
 // Mantener compatibilidad con llamadas anteriores
+function getQueryParam(name) {
+  return new URLSearchParams(window.location.search).get(name) || '';
+}
+
+function initReportFromURL() {
+  const reportFromURL = getQueryParam('report');
+  if (reportFromURL) {
+    const typeSelect = document.getElementById('rtype');
+    if (typeSelect.querySelector(`option[value="${reportFromURL}"]`)) {
+      typeSelect.value = reportFromURL;
+    }
+  }
+}
+
 function exportCSV() { exportReport('csv'); }
 
-document.addEventListener('DOMContentLoaded', loadReport);
+document.addEventListener('DOMContentLoaded', () => {
+  initReportFromURL();
+  switchReport();
+});
 </script>
 <?php $content = ob_get_clean(); echo render_layout('Reportes y Exportaciones','reportes',$content); ?>

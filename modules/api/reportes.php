@@ -140,6 +140,45 @@ try {
                 );
                 break;
 
+            case 'importaciones':
+                $where = "WHERE entidad='importacion_vehiculos' AND accion IN ('import','import_partial','import_error')";
+                $params = [];
+                if ($from) { $where .= " AND DATE(created_at) >= ?"; $params[] = $from; }
+                if ($to) { $where .= " AND DATE(created_at) <= ?"; $params[] = $to; }
+                $stmt = $db->prepare("SELECT al.id, al.usuario_id, u.nombre AS usuario_nombre, al.accion AS resultado,
+                    JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.archivo')) AS archivo,
+                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.insertados')),0)+0 AS insertados,
+                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.actualizados')),0)+0 AS actualizados,
+                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.errores')),0)+0 AS errores,
+                    JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.update_key_field')) AS campo_actualizar,
+                    COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.duracion_segundos')),0)+0 AS duracion,
+                    al.created_at
+                    FROM audit_logs al
+                    LEFT JOIN usuarios u ON u.id=al.usuario_id
+                    $where ORDER BY al.created_at DESC");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                $exportRows = [];
+                foreach ($rows as $r) {
+                    $exportRows[] = [
+                        $r['usuario_nombre'],
+                        $r['resultado'],
+                        $r['archivo'],
+                        $r['insertados'],
+                        $r['actualizados'],
+                        $r['errores'],
+                        $r['campo_actualizar'],
+                        $r['duracion'],
+                        $r['created_at'],
+                    ];
+                }
+                audit_log('reportes', 'export_' . $format, null, [], ['tipo' => 'importaciones', 'formato' => $format, 'filtros' => compact('from','to')]);
+                export_dispatch($format, 'reporte_importaciones',
+                    ['Usuario','Resultado','Archivo','Insertados','Actualizados','Errores','Campo Actualizar','Duración (s)','Fecha'],
+                    $exportRows, 'Reporte de Importaciones de Vehículos'
+                );
+                break;
+
             case 'historial_asignaciones':
                 $where = "WHERE 1=1";
                 $params = [];
@@ -549,72 +588,73 @@ try {
             ]);
             break;
 
-        case 'historial_asignaciones':
-            $where = "WHERE 1=1";
+        case 'importaciones':
+            $where = "WHERE entidad='importacion_vehiculos' AND accion IN ('import','import_partial','import_error')";
             $params = [];
-            $opId = (int)($_GET['operador_id'] ?? 0);
-            if ($from) { $where .= " AND a.start_at >= ?"; $params[] = $from; }
-            if ($to) { $where .= " AND a.start_at <= ?"; $params[] = $to; }
-            if ($vid) { $where .= " AND a.vehiculo_id = ?"; $params[] = $vid; }
-            if ($opId) { $where .= " AND a.operador_id = ?"; $params[] = $opId; }
-            $depId = (int)($_GET['departamento_id'] ?? 0);
-            if ($depId) { $where .= " AND o.departamento_id = ?"; $params[] = $depId; }
+            if ($from) { $where .= " AND DATE(al.created_at) >= ?"; $params[] = $from; }
+            if ($to) { $where .= " AND DATE(al.created_at) <= ?"; $params[] = $to; }
+            $usuarioId = (int)($_GET['usuario_id'] ?? 0);
+            if ($usuarioId) { $where .= " AND al.usuario_id = ?"; $params[] = $usuarioId; }
 
-            // Detalle de asignaciones
-            $stmt = $db->prepare("SELECT a.id, a.start_at, a.end_at, v.id AS vehiculo_id, v.placa, CONCAT(v.marca,' ',v.modelo) AS vehiculo,
-                o.id AS operador_id, o.nombre AS operador, o.dni, COALESCE(dep.nombre,'') AS departamento,
-                a.start_km, a.end_km, a.estado,
-                CASE WHEN a.end_km IS NOT NULL AND a.start_km IS NOT NULL THEN ROUND(a.end_km - a.start_km,1) ELSE NULL END AS km_recorridos
-                FROM asignaciones a
-                JOIN vehiculos v ON v.id=a.vehiculo_id
-                JOIN operadores o ON o.id=a.operador_id
-                LEFT JOIN departamentos dep ON dep.id=o.departamento_id
-                $where ORDER BY a.start_at DESC");
+            $stmt = $db->prepare("SELECT COUNT(*) as total_importaciones,
+                COUNT(DISTINCT al.usuario_id) as usuarios_activos,
+                SUM(CASE WHEN al.accion='import' THEN 1 ELSE 0 END) as exitosas,
+                SUM(CASE WHEN al.accion='import_partial' THEN 1 ELSE 0 END) as parciales,
+                SUM(CASE WHEN al.accion='import_error' THEN 1 ELSE 0 END) as fallidas,
+                SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta,'$.insertados')),0)+0) as total_insertados,
+                SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta,'$.actualizados')),0)+0) as total_actualizados,
+                SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta,'$.errores')),0)+0) as total_errores
+                FROM audit_logs al
+                $where");
+            $stmt->execute($params);
+            $totales = $stmt->fetch();
+
+            $stmt = $db->prepare("SELECT u.id as usuario_id, u.nombre,
+                COUNT(*) as importaciones,
+                SUM(CASE WHEN al.accion='import' THEN 1 ELSE 0 END) as exitosas,
+                SUM(CASE WHEN al.accion='import_partial' THEN 1 ELSE 0 END) as parciales,
+                SUM(CASE WHEN al.accion='import_error' THEN 1 ELSE 0 END) as fallidas,
+                SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta,'$.insertados')),0)+0) as total_insertados,
+                SUM(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta,'$.actualizados')),0)+0) as total_actualizados,
+                MAX(al.created_at) as ultima_importacion
+                FROM audit_logs al
+                JOIN usuarios u ON u.id=al.usuario_id
+                $where
+                GROUP BY u.id, u.nombre
+                ORDER BY importaciones DESC");
+            $stmt->execute($params);
+            $usuarios = $stmt->fetchAll();
+
+            $detailQuery = "SELECT al.id, al.usuario_id, u.nombre AS usuario_nombre, al.accion AS resultado,
+                JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.archivo')) AS archivo,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.insertados')),0)+0 AS insertados,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.actualizados')),0)+0 AS actualizados,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.errores')),0)+0 AS errores,
+                JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.update_key_field')) AS campo_actualizar,
+                COALESCE(JSON_UNQUOTE(JSON_EXTRACT(al.meta, '$.duracion_segundos')),0)+0 AS duracion,
+                al.created_at
+                FROM audit_logs al
+                LEFT JOIN usuarios u ON u.id=al.usuario_id
+                $where
+                ORDER BY al.created_at DESC
+                LIMIT 500";
+            $stmt = $db->prepare($detailQuery);
             $stmt->execute($params);
             $detalle = $stmt->fetchAll();
 
-            // Totales
-            $totalKm = 0; $totalActivas = 0; $totalCerradas = 0;
-            foreach ($detalle as $r) {
-                $totalKm += (float)($r['km_recorridos'] ?? 0);
-                if ($r['estado'] === 'Activa') $totalActivas++; else $totalCerradas++;
-            }
-
-            // Agrupado por vehículo
-            $porVehiculo = [];
-            foreach ($detalle as $r) {
-                $key = $r['vehiculo_id'];
-                if (!isset($porVehiculo[$key])) {
-                    $porVehiculo[$key] = ['placa'=>$r['placa'],'vehiculo'=>$r['vehiculo'],'asignaciones'=>0,'km_total'=>0,'operadores'=>[],'activas'=>0,'cerradas'=>0];
-                }
-                $porVehiculo[$key]['asignaciones']++;
-                $porVehiculo[$key]['km_total'] += (float)($r['km_recorridos'] ?? 0);
-                if ($r['estado'] === 'Activa') $porVehiculo[$key]['activas']++; else $porVehiculo[$key]['cerradas']++;
-                $porVehiculo[$key]['operadores'][$r['operador_id']] = $r['operador'];
-            }
-            foreach ($porVehiculo as &$pv) { $pv['total_operadores'] = count($pv['operadores']); $pv['operadores'] = array_values($pv['operadores']); }
-            unset($pv);
-
-            // Agrupado por operador
-            $porOperador = [];
-            foreach ($detalle as $r) {
-                $key = $r['operador_id'];
-                if (!isset($porOperador[$key])) {
-                    $porOperador[$key] = ['operador'=>$r['operador'],'dni'=>$r['dni'],'departamento'=>$r['departamento'],'asignaciones'=>0,'km_total'=>0,'vehiculos'=>[],'activas'=>0,'cerradas'=>0];
-                }
-                $porOperador[$key]['asignaciones']++;
-                $porOperador[$key]['km_total'] += (float)($r['km_recorridos'] ?? 0);
-                if ($r['estado'] === 'Activa') $porOperador[$key]['activas']++; else $porOperador[$key]['cerradas']++;
-                $porOperador[$key]['vehiculos'][$r['vehiculo_id']] = $r['placa'];
-            }
-            foreach ($porOperador as &$po) { $po['total_vehiculos'] = count($po['vehiculos']); $po['vehiculos'] = array_values($po['vehiculos']); }
-            unset($po);
-
             echo json_encode([
-                'totales' => ['asignaciones'=>count($detalle),'km_total'=>$totalKm,'activas'=>$totalActivas,'cerradas'=>$totalCerradas,'vehiculos'=>count($porVehiculo),'operadores'=>count($porOperador)],
+                'totales' => [
+                    'total_importaciones' => (int)($totales['total_importaciones'] ?? 0),
+                    'usuarios_activos' => (int)($totales['usuarios_activos'] ?? 0),
+                    'exitosas' => (int)($totales['exitosas'] ?? 0),
+                    'parciales' => (int)($totales['parciales'] ?? 0),
+                    'fallidas' => (int)($totales['fallidas'] ?? 0),
+                    'total_insertados' => (int)($totales['total_insertados'] ?? 0),
+                    'total_actualizados' => (int)($totales['total_actualizados'] ?? 0),
+                    'total_errores' => (int)($totales['total_errores'] ?? 0),
+                ],
+                'usuarios' => $usuarios,
                 'detalle' => $detalle,
-                'por_vehiculo' => array_values($porVehiculo),
-                'por_operador' => array_values($porOperador),
             ]);
             break;
 
