@@ -41,7 +41,7 @@ case 'asignacion':
     $a = $stmt->fetch();
     if (!$a) die('Asignación no encontrada.');
 
-    $title = 'Acta de Inspección y Asignación';
+    $title = 'Acta de Inspección y Asignación / Pase de Salida';
     $subtitle = 'Control de Flota Vehicular | Inspección Pre-Salida';
     $folio = 'ASG-' . str_pad($id, 6, '0', STR_PAD_LEFT);
     $momento = $a['end_at'] ? 'retorno' : 'entrega';
@@ -68,38 +68,46 @@ case 'asignacion':
     $content .= '<div class="section"><h3>Datos de la Asignación</h3>';
     $content .= '<table class="info-table"><tbody>';
     $folioPase = 'PS-' . str_pad($id, 6, '0', STR_PAD_LEFT);
-    $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>Inicio:</strong></td><td>{$a['start_at']}</td></tr>";
-    $content .= "<tr><td><strong>Pase de Salida:</strong></td><td><strong>{$folioPase}</strong></td><td><strong>KM Inicio:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td></tr>";
-    $content .= "<tr><td><strong>Fin:</strong></td><td>" . ($a['end_at'] ?? 'Vigente') . "</td><td></td><td></td></tr>";
+    $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>No. correlativo:</strong></td><td>{$folioPase}</td></tr>";
+    $content .= "<tr><td><strong>Inicio:</strong></td><td>{$a['start_at']}</td><td><strong>KM Inicio:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td></tr>";
+    $content .= "<tr><td><strong>Fin:</strong></td><td>" . ($a['end_at'] ?? 'Vigente') . "</td><td><strong>KM Retorno:</strong></td><td>" . ($a['end_at'] ? number_format((float)($a['end_km'] ?? 0), 0) . " km" : '—') . "</td></tr>";
     if ($a['end_at']) {
-        $content .= "<tr><td><strong>KM Retorno:</strong></td><td>" . number_format((float)($a['end_km'] ?? 0), 0) . " km</td><td><strong>KM Recorridos:</strong></td><td>" . number_format(((float)($a['end_km'] ?? 0) - (float)($a['start_km'] ?? 0)), 0) . " km</td></tr>";
+        $content .= "<tr><td><strong>KM Recorridos:</strong></td><td>" . number_format(((float)($a['end_km'] ?? 0) - (float)($a['start_km'] ?? 0)), 0) . " km</td><td></td><td></td></tr>";
     }
     $content .= "<tr><td><strong>Notas:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['notas'] ?? '—') . "</td></tr>";
+    $content .= '</tbody></table></div>';
+
+    $content .= '<div class="section"><h3>Pase de Salida</h3>';
+    $content .= '<table class="info-table"><tbody>';
+    $content .= "<tr><td><strong>Destino:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['destino'] ?? '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Hora de Salida:</strong></td><td>" . ($a['hora_salida'] ? date('H:i', strtotime($a['hora_salida'])) : '—') . "</td><td><strong>Hora de Regreso:</strong></td><td>" . ($a['hora_regreso'] ? date('H:i', strtotime($a['hora_regreso'])) : '—') . "</td></tr>";
+    $content .= "<tr><td><strong>Observaciones:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['observaciones_pase'] ?? '—') . "</td></tr>";
     $content .= '</tbody></table></div>';
 
     // Checklist de entrega
     $ck = fn($v) => ((int)$v) ? '✓' : '✗';
     $ckStyle = fn($v) => ((int)$v) ? 'color:#22c55e;font-weight:700' : 'color:#ccc';
     $checklistItems = [
-        ['checklist_herramientas', 'Herramientas en buen estado'],
-        ['checklist_llanta',       'Llanta de repuesto equipada'],
-        ['checklist_liquidos',     'Nivel de líquidos operativos'],
-        ['checklist_motor',        'Motor en buen estado'],
-        ['checklist_parabrisas',   'Parabrisas sin daños'],
-        ['checklist_luces',        'Luces en buen estado'],
-        ['checklist_frenos',       'Frenos operativos'],
-        ['checklist_espejos',      'Espejos completos'],
-        ['checklist_gata',         'Gata disponible'],
-        ['checklist_bac',          'BAC Flota'],
-        ['checklist_documentacion','Documentación en regla'],
-        ['checklist_revision',     'Revisión general OK'],
+        ['licencia',                'Licencia de Conducir'],
+        ['checklist_documentacion', 'Documentación en regla'],
+        ['checklist_bac',           'BAC Flota'],
+        ['checklist_revision',      'Revisión vigente'],
+        ['checklist_gata',          'Gata disponible'],
+        ['checklist_herramientas',  'Herramientas en buen estado'],
+        ['checklist_llanta',        'Llanta de repuesto equipada'],
+        ['checklist_liquidos',      'Nivel de líquidos operativos'],
+        ['checklist_motor',         'Motor en buen estado'],
+        ['checklist_parabrisas',    'Parabrisas sin daños'],
+        ['checklist_luces',         'Luces en buen estado'],
+        ['checklist_frenos',        'Frenos operativos'],
+        ['checklist_espejos',       'Espejos completos'],
     ];
     if (isset($a['checklist_gata'])) {
         $content .= '<div class="section"><h3>Lista de Verificación Pre-Salida</h3>';
         $content .= '<table class="data-table"><thead><tr><th style="width:40%">Ítem de Verificación</th><th style="width:15%;text-align:center">Estado</th><th>Observación</th></tr></thead><tbody>';
         $obsMap = json_decode($a['checklist_detalles'] ?? '', true) ?: [];
         foreach ($checklistItems as [$col, $label]) {
-            $val = $a[$col] ?? 0;
+            $val = $col === 'licencia' ? (!empty($a['licencia']) ? 1 : 0) : ($a[$col] ?? 0);
             $obs = htmlspecialchars($obsMap[$col] ?? '');
             $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:16px;{$ckStyle($val)}\">{$ck($val)}</td><td style=\"font-size:11px\">{$obs}</td></tr>";
         }
@@ -110,6 +118,14 @@ case 'asignacion':
         }
         $content .= '</div>';
     }
+
+    $content .= '<div class="section"><h3>Combustible</h3>';
+    $content .= '<table class="data-table"><thead><tr><th style="width:45%">Estado</th><th style="width:27%;text-align:center">Salida</th><th style="width:27%;text-align:center">Llegada</th></tr></thead><tbody>';
+    $fuelLines = ['Tanque lleno', '¾ tanque', '½ tanque', '¼ tanque', 'Tanque vacío/E'];
+    foreach ($fuelLines as $line) {
+        $content .= "<tr><td>{$line}</td><td style=\"text-align:center\">&nbsp;</td><td style=\"text-align:center\">&nbsp;</td></tr>";
+    }
+    $content .= '</tbody></table></div>';
 
     // Checklist de retorno (si cerrada)
     if ($a['end_at'] && isset($a['end_checklist_gata'])) {
@@ -202,11 +218,10 @@ case 'asignacion':
     } catch (Throwable $e) { /* table may not exist yet */ }
 
     // Signature block
-    $responsable = htmlspecialchars(current_user()['nombre'] ?? 'Responsable de Flota');
     $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Entrega:</strong> ' . $responsable . '</p><p>Responsable de Flota</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Recibe:</strong> ' . htmlspecialchars($a['operador_nombre']) . '</p><p>Operador / Conductor</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Vo.Bo.:</strong> Administración</p><p>Gerencia</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Firma de Autorización</strong></p><p>IT y Seguridad</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Firma de Responsable</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Firma de Entrega de Vehículo</strong></p><p>Responsable de Flota</p></div>';
     $content .= '</div>';
     break;
 
@@ -249,9 +264,9 @@ case 'combustible':
     $content .= '</tbody></table></div>';
 
     $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>' . htmlspecialchars($c['operador_nombre']) . '</strong></p><p>Conductor</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Responsable de Flota</strong></p><p>Autorización</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Contabilidad</strong></p><p>Vo.Bo.</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>IT y Seguridad</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Autorización Financiera</p></div>';
     $content .= '</div>';
     break;
 
@@ -293,9 +308,9 @@ case 'combustible_lote':
     $content .= '</tbody></table></div>';
 
     $content .= '<div class="signatures">';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Elaboró</strong></p><p>Responsable de Flota</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>Coordinación</p></div>';
-    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Vo.Bo.</strong></p><p>Contabilidad</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Solicitante</strong></p><p>Responsable de Flota</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Autorizó</strong></p><p>IT y Seguridad</p></div>';
+    $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Finanzas</strong></p><p>Autorización Financiera</p></div>';
     $content .= '</div>';
     break;
 
