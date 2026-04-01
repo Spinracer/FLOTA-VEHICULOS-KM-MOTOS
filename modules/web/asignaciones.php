@@ -54,6 +54,16 @@ ob_start();
       <div class="form-group"><label>Departamento</label><input id="depto-display" readonly style="background:var(--bg2);cursor:default" placeholder="Se llena al seleccionar operador"></div>
       <div class="form-group"><label>Inicio *</label><input name="start_at" type="datetime-local"></div>
       <div class="form-group"><label>KM Inicio</label><input name="start_km" type="number" step="0.1" placeholder="45000"></div>
+      <div class="form-group"><label>Combustible salida</label>
+        <select name="start_combustible">
+          <option value="">— Seleccionar combustible —</option>
+          <option value="tanque_lleno">Tanque lleno</option>
+          <option value="tres_cuartos">¾ tanque</option>
+          <option value="medio_tanque">½ tanque</option>
+          <option value="un_cuarto">¼ tanque</option>
+          <option value="tanque_vacio">Tanque vacío/E</option>
+        </select>
+      </div>
       <div class="form-group full"><label>Notas</label><textarea name="start_notes" placeholder="Observaciones de entrega..."></textarea></div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -129,11 +139,21 @@ ob_start();
 
 <div class="modal-bg" id="modal-close">
   <div class="modal" style="max-width:700px">
-    <div class="modal-title">✅ Cerrar Asignación</div>
+    <div class="modal-title">✅ Retorno / Cierre</div>
     <div class="form-grid">
       <input type="hidden" name="id">
       <div class="form-group"><label>Fin *</label><input name="end_at" type="datetime-local"></div>
       <div class="form-group"><label>KM Fin *</label><input name="end_km" type="number" step="0.1" placeholder="45500"></div>
+      <div class="form-group"><label>Combustible regreso</label>
+        <select name="end_combustible">
+          <option value="">— Seleccionar combustible —</option>
+          <option value="tanque_lleno">Tanque lleno</option>
+          <option value="tres_cuartos">¾ tanque</option>
+          <option value="medio_tanque">½ tanque</option>
+          <option value="un_cuarto">¼ tanque</option>
+          <option value="tanque_vacio">Tanque vacío/E</option>
+        </select>
+      </div>
       <div class="form-group full"><label>Notas de cierre</label><textarea name="end_notes" placeholder="Observaciones de retorno..."></textarea></div>
       <div class="form-group full" style="border-top:1px solid var(--border);padding-top:10px">
         <label style="font-weight:700;font-size:13px;margin-bottom:8px;display:block">✅ Checklist de Retorno</label>
@@ -625,9 +645,8 @@ async function load(){
       <?php if(can('edit')): ?>
       <td>
         <div class="action-btns">
-          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=asignacion&id=${r.id}','_blank')" title="Imprimir Acta">🖨️</button>
-          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=pase_salida&id=${r.id}','_blank')" title="Pase de Salida">🚗</button>
-          ${r.estado==='Activa' ? `<button class="btn btn-primary btn-sm" onclick='openClose(${JSON.stringify(r)})'>Cerrar</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="window.open('/print.php?type=asignacion&id=${r.id}','_blank')" title="Imprimir Asignación y Pase de Salida">🖨️</button>
+          ${r.estado==='Activa' ? `<button class="btn btn-primary btn-sm" onclick='openClose(${JSON.stringify(r)})'>Retorno / Cierre</button>` : ''}
           <?php if(can('delete')): ?>
           <button class="btn btn-danger btn-sm" onclick="delItem(${r.id})">🗑️</button>
           <?php endif; ?>
@@ -692,7 +711,7 @@ async function saveClose(){
     d.firma_tipo = 'ninguna';
   }
   await api('/api/asignaciones.php', 'PUT', { ...d, action: 'close' });
-  toast('Asignación cerrada');
+  toast('Retorno registrado y asignación cerrada');
   closeModal('modal-close');
   load();
 }

@@ -337,12 +337,12 @@ try {
             $existingAsig = $existingStmt->fetch();
             if ($existingAsig) {
                 // Actualizar la asignación existente (mismo operador, mismo vehículo)
-                $updStmt = $db->prepare("UPDATE asignaciones SET start_km=COALESCE(?,start_km), start_notes=COALESCE(?,start_notes),
+                $updStmt = $db->prepare("UPDATE asignaciones SET start_km=COALESCE(?,start_km), start_notes=COALESCE(?,start_notes), start_combustible=COALESCE(?,start_combustible),
                     checklist_gata=?,checklist_herramientas=?,checklist_llanta=?,checklist_bac=?,checklist_revision=?,
                     checklist_luces=?,checklist_liquidos=?,checklist_motor=?,checklist_parabrisas=?,checklist_documentacion=?,checklist_frenos=?,checklist_espejos=?,
                     checklist_detalles=? WHERE id=?");
                 $updStmt->execute([
-                    $startKm, $d['start_notes'] ?: null,
+                    $startKm, $d['start_notes'] ?: null, trim((string)($d['start_combustible'] ?? '')) ?: null,
                     (int)($d['checklist_gata'] ?? 0), (int)($d['checklist_herramientas'] ?? 0),
                     (int)($d['checklist_llanta'] ?? 0), (int)($d['checklist_bac'] ?? 0),
                     (int)($d['checklist_revision'] ?? 0), (int)($d['checklist_luces'] ?? 0),
@@ -389,14 +389,16 @@ try {
                 $firmaEntregaFecha = ($firmaEntregaTipo !== 'ninguna') ? date('Y-m-d H:i:s') : null;
                 $firmaEntregaIp = ($firmaEntregaTipo !== 'ninguna') ? ($_SERVER['REMOTE_ADDR'] ?? null) : null;
 
-                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip,destino,hora_salida,hora_regreso,observaciones_pase)
-                    VALUES (?,?,?,?,?,'Activa',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $stmt = $db->prepare("INSERT INTO asignaciones (vehiculo_id,operador_id,start_at,start_km,start_notes,start_combustible,estado,override_reason,created_by,checklist_gata,checklist_herramientas,checklist_llanta,checklist_bac,checklist_revision,checklist_luces,checklist_liquidos,checklist_motor,checklist_parabrisas,checklist_documentacion,checklist_frenos,checklist_espejos,checklist_detalles,firma_entrega_tipo,firma_entrega_data,firma_entrega_fecha,firma_entrega_ip,destino,hora_salida,hora_regreso,observaciones_pase)
+                    VALUES (?,?,?,?,?,?,? ,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $stmt->execute([
                     $vehiculoId,
                     $operadorId,
                     $d['start_at'] ?: date('Y-m-d H:i:s'),
                     $startKm,
                     $d['start_notes'] ?: null,
+                    trim((string)($d['start_combustible'] ?? '')) ?: null,
+                    'Activa',
                     $allowOverride ? $overrideReason : null,
                     (int)($_SESSION['user_id'] ?? 0),
                     (int)($d['checklist_gata'] ?? 0),
@@ -529,7 +531,7 @@ try {
                 }
 
                 $stmt = $db->prepare("UPDATE asignaciones
-                    SET end_at=?, end_km=?, end_notes=?, estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?,
+                    SET end_at=?, end_km=?, end_notes=?, end_combustible=COALESCE(?,end_combustible), estado='Cerrada', override_reason=COALESCE(?,override_reason), closed_by=?,
                         end_checklist_gata=?, end_checklist_herramientas=?, end_checklist_llanta=?, end_checklist_bac=?, end_checklist_revision=?,
                         end_checklist_luces=?, end_checklist_liquidos=?, end_checklist_motor=?, end_checklist_parabrisas=?, end_checklist_documentacion=?, end_checklist_frenos=?, end_checklist_espejos=?,
                         end_checklist_detalles=?,
@@ -540,6 +542,7 @@ try {
                     $d['end_at'] ?: date('Y-m-d H:i:s'),
                     $endKm,
                     $d['end_notes'] ?: null,
+                    trim((string)($d['end_combustible'] ?? '')) ?: null,
                     $allowOverride ? $overrideReason : null,
                     (int)($_SESSION['user_id'] ?? 0),
                     (int)($d['end_checklist_gata'] ?? 0),

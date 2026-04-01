@@ -121,9 +121,17 @@ case 'asignacion':
 
     $content .= '<div class="section"><h3>Combustible</h3>';
     $content .= '<table class="data-table"><thead><tr><th style="width:45%">Estado</th><th style="width:27%;text-align:center">Salida</th><th style="width:27%;text-align:center">Llegada</th></tr></thead><tbody>';
-    $fuelLines = ['Tanque lleno', '¾ tanque', '½ tanque', '¼ tanque', 'Tanque vacío/E'];
-    foreach ($fuelLines as $line) {
-        $content .= "<tr><td>{$line}</td><td style=\"text-align:center\">&nbsp;</td><td style=\"text-align:center\">&nbsp;</td></tr>";
+    $fuelLines = [
+        'tanque_lleno' => 'Tanque lleno',
+        'tres_cuartos' => '¾ tanque',
+        'medio_tanque' => '½ tanque',
+        'un_cuarto' => '¼ tanque',
+        'tanque_vacio' => 'Tanque vacío/E',
+    ];
+    foreach ($fuelLines as $key => $label) {
+        $salida = ($a['start_combustible'] ?? '') === $key ? '✓' : '&nbsp;';
+        $llegada = ($a['end_combustible'] ?? '') === $key ? '✓' : '&nbsp;';
+        $content .= "<tr><td>{$label}</td><td style=\"text-align:center;font-size:18px\">{$salida}</td><td style=\"text-align:center;font-size:18px\">{$llegada}</td></tr>";
     }
     $content .= '</tbody></table></div>';
 
