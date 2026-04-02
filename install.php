@@ -446,6 +446,25 @@ $tables = [
   CONSTRAINT fk_pi_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
   CONSTRAINT fk_pi_proveedor FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+"import_runs" => "CREATE TABLE IF NOT EXISTS import_runs (
+  id                  INT AUTO_INCREMENT PRIMARY KEY,
+  tipo_importacion    VARCHAR(50) NOT NULL DEFAULT 'vehiculos' COMMENT 'Tipo de importación: vehiculos, operadores, etc.',
+  nombre_archivo      VARCHAR(255) NOT NULL,
+  usuario_id          INT NOT NULL,
+  total_filas         INT NOT NULL DEFAULT 0,
+  creados             INT NOT NULL DEFAULT 0,
+  actualizados        INT NOT NULL DEFAULT 0,
+  errores             INT NOT NULL DEFAULT 0,
+  detalle_errores     JSON NULL COMMENT 'Array de objetos con fila, tipo, errores, placa',
+  estado              ENUM('procesando', 'completado', 'fallido') NOT NULL DEFAULT 'procesando',
+  created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  completed_at        DATETIME NULL,
+  INDEX idx_tipo (tipo_importacion),
+  INDEX idx_estado (estado),
+  INDEX idx_created (created_at),
+  FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 ];
 
 foreach ($tables as $name => $sql) {
