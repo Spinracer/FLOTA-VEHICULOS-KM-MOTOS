@@ -426,6 +426,29 @@ try {
                 ]);
 
                 $id = (int)$db->lastInsertId();
+                
+                // Generar correlativo con mes
+                $fechaAsignacion = new DateTime($d['start_at'] ?: date('Y-m-d H:i:s'));
+                $mesNumero = (int)$fechaAsignacion->format('m');
+                $anio = $fechaAsignacion->format('Y');
+                $mesesEsp = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                $mesNombre = strtoupper($mesesEsp[$mesNumero - 1]);
+                
+                // Contar asignaciones del mismo mes/año para número secuencial
+                $stCount = $db->prepare("
+                    SELECT COUNT(*) as total FROM asignaciones 
+                    WHERE YEAR(start_at) = ? AND MONTH(start_at) = ? AND id <= ?
+                ");
+                $stCount->execute([$anio, $mesNumero, $id]);
+                $countResult = $stCount->fetch();
+                $numeroSecuencial = str_pad($countResult['total'], 3, '0', STR_PAD_LEFT);
+                
+                $correlativo = 'ASG-' . $mesNombre . '-' . $numeroSecuencial;
+                
+                // Guardar correlativo
+                $db->prepare("UPDATE asignaciones SET correlativo = ? WHERE id = ?")->execute([$correlativo, $id]);
+                
                 if ($startKm) {
                     odometro_registrar($db, $vehiculoId, $startKm, 'assignment_start', (int)($_SESSION['user_id'] ?? 0));
                 }

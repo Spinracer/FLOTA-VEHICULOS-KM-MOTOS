@@ -19,6 +19,7 @@ $id   = (int)($_GET['id'] ?? 0);
 $title    = 'Documento';
 $subtitle = '';
 $content  = '';
+$paseSection = '';
 $folio    = '';
 $fecha    = date('Y-m-d H:i');
 
@@ -41,9 +42,28 @@ case 'asignacion':
     $a = $stmt->fetch();
     if (!$a) die('Asignación no encontrada.');
 
-    $title = 'Acta de Inspección y Asignación / Pase de Salida';
+    $title = 'KM MOTOS - Hoja de Asignación';
     $subtitle = 'Control de Flota Vehicular | Inspección Pre-Salida';
-    $folio = 'ASG-' . str_pad($id, 6, '0', STR_PAD_LEFT);
+    
+    // Generar correlativo con mes
+    $fechaAsignacion = new DateTime($a['start_at']);
+    $mesNumero = (int)$fechaAsignacion->format('m');
+    $anio = $fechaAsignacion->format('Y');
+    $mesesEsp = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    $mesNombre = $mesesEsp[$mesNumero - 1];
+    
+    // Contar asignaciones del mismo mes/año
+    $stCount = $db->prepare("
+        SELECT COUNT(*) as total FROM asignaciones 
+        WHERE YEAR(start_at) = ? AND MONTH(start_at) = ?
+    ");
+    $stCount->execute([$anio, $mesNumero]);
+    $countResult = $stCount->fetch();
+    $numeroSecuencial = str_pad($countResult['total'], 3, '0', STR_PAD_LEFT);
+    
+    $folio = 'ASG-' . strtoupper($mesNombre) . '-' . $numeroSecuencial;
+    $folioPase = 'PS-' . strtoupper($mesNombre) . '-' . $numeroSecuencial;
     $momento = $a['end_at'] ? 'retorno' : 'entrega';
 
     // Snapshots
@@ -67,8 +87,7 @@ case 'asignacion':
 
     $content .= '<div class="section"><h3>Datos de la Asignación</h3>';
     $content .= '<table class="info-table"><tbody>';
-    $folioPase = 'PS-' . str_pad($id, 6, '0', STR_PAD_LEFT);
-    $content .= "<tr><td><strong>Folio:</strong></td><td>{$folio}</td><td><strong>No. correlativo:</strong></td><td>{$folioPase}</td></tr>";
+    $content .= "<tr><td><strong>Correlativo Asignación:</strong></td><td>{$folio}</td><td><strong>Correlativo Pase:</strong></td><td>{$folioPase}</td></tr>";
     $content .= "<tr><td><strong>Inicio:</strong></td><td>{$a['start_at']}</td><td><strong>KM Inicio:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td></tr>";
     $content .= "<tr><td><strong>Fin:</strong></td><td>" . ($a['end_at'] ?? 'Vigente') . "</td><td><strong>KM Retorno:</strong></td><td>" . ($a['end_at'] ? number_format((float)($a['end_km'] ?? 0), 0) . " km" : '—') . "</td></tr>";
     if ($a['end_at']) {
@@ -77,12 +96,51 @@ case 'asignacion':
     $content .= "<tr><td><strong>Notas:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['notas'] ?? '—') . "</td></tr>";
     $content .= '</tbody></table></div>';
 
-    $content .= '<div class="section"><h3>Pase de Salida</h3>';
-    $content .= '<table class="info-table"><tbody>';
-    $content .= "<tr><td><strong>Destino:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['destino'] ?? '—') . "</td></tr>";
-    $content .= "<tr><td><strong>Hora de Salida:</strong></td><td>" . ($a['hora_salida'] ? date('H:i', strtotime($a['hora_salida'])) : '—') . "</td><td><strong>Hora de Regreso:</strong></td><td>" . ($a['hora_regreso'] ? date('H:i', strtotime($a['hora_regreso'])) : '—') . "</td></tr>";
-    $content .= "<tr><td><strong>Observaciones:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['observaciones_pase'] ?? '—') . "</td></tr>";
-    $content .= '</tbody></table></div>';
+    $driverName = htmlspecialchars($a['operador_nombre'] ?? '—');
+    $driverDni = htmlspecialchars($a['dni'] ?? '—');
+    $driverLicense = htmlspecialchars($a['licencia'] ?? '—');
+    $driverPhone = htmlspecialchars($a['telefono'] ?? '—');
+    $driverDept = htmlspecialchars($a['departamento_nombre'] ?? '—');
+
+    $paseSection .= '<div class="section" style="page-break-before:always;margin-top:40px;">';
+    $paseSection .= '<div style="border:2px solid #222;padding:10px;background:#f3f4f6;border-radius:6px;margin-bottom:12px;">';
+    $paseSection .= '<h2 style="margin:0;font-size:16px;color:#111;font-weight:800;text-transform:uppercase;letter-spacing:1px;">PASE DE SALIDA</h2>';
+    $paseSection .= '<p style="margin:6px 0 0;font-size:11px;color:#333;line-height:1.4;">KM MOTOS &sdot; Correlativo (Hoja Asignación): <strong>' . $folio . '</strong> &sdot; Correlativo (Pase): <strong>' . $folioPase . '</strong></p>';
+    $paseSection .= '</div>';
+
+    $paseSection .= '<table class="info-table"><tbody>';
+    $paseSection .= "<tr><td><strong>Conductor:</strong></td><td>{$driverName}</td><td><strong>DNI:</strong></td><td>{$driverDni}</td></tr>";
+    $paseSection .= "<tr><td><strong>Licencia:</strong></td><td>{$driverLicense}</td><td><strong>Teléfono:</strong></td><td>{$driverPhone}</td></tr>";
+    $paseSection .= "<tr><td><strong>Departamento:</strong></td><td>{$driverDept}</td><td><strong>Vehículo:</strong></td><td>" . htmlspecialchars($a['placa'] . ' ' . $a['marca'] . ' ' . $a['modelo']) . "</td></tr>";
+    $paseSection .= "<tr><td><strong>Destino:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['destino'] ?? '—') . "</td></tr>";
+    $paseSection .= "<tr><td><strong>Hora de Salida:</strong></td><td>" . ($a['hora_salida'] ? date('H:i', strtotime($a['hora_salida'])) : '—') . "</td><td><strong>Hora de Regreso:</strong></td><td>" . ($a['hora_regreso'] ? date('H:i', strtotime($a['hora_regreso'])) : '—') . "</td></tr>";
+    $paseSection .= "<tr><td><strong>KM Salida:</strong></td><td>" . number_format((float)($a['start_km'] ?? 0), 0) . " km</td><td><strong>KM Actual:</strong></td><td>" . number_format((float)($a['km_actual'] ?? 0), 0) . " km</td></tr>";
+    $paseSection .= "<tr><td><strong>Inicio Combustible:</strong></td><td>" . ($a['start_combustible'] ? ucfirst(str_replace('_', ' ', $a['start_combustible'])) : '—') . "</td><td><strong>Retorno Combustible:</strong></td><td>" . ($a['end_combustible'] ? ucfirst(str_replace('_', ' ', $a['end_combustible'])) : '—') . "</td></tr>";
+    $paseSection .= "<tr><td><strong>Observaciones del Pase:</strong></td><td colspan=\"3\">" . htmlspecialchars($a['observaciones_pase'] ?? '—') . "</td></tr>";
+    $paseSection .= '</tbody></table>';
+
+    $paseSection .= '<div class="section" style="margin-top:14px">';
+    $paseSection .= '<h3 style="font-size:13px;margin-bottom:8px">Checklist de Retorno (para completar al final del viaje)</h3>';
+
+    $paseSection .= '<table class="info-table" style="font-size:11px"><tbody>';
+    $paseSection .= '<tr><td><strong>KM al Regresar:</strong></td><td>' . ($a['end_km'] ? number_format((float)$a['end_km'],0).' km' : '________') . '</td><td><strong>Hora Regreso:</strong></td><td>' . ($a['end_at'] ? date('H:i', strtotime($a['end_at'])) : '________') . '</td></tr>';
+    $paseSection .= '<tr><td><strong>Estado Neumáticos:</strong></td><td><span style="font-weight:700">' . (isset($a['end_checklist_llanta']) && $a['end_checklist_llanta'] ? '✅' : '⬜') . '</span></td><td><strong>Frenos:</strong></td><td><span style="font-weight:700">' . (isset($a['end_checklist_frenos']) && $a['end_checklist_frenos'] ? '✅' : '⬜') . '</span></td></tr>';
+    $paseSection .= '<tr><td><strong>Luces:</strong></td><td><span style="font-weight:700">' . (isset($a['end_checklist_luces']) && $a['end_checklist_luces'] ? '✅' : '⬜') . '</span></td><td><strong>Documentación:</strong></td><td><span style="font-weight:700">' . (isset($a['end_checklist_documentacion']) && $a['end_checklist_documentacion'] ? '✅' : '⬜') . '</span></td></tr>';
+    $paseSection .= '<tr><td><strong>Niveles (Aceite/Líquidos):</strong></td><td><span style="font-weight:700">' . (isset($a['end_checklist_liquidos']) && $a['end_checklist_liquidos'] ? '✅' : '⬜') . '</span></td><td><strong>Observaciones</strong></td><td>______________________________</td></tr>';
+    $paseSection .= '</tbody></table>';
+    $paseSection .= '</div>';
+
+    $paseSection .= '<div class="section" style="margin-top:14px"><h3 style="font-size:13px;margin-bottom:8px">Observaciones al Retorno</h3>';
+    $paseSection .= '<div style="border:1px solid #ddd;min-height:60px;padding:8px;font-size:11px;background:#fafafa"></div>';
+    $paseSection .= '</div>';
+
+    $paseSection .= '<div class="signatures" style="margin-top:100px">';
+    $paseSection .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Responsable Flota</strong></p><p style="font-size:10px;color:#888">Autoriza Entrega</p></div>';
+    $paseSection .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Operador</strong></p><p style="font-size:10px;color:#888">' . $driverName . '</p></div>';
+    $paseSection .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Guardia</strong></p><p style="font-size:10px;color:#888">Seguridad</p></div>';
+    $paseSection .= '</div>';
+
+    $paseSection .= '</div>';
 
     // Checklist de entrega
     $ck = fn($v) => ((int)$v) ? '✓' : '✗';
@@ -168,6 +226,11 @@ case 'asignacion':
     $content .= '<div class="section" style="text-align:center;padding:16px 0;border:2px solid #22c55e;border-radius:6px;margin:16px 0">';
     $content .= '<h3 style="background:transparent;color:#22c55e;margin:0;padding:0;text-transform:uppercase;letter-spacing:1px">Estado General del Vehículo: Regular</h3>';
     $content .= '</div>';
+    $content .= '<div class="section" style="margin-top:16px"><h3 style="font-size:13px;margin-bottom:6px">Correlativo Hoja-Asig / Pase</h3>';
+    $content .= '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">';
+    $content .= '<div style="font-size:12px;font-weight:700">Hoja Asignación: ' . $folio . '</div>';
+    $content .= '<div style="font-size:12px;font-weight:700">Pase: ' . $folioPase . '</div>';
+    $content .= '</div></div>';
 
     // Observaciones / Notas
     $content .= '<div class="section"><h3>Observaciones / Notas</h3>';
@@ -231,6 +294,10 @@ case 'asignacion':
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Firma de Responsable</strong></p><p>' . htmlspecialchars($a['operador_nombre']) . '</p></div>';
     $content .= '<div class="sig-block"><div class="sig-line"></div><p><strong>Firma de Entrega de Vehículo</strong></p><p>Responsable de Flota</p></div>';
     $content .= '</div>';
+
+    if (!empty($paseSection)) {
+        $content .= $paseSection;
+    }
     break;
 
 // ─── PDF AUTORIZACIÓN COMBUSTIBLE ───────────────────
@@ -536,10 +603,12 @@ $saveAsAttachment = (int)($_GET['save'] ?? 0);
 
   /* Header */
   .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1a1a1a; padding-bottom: 12px; margin-bottom: 16px; }
-  .header-left h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+  .header-left h1 { font-size: 18px; font-weight: 900; margin-bottom: 2px; }
   .header-left .subtitle { font-size: 12px; color: #555; }
+  .header-left .logo { font-size: 10px; font-weight: 700; color:#111; letter-spacing:1px; margin-bottom:2px; }
   .header-right { text-align: right; font-size: 11px; color: #555; }
-  .header-right .folio { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+  .header-right .folio { font-size: 22px; font-weight: 900; color: #1a1a1a; letter-spacing:1px; }
+  .header-right .folio-min { font-size: 11px; }
 
   /* Sections */
   .section { margin-bottom: 16px; }
@@ -584,8 +653,9 @@ $saveAsAttachment = (int)($_GET['save'] ?? 0);
 
   /* QR Code */
   .qr-wrap { margin-top: 16px; text-align: center; }
-  .qr-wrap img { width: 100px; height: 100px; }
-  .qr-wrap .qr-label { font-size: 9px; color: #888; margin-top: 4px; }
+  .qr-box { width: 100px; height: 100px; margin: 0 auto; border: 2px solid #333; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; letter-spacing: 1px; color: #333; background: #fff; }
+  .qr-wrap .qr-label { font-size: 9px; color: #888; margin-top: 4px; word-break: break-all; }
+  .qr-wrap .qr-label a { color: #0a3d62; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -600,25 +670,19 @@ $saveAsAttachment = (int)($_GET['save'] ?? 0);
 <div class="page" style="margin-top:50px">
   <div class="header">
     <div class="header-left">
-      <h1>FlotaCtrl</h1>
+      <div class="logo">KM MOTOS</div>
+      <h1><?= $type === 'asignacion' ? 'Hoja de Asignación' : htmlspecialchars($title) ?></h1>
       <div class="subtitle"><?= htmlspecialchars($title) ?></div>
       <?php if (!empty($subtitle)): ?><div class="subtitle" style="font-size:10px;margin-top:2px"><?= htmlspecialchars($subtitle) ?></div><?php endif; ?>
     </div>
     <div class="header-right">
       <div class="folio"><?= $folio ?></div>
-      <div>Generado: <?= $fecha ?></div>
-      <div>Por: <?= $generadoPor ?></div>
+      <div class="folio-min">Generado: <?= $fecha ?></div>
+      <div class="folio-min">Por: <?= $generadoPor ?></div>
     </div>
   </div>
 
   <?= $content ?>
-
-  <?php if ($qrUrl): ?>
-  <div class="qr-wrap">
-    <img src="<?= htmlspecialchars($qrUrl) ?>" alt="QR Verificación" />
-    <div class="qr-label">Escanea para verificar documento — <?= $folio ?></div>
-  </div>
-  <?php endif; ?>
 
   <div class="footer">
     <span>Documento generado por FlotaCtrl — Sistema de Gestión de Flota</span>

@@ -201,6 +201,7 @@ $tables = [
 
 "asignaciones" => "CREATE TABLE IF NOT EXISTS asignaciones (
   id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+  correlativo     VARCHAR(50) UNIQUE NULL,
   vehiculo_id      INT NOT NULL,
   operador_id      INT NOT NULL,
   start_at         DATETIME NOT NULL,
@@ -218,6 +219,8 @@ $tables = [
   created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_asignaciones_vehiculo_estado (vehiculo_id, estado),
   INDEX idx_asignaciones_operador_estado (operador_id, estado),
+  INDEX idx_asignaciones_correlativo (correlativo),
+  INDEX idx_asignaciones_start_at (start_at),
   CONSTRAINT fk_asig_vehiculo FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
   CONSTRAINT fk_asig_operador FOREIGN KEY (operador_id) REFERENCES operadores(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
