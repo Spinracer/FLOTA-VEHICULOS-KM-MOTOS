@@ -427,7 +427,7 @@ try {
 
                 $id = (int)$db->lastInsertId();
                 
-                // Generar correlativo con mes
+                // Generar correlativo con mes y año
                 $fechaAsignacion = new DateTime($d['start_at'] ?: date('Y-m-d H:i:s'));
                 $mesNumero = (int)$fechaAsignacion->format('m');
                 $anio = $fechaAsignacion->format('Y');
@@ -444,7 +444,7 @@ try {
                 $countResult = $stCount->fetch();
                 $numeroSecuencial = str_pad($countResult['total'], 3, '0', STR_PAD_LEFT);
                 
-                $correlativo = 'ASG-' . $mesNombre . '-' . $numeroSecuencial;
+                $correlativo = 'ASG-' . $mesNombre . '-' . $anio . '-' . $numeroSecuencial;
                 
                 // Guardar correlativo
                 $db->prepare("UPDATE asignaciones SET correlativo = ? WHERE id = ?")->execute([$correlativo, $id]);

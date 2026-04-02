@@ -45,7 +45,7 @@ case 'asignacion':
     $title = 'KM MOTOS - Hoja de Asignación';
     $subtitle = 'Control de Flota Vehicular | Inspección Pre-Salida';
     
-    // Generar correlativo con mes
+    // Generar correlativo con mes y año
     $fechaAsignacion = new DateTime($a['start_at']);
     $mesNumero = (int)$fechaAsignacion->format('m');
     $anio = $fechaAsignacion->format('Y');
@@ -62,8 +62,8 @@ case 'asignacion':
     $countResult = $stCount->fetch();
     $numeroSecuencial = str_pad($countResult['total'], 3, '0', STR_PAD_LEFT);
     
-    $folio = 'ASG-' . strtoupper($mesNombre) . '-' . $numeroSecuencial;
-    $folioPase = 'PS-' . strtoupper($mesNombre) . '-' . $numeroSecuencial;
+    $folio = 'ASG-' . strtoupper($mesNombre) . '-' . $anio . '-' . $numeroSecuencial;
+    $folioPase = 'PS-' . strtoupper($mesNombre) . '-' . $anio . '-' . $numeroSecuencial;
     $momento = $a['end_at'] ? 'retorno' : 'entrega';
 
     // Snapshots

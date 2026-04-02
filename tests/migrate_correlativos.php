@@ -73,7 +73,7 @@ try {
             
             foreach ($ids as $index => $id) {
                 $numeroSeq = str_pad($index + 1, 3, '0', STR_PAD_LEFT);
-                $correlativo = 'ASG-' . $mesNombre . '-' . $numeroSeq;
+                $correlativo = 'ASG-' . $mesNombre . '-' . $anio . '-' . $numeroSeq;
                 $updateStmt->execute([$correlativo, $id]);
                 $processed++;
             }
