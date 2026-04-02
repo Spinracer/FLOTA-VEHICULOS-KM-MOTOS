@@ -122,8 +122,8 @@ ob_start();
 
 <script>
 const pager = new Paginator('pgr', load, 25);
-const TIPO_ICON = {vencimiento:'📅',mantenimiento:'🔧',incidente:'⚠️',combustible:'⛽',recordatorio:'🔔',componente:'🧰',licencia:'🪪',contrato:'📋',seguro:'🛡️',inventario:'📦'};
-const TIPO_BADGE = {vencimiento:'badge-yellow',mantenimiento:'badge-blue',incidente:'badge-red',combustible:'badge-orange',recordatorio:'badge-cyan',componente:'badge-gray',licencia:'badge-yellow',contrato:'badge-blue',seguro:'badge-green',inventario:'badge-orange'};
+const TIPO_ICON = {vencimiento:'📅',mantenimiento:'🔧',incidente:'⚠️',combustible:'⛽',recordatorio:'🔔',componente:'🧰',licencia:'🪪',contrato:'📋',seguro:'🛡️',inventario:'📦',operador_inactivo:'👤'};
+const TIPO_BADGE = {vencimiento:'badge-yellow',mantenimiento:'badge-blue',incidente:'badge-red',combustible:'badge-orange',recordatorio:'badge-cyan',componente:'badge-gray',licencia:'badge-yellow',contrato:'badge-blue',seguro:'badge-green',inventario:'badge-orange',operador_inactivo:'badge-purple'};
 const PRI_BADGE = {Urgente:'badge-red',Alta:'badge-orange',Normal:'badge-blue',Baja:'badge-gray'};
 const EST_BADGE = {Activa:'badge-yellow',Atendida:'badge-blue',Resuelta:'badge-green',Descartada:'badge-gray'};
 let currentAlertId = 0;

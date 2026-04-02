@@ -84,9 +84,6 @@ tailwind.config = {
     <div class="text-[10px] text-muted tracking-[2px] uppercase px-3 pt-3 pb-1.5 nav-section-label">Principal</div>
     <?= $nav('/dashboard.php', 'dashboard', '📊', 'Dashboard') ?>
     <?= $nav('/vehiculos.php', 'vehiculos', '🚗', 'Vehículos') ?>
-    <?php if ($can_create): ?>
-    <?= $nav('/importacion_vehiculos.php', 'importacion_vehiculos', '📥', 'Importar Vehículos') ?>
-    <?php endif; ?>
     <?= $nav('/asignaciones.php', 'asignaciones', '📝', 'Asignaciones') ?>
     <?= $nav('/combustible.php', 'combustible', '⛽', 'Combustible') ?>
 

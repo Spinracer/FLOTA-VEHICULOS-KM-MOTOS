@@ -39,8 +39,9 @@ function bloqueo_asignacion(PDO $db, int $vehiculoId): ?array {
         return ['reason' => 'Vehículo no encontrado.', 'blocking_type' => 'vehiculo', 'blocking_id' => $vehiculoId];
     }
 
-    if (($veh['estado'] ?? 'Activo') !== 'Activo') {
-        return ['reason' => 'El vehículo no está disponible para asignación (estado no activo).', 'blocking_type' => 'estado_vehiculo', 'blocking_id' => $vehiculoId];
+    $estadoVeh = trim((string)($veh['estado'] ?? 'Activo'));
+    if (strcasecmp($estadoVeh, 'Activo') !== 0) {
+        return ['reason' => "El vehículo no está disponible para asignación (estado: {$estadoVeh}).", 'blocking_type' => 'estado_vehiculo', 'blocking_id' => $vehiculoId];
     }
 
     return null;

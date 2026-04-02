@@ -6,6 +6,7 @@ ob_start();
 <div class="toolbar">
   <div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="s" placeholder="Buscar operador..." oninput="debouncedLoad()"></div>
   <?php if(can('create')): ?><button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Operador</button>
+  <button class="btn btn-ghost" onclick="location.href='/importacion_operadores.php'" title="Importar operadores">⬇ Importar operadores</button>
   <button class="btn btn-ghost" onclick="openDeptModal()" title="Administrar departamentos">🏢 Departamentos</button><?php endif; ?>
 </div>
 <div class="table-wrap">

@@ -121,11 +121,13 @@ try {
             $off  = ($page - 1) * $per;
             $sucId = (int)($_GET['sucursal_id'] ?? 0);
             $tag  = trim($_GET['tag'] ?? '');
+            $tipo = trim($_GET['tipo'] ?? '');
 
             $where = "WHERE v.deleted_at IS NULL AND (v.placa LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR v.tipo LIKE ?)";
             $params = [$q,$q,$q,$q];
             if ($sucId) { $where .= " AND v.sucursal_id = ?"; $params[] = $sucId; }
             if ($tag !== '') { $where .= " AND v.id IN (SELECT vehiculo_id FROM vehiculo_etiquetas WHERE etiqueta = ?)"; $params[] = $tag; }
+            if ($tipo !== '') { $where .= " AND v.tipo = ?"; $params[] = $tipo; }
 
             $total = $db->prepare("SELECT COUNT(*) FROM vehiculos v LEFT JOIN operadores o ON o.id = v.operador_id $where");
             $total->execute($params);

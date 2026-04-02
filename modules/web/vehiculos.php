@@ -27,8 +27,19 @@ ob_start();
       <option value="<?=htmlspecialchars($tg['etiqueta'])?>"><?=htmlspecialchars($tg['etiqueta'])?></option>
     <?php endforeach; ?>
   </select>
+  <select id="ftipo" onchange="loadVehiculos()" style="max-width:180px">
+    <option value="">Todos los tipos</option>
+    <option>Automóvil</option>
+    <option>Camioneta</option>
+    <option>Camión</option>
+    <option>Motocicleta</option>
+    <option>Furgoneta</option>
+    <option>Maquinaria</option>
+    <option>Otro</option>
+  </select>
   <?php if(can('create')): ?>
   <button class="btn btn-primary" onclick="abrirNuevo()">+ Nuevo Vehículo</button>
+  <button class="btn btn-ghost" onclick="location.href='/importacion_vehiculos.php'" title="Importar vehículos">⬇ Importar vehículos</button>
   <?php endif; ?>
 </div>
 
@@ -162,8 +173,17 @@ async function loadVehiculos() {
   const q = document.getElementById('search-veh').value;
   const sucId = document.getElementById('fsuc').value;
   const tag = document.getElementById('ftag').value;
+  const tipo = document.getElementById('ftipo').value;
   try {
-    const data = await api(`/api/vehiculos.php?q=${encodeURIComponent(q)}&sucursal_id=${sucId}&tag=${encodeURIComponent(tag)}&page=${pager.page}&per=${pager.perPage}`);
+    const params = new URLSearchParams({
+      q: q,
+      sucursal_id: sucId,
+      tag: tag,
+      tipo: tipo,
+      page: pager.page,
+      per: pager.perPage,
+    });
+    const data = await api(`/api/vehiculos.php?${params.toString()}`);
     pager.setTotal(data.total);
     const tbody = document.getElementById('tbody-veh');
     if (!data.rows.length) {

@@ -43,7 +43,22 @@ try {
             }
         }
 
-        // 2. Seguros de vehículos por vencer (30 días)
+        // 2. Vehículos asignados a operadores inactivos o suspendidos
+        $stmt = $db->query("SELECT a.id, a.vehiculo_id, a.operador_id, v.placa, o.nombre, o.estado
+            FROM asignaciones a
+            JOIN vehiculos v ON v.id = a.vehiculo_id
+            JOIN operadores o ON o.id = a.operador_id
+            WHERE a.estado = 'Activa' AND o.estado IN ('Inactivo','Suspendido')");
+        foreach ($stmt->fetchAll() as $a) {
+            if (!alertExistsBatch($existingKeys, 'operador_inactivo', 'asignaciones', $a['id'])) {
+                createAlert($db, 'operador_inactivo', 'Alta',
+                    "Operador {$a['nombre']} ({$a['estado']}) asignado en vehículo {$a['placa']}",
+                    "Asignación activa con operador {$a['estado']}", 'asignaciones', $a['id'], $a['vehiculo_id'], null);
+                $created++;
+            }
+        }
+
+        // 3. Seguros de vehículos por vencer (30 días)
         $stmt = $db->query("SELECT id, placa, marca, venc_seguro, DATEDIFF(venc_seguro, CURDATE()) AS dias
             FROM vehiculos WHERE venc_seguro IS NOT NULL AND DATEDIFF(venc_seguro, CURDATE()) <= 30 AND estado='Activo'");
         foreach ($stmt->fetchAll() as $v) {

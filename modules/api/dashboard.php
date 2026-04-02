@@ -10,6 +10,31 @@ require_once __DIR__ . '/../../includes/cache.php';
 require_login();
 header('Content-Type: application/json; charset=utf-8');
 
+function dashboard_scan_inactive_operator_assignments(PDO $db): void {
+    try {
+        $existing = $db->query("SELECT CONCAT(tipo,':',entidad,':',entidad_id) AS k FROM alertas WHERE estado IN ('Activa','Atendida')")->fetchAll(PDO::FETCH_COLUMN);
+        $keys = array_flip($existing ?: []);
+        $stmt = $db->query("SELECT a.id, v.id AS vehiculo_id, v.placa, o.nombre, o.estado
+            FROM asignaciones a
+            JOIN vehiculos v ON v.id = a.vehiculo_id
+            JOIN operadores o ON o.id = a.operador_id
+            WHERE a.estado = 'Activa' AND o.estado IN ('Inactivo','Suspendido')");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $key = "operador_inactivo:asignaciones:{$row['id']}";
+            if (isset($keys[$key])) continue;
+            $db->prepare("INSERT INTO alertas (tipo,prioridad,titulo,mensaje,estado,entidad,entidad_id,vehiculo_id,fecha_referencia) VALUES (?,?,?,?,?,?,?,?,?)")
+               ->execute([
+                   'operador_inactivo', 'Alta',
+                   "Operador {$row['nombre']} ({$row['estado']}) asignado en vehículo {$row['placa']}",
+                   "Asignación activa con operador {$row['estado']}",
+                   'Activa', 'asignaciones', $row['id'], $row['vehiculo_id'], null
+               ]);
+        }
+    } catch (Throwable $e) {
+        // no-op
+    }
+}
+
 try {
 
 $db = getDB();
@@ -96,9 +121,12 @@ $kmSql .= " GROUP BY v.id HAVING km_diff > 0 AND km_diff < 999999999) sub";
 $km_recorridos = $db->prepare($kmSql); $km_recorridos->execute($kmP);
 $km_recorridos = $km_recorridos->fetchColumn();
 
-// Alertas activas
+// Alertas activas y verificación de operadores asignados inactivos
 $alertas_activas = 0;
-try { $alertas_activas = $db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa'")->fetchColumn(); } catch(Throwable $e) {}
+try {
+    dashboard_scan_inactive_operator_assignments($db);
+    $alertas_activas = $db->query("SELECT COUNT(*) FROM alertas WHERE estado='Activa'")->fetchColumn();
+} catch(Throwable $e) {}
 
 // OTs pendientes
 $otSql = "SELECT COUNT(*) FROM mantenimientos m JOIN vehiculos v ON v.id = m.vehiculo_id

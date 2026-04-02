@@ -1,0 +1,4 @@
+nombre,dni,departamento_id,licencia,categoria_lic,venc_licencia,telefono,email,estado,notas
+Juan Pérez,0801199012345,1,L12345678,A,2026-12-31,+50499990000,juan.perez@empresa.com,Activo,Conductor asignado a ruta urbana
+María López,0801198954321,2,L87654321,B,2025-08-15,+50499991111,maria.lopez@empresa.com,Inactivo,Licencia en proceso de renovación
+Carlos Rivera,0801199211223,1,L23456789,C,2027-04-20,+50499992222,carlos.rivera@empresa.com,Suspendido,Supervisor requiere seguimiento
